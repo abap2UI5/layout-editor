@@ -98,7 +98,9 @@ button.cmd { display: flex; gap: 10px; align-items: center; min-width: 210px; ju
 .menu button:hover { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* ---------------------------------------------------------- workspace */
-.workspace { flex: 1; display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; min-height: 0; }
+.workspace { --drawer-w: 280px; --inspector-w: 320px; flex: 1; display: grid; grid-template-columns: var(--drawer-w) 6px minmax(0, 1fr) 6px var(--inspector-w); min-height: 0; }
+.resizer { cursor: col-resize; background: var(--line); touch-action: none; }
+.resizer:hover, .resizer:active { background: var(--accent); }
 /* the left pane's tabs, after the Fiori icon tab bar (text only) */
 .rail { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .rail-btn { position: relative; border: none; border-radius: 0; background: none; padding: 11px 8px 9px; color: var(--text); border-bottom: 3px solid transparent; font-size: 13px; }
@@ -134,6 +136,7 @@ button.cmd { display: flex; gap: 10px; align-items: center; min-width: 210px; ju
   display: flex; align-items: center; gap: 4px; padding: 3px 8px; cursor: pointer; white-space: nowrap; user-select: none; position: relative; border-radius: 6px; margin: 0 6px;
 }
 .lrow:hover { background: var(--accent-soft); }
+.lrow:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .lrow.sel { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); color: var(--text); }
 .lrow.sel .ltype { font-weight: 700; }
 .lrow .caret { width: 14px; text-align: center; color: var(--muted); font-size: 10px; flex: none; border: none; background: none; padding: 0; }
@@ -272,12 +275,13 @@ table.rows td input[type=checkbox] { width: auto; }
 .toast.show { opacity: 1; transform: translateX(-50%); }
 
 @media (max-width: 1280px) {
-  .workspace { grid-template-columns: 250px minmax(0, 1fr) 290px; }
+  .workspace { --drawer-w: 250px; --inspector-w: 290px; }
   .stage-body.view-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr); }
   .stage-body.view-split .code-pane { border-left: none; border-top: 1px solid var(--line); }
 }
 @media (max-width: 900px) {
   .workspace { grid-template-columns: 1fr; grid-auto-rows: minmax(300px, auto); }
+  .resizer { display: none; }
   body { height: auto; }
   .stage { min-height: 640px; }
   button.cmd span { display: none; }

@@ -179,20 +179,36 @@ sap.ui.define([
     mark('dsg-hover', domOf(nodeIdOf(e.target)));
   }, true);
 
+  // where on the control the pointer is: the upper quarter means before
+  // it, the lower quarter after it, the middle into it (the designer
+  // decides whether it takes children - else "into" lands next to it)
+  function dropZone(e, el) {
+    if (!el) return 'inside';
+    var r = el.getBoundingClientRect();
+    var y = r.height ? (e.clientY - r.top) / r.height : 0.5;
+    return y < 0.25 ? 'before' : y > 0.75 ? 'after' : 'inside';
+  }
+  var DROP_CLASSES = ['dsg-drop', 'dsg-drop-before', 'dsg-drop-after'];
+  function markDrop(el, zone) {
+    DROP_CLASSES.forEach(function (c) { mark(c, null); });
+    if (el) el.classList.add(zone === 'before' ? 'dsg-drop-before' : zone === 'after' ? 'dsg-drop-after' : 'dsg-drop');
+  }
   document.addEventListener('dragover', function (e) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-    mark('dsg-drop', domOf(nodeIdOf(e.target)) || document.getElementById('content'));
+    var el = domOf(nodeIdOf(e.target));
+    markDrop(el || document.getElementById('content'), dropZone(e, el));
   }, true);
   document.addEventListener('dragleave', function (e) {
-    if (!e.relatedTarget) mark('dsg-drop', null);
+    if (!e.relatedTarget) markDrop(null);
   }, true);
   document.addEventListener('drop', function (e) {
     e.preventDefault();
     e.stopPropagation();
-    mark('dsg-drop', null);
+    markDrop(null);
     var data = e.dataTransfer && e.dataTransfer.getData('text/plain');
-    if (data && data.indexOf('dsg:') === 0) post({ type: 'drop', data: data, onId: nodeIdOf(e.target) || 'root' });
+    var id = nodeIdOf(e.target);
+    if (data && data.indexOf('dsg:') === 0) post({ type: 'drop', data: data, onId: id || 'root', zone: dropZone(e, domOf(id)) });
   }, true);
 
   document.addEventListener('keydown', function (e) {

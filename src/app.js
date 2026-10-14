@@ -10,7 +10,7 @@
 
 import { CONTROLS, CATEGORIES, DESCRIPTIONS, getControl, splitType, NAMESPACES } from './catalog.js';
 import {
-  createNode, clone, walk, findNode, aggNames, aggAccepts, canHaveChildren, insertNode, dropTarget, removeNode,
+  createNode, clone, walk, findNode, newId, aggNames, aggAccepts, canHaveChildren, insertNode, dropTarget, removeNode,
   moveNode, shiftNode, duplicateNode, rowContext, bindableAggs, bindListToTable, hasOwnTemplate, unbindList, attributeUsage, renameAttribute,
   validate, previewModel, attributeFits, normalizeDesign, checkAttributeName, checkFieldName, checkEventName, checkClassName, SCALAR_TYPES, ATTRIBUTE_TYPES,
 } from './model.js';
@@ -235,7 +235,13 @@ function apiLink(type) {
 
 function showPanel(panel) {
   state.panel = panel;
-  for (const b of document.querySelectorAll('.rail-btn')) b.classList.toggle('active', b.dataset.panel === panel);
+  for (const b of document.querySelectorAll('.rail-btn')) {
+    const on = b.dataset.panel === panel;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
+    b.setAttribute('aria-controls', `panel-${b.dataset.panel}`);
+    b.tabIndex = on ? 0 : -1;
+  }
   for (const p of ['insert', 'layers', 'data', 'issues']) $(`#panel-${p}`).classList.toggle('hidden', p !== panel);
 }
 
@@ -324,12 +330,23 @@ function insertPattern(id, onId, place) {
   });
 }
 
-// a drop: "dsg:new:<type>", "dsg:pattern:<id>" or "dsg:move:<id>" onto a
-// node, or into an aggregation / at a position (`place`)
-function handleDrop(data, onId, place) {
-  const m = /^dsg:(new|move|pattern):(.+)$/.exec(data || '');
+// the place next to a node: before it or after it in its parent's list
+function placeBeside(onId, zone) {
+  const hit = findNode(state.design.root, onId);
+  if (!hit || !hit.parent || (zone !== 'before' && zone !== 'after')) return null;
+  return { parentId: hit.parent.id, agg: hit.agg, index: hit.index + (zone === 'after' ? 1 : 0) };
+}
+
+// a drop: "dsg:new:<type>", "dsg:pattern:<id>", "dsg:move:<id>" or
+// "dsg:paste" onto a node, or into an aggregation / at a position (`place`);
+// `zone` is where on the node the canvas saw the pointer (before / inside /
+// after)
+function handleDrop(data, onId, place, zone) {
+  const m = /^dsg:(new|move|pattern|paste):(.*)$/.exec(data || '');
   if (!m) return;
   const [, kind, what] = m;
+  place = place || placeBeside(onId, zone);
+  if (kind === 'paste') { pasteNodes(onId, place); return; }
   if (kind === 'pattern') {
     insertPattern(what, onId, place);
   } else if (kind === 'new') {
@@ -355,6 +372,50 @@ function handleDrop(data, onId, place) {
   }
 }
 
+// ------------------------------------------------------------- clipboard
+
+// the selection as text: a design node in JSON, with a marker so a paste
+// knows it - the system clipboard carries it between designs and tabs, the
+// editor's own copy covers a browser that refuses to read the clipboard
+const CLIP_MARK = 'abap2ui5-designer:node';
+function copySelection(cut) {
+  const hit = findNode(state.design.root, state.selected);
+  if (!hit || !hit.parent) return;
+  const text = JSON.stringify({ [CLIP_MARK]: 1, node: hit.node });
+  state.clipboard = text;
+  try { navigator.clipboard.writeText(text).catch(() => {}); } catch { /* no clipboard */ }
+  if (cut) commit((d) => removeNode(d, hit.node.id));
+  toast(`${displayType(hit.node.type)} ${cut ? 'cut' : 'copied'}`);
+}
+
+async function pasteSelection() {
+  let text = state.clipboard;
+  try {
+    const sys = await navigator.clipboard.readText();
+    if (sys && sys.includes(CLIP_MARK)) text = sys;
+  } catch { /* permission or no clipboard - the editor's own copy */ }
+  if (!text) { toast('Nothing to paste'); return; }
+  pasteNodes(state.selected, null, text);
+}
+
+function pasteNodes(onId, place, text = state.clipboard) {
+  let node;
+  try {
+    const parsed = JSON.parse(text);
+    node = parsed && parsed[CLIP_MARK] ? parsed.node : null;
+  } catch { node = null; }
+  if (!node) { toast('Nothing to paste'); return; }
+  const fresh = clone(node);
+  walk(fresh, (n) => { n.id = newId(); return true; });
+  commit((d) => {
+    const t = place || dropTarget(d, onId || 'root', fresh.type);
+    if (!t) { toast(`${displayType(fresh.type)} does not fit here`); return undefined; }
+    const p = findNode(d.root, t.parentId);
+    if (!p || !aggAccepts(p.node, t.agg, fresh.type)) { toast(`${displayType(fresh.type)} does not fit here`); return undefined; }
+    return insertNode(d, fresh, t.parentId, t.agg, t.index);
+  });
+}
+
 // ------------------------------------------------------------- layers
 
 function renderLayers() {
@@ -371,8 +432,10 @@ function renderLayers() {
     const el = h('div', {
       class: `lrow${state.selected === node.id ? ' sel' : ''}`,
       role: 'treeitem',
+      tabindex: state.selected === node.id ? '0' : '-1',
       'aria-selected': state.selected === node.id ? 'true' : 'false',
       'aria-expanded': kids ? String(!collapsed) : null,
+      'aria-level': String(depth + 1),
       style: `padding-left:${4 + depth * 14}px`,
       draggable: isRoot ? null : 'true',
       'data-id': node.id,
@@ -425,6 +488,36 @@ function renderLayers() {
   box.scrollTop = scrollTop;
   const sel = box.querySelector('.lrow.sel');
   if (sel && !state.layersNoScroll) sel.scrollIntoView({ block: 'nearest' });
+  if (state.focusLayers) { state.focusLayers = false; if (sel) sel.focus(); }
+}
+
+// the keys of the outline: up and down walk the visible rows, left
+// collapses or goes to the parent, right expands or goes to the first
+// child, Enter opens the properties
+function onLayersKey(e) {
+  const rows = [...$('#layers').querySelectorAll('.lrow[data-id]')];
+  const i = rows.findIndex((r) => r.dataset.id === state.selected);
+  if (i < 0) return;
+  const go = (j) => { if (rows[j]) { state.focusLayers = true; select(rows[j].dataset.id); } };
+  const node = findNode(state.design.root, state.selected);
+  const open = node && rows[i].getAttribute('aria-expanded') === 'true';
+  if (e.key === 'ArrowDown') { e.preventDefault(); go(i + 1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); go(i - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End') { e.preventDefault(); go(rows.length - 1); }
+  else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (open) { state.collapsed.add(state.selected); state.focusLayers = true; renderLayers(); }
+    else if (node && node.parent) go(rows.findIndex((r) => r.dataset.id === node.parent.id));
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    if (rows[i].getAttribute('aria-expanded') === 'false') { state.collapsed.delete(state.selected); state.focusLayers = true; renderLayers(); }
+    else if (open) go(i + 1);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const first = $('#inspector').querySelector('input, select');
+    if (first) first.focus();
+  }
 }
 
 function clearDropMarks() {
@@ -1042,7 +1135,7 @@ window.addEventListener('message', (e) => {
   } else if (msg.type === 'action') {
     onToolbarAction(msg.action, msg.id);
   } else if (msg.type === 'drop') {
-    handleDrop(msg.data, msg.onId);
+    handleDrop(msg.data, msg.onId, null, msg.zone);
   } else if (msg.type === 'key') {
     onKey({ key: msg.key, ctrlKey: msg.ctrl, metaKey: false, shiftKey: msg.shift, altKey: msg.alt, preventDefault() {}, target: document.body });
   } else if (msg.type === 'error') {
@@ -1075,11 +1168,14 @@ function commands() {
   action('Open design', () => openFile('.json,.xml'));
   action('Show layout only', () => setView('canvas'));
   action('Show code only', () => setView('code'));
+  action('Paste', pasteSelection, 'Ctrl+V');
   action('Undo', undo, 'Ctrl+Z');
   action('Redo', redo, 'Ctrl+Shift+Z');
   if (sel && sel.parent) {
     action('Delete selection', () => commit((d) => removeNode(d, state.selected)), 'Del');
     action('Duplicate selection', () => commit((d) => duplicateNode(d, state.selected)), 'Ctrl+D');
+    action('Copy selection', () => copySelection(false), 'Ctrl+C');
+    action('Cut selection', () => copySelection(true), 'Ctrl+X');
     action('Select parent', () => select(sel.parent.id), 'Alt+↑');
   }
   return list;
@@ -1264,6 +1360,35 @@ function wireMenu(button, menu) {
   document.addEventListener('click', (e) => { if (!menu.contains(e.target)) close(); });
 }
 
+// ------------------------------------------------------------- panes
+
+function applyWidths() {
+  const ws = $('.workspace');
+  for (const [key, prop] of [['drawerW', '--drawer-w'], ['inspectorW', '--inspector-w']]) {
+    if (state.prefs[key]) ws.style.setProperty(prop, `${state.prefs[key]}px`); else ws.style.removeProperty(prop);
+  }
+}
+
+function wireResizer(handle, pane, min, max) {
+  if (!handle) return;
+  const key = `${pane}W`;
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    const start = e.clientX;
+    const from = state.prefs[key] || (pane === 'drawer' ? 280 : 320);
+    const move = (ev) => {
+      const delta = pane === 'drawer' ? ev.clientX - start : start - ev.clientX;
+      state.prefs[key] = Math.round(Math.max(min, Math.min(max, from + delta)));
+      applyWidths();
+    };
+    const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); savePrefs(); };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+  });
+  handle.addEventListener('dblclick', () => { delete state.prefs[key]; applyWidths(); savePrefs(); });
+}
+
 // ------------------------------------------------------------- keyboard
 
 function onKey(e) {
@@ -1277,8 +1402,11 @@ function onKey(e) {
   if (ctrl && !typing && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
   if (typing) return;
   const sel = state.selected;
+  if (ctrl && !e.shiftKey && (e.key === 'c' || e.key === 'C') && sel !== 'root' && !getSelection().toString()) { e.preventDefault(); copySelection(false); return; }
+  if (ctrl && (e.key === 'x' || e.key === 'X') && sel !== 'root') { e.preventDefault(); copySelection(true); return; }
+  if (ctrl && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); pasteSelection(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel !== 'root') { e.preventDefault(); commit((d) => removeNode(d, sel)); }
-  if (ctrl && (e.key === 'd' || e.key === 'D') && sel !== 'root') { e.preventDefault(); commit((d) => duplicateNode(d, sel)); }
+  if (ctrl && (e.key === 'd' || e.key === 'D') && sel !== 'root') { e.preventDefault(); commit((d) => duplicateNode(d, sel) || toast('It cannot be duplicated: its slot takes one control')); }
   if (e.altKey && e.key === 'ArrowUp') { const hit = findNode(state.design.root, sel); if (hit && hit.parent) select(hit.parent.id); }
   if (e.key === 'Escape') select('root');
 }
@@ -1366,10 +1494,16 @@ function wire() {
   };
   document.addEventListener('keydown', onKey);
 
+  // the drawer and the properties can be dragged wider or narrower
+  wireResizer($('#resizeDrawer'), 'drawer', 200, 480);
+  wireResizer($('#resizeInspector'), 'inspector', 240, 560);
+  applyWidths();
+
   // the canvas around the frame takes drops too
   const pane = $('#canvasPane');
   pane.addEventListener('dragover', (e) => e.preventDefault());
   pane.addEventListener('drop', (e) => { e.preventDefault(); handleDrop(e.dataTransfer.getData('text/plain'), 'root'); });
+  $('#layers').addEventListener('keydown', onLayersKey);
   $('#layers').addEventListener('dragover', (e) => e.preventDefault());
   $('#layers').addEventListener('drop', (e) => { e.preventDefault(); clearDropMarks(); handleDrop(e.dataTransfer.getData('text/plain'), 'root'); });
 }
@@ -1386,4 +1520,4 @@ renderAll();
 loadPreview();
 
 // for the browser tests and the curious: the state and the generators
-window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop, openPalette };
+window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection };

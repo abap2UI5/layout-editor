@@ -189,3 +189,34 @@ test('a new design from a template', async ({ designer: page }) => {
   await expect(preview(page).getByText('Notebook')).toBeVisible();
   expect(await abapOf(page)).toContain('CLASS zcl_my_table DEFINITION PUBLIC.');
 });
+
+test('a drop on the canvas lands before, into or after the control under the pointer', async ({ designer: page }) => {
+  const formId = (await nodeIds(page, 'form:SimpleForm'))[0];
+  const order = () => page.evaluate(() => window.designer.state.design.root.aggs.content[0].aggs.content.map((n) => n.type));
+  await page.evaluate((id) => window.designer.handleDrop('dsg:new:Button', id, null, 'before'), formId);
+  expect(await order()).toEqual(['Button', 'form:SimpleForm']);
+  await page.evaluate((id) => window.designer.handleDrop('dsg:new:Title', id, null, 'after'), formId);
+  expect(await order()).toEqual(['Button', 'form:SimpleForm', 'Title']);
+  await page.evaluate((id) => window.designer.handleDrop('dsg:new:Text', id, null, 'inside'), formId);
+  expect(await order()).toEqual(['Button', 'form:SimpleForm', 'Title']);
+  const inForm = await page.evaluate((id) => { let hit; const walk = (n) => { if (n.id === id) hit = n; Object.values(n.aggs).flat().forEach(walk); }; walk(window.designer.state.design.root); return hit.aggs.content.at(-1).type; }, formId);
+  expect(inForm).toBe('Text');
+});
+
+test('copy and paste, by key and across the outline', async ({ designer: page }) => {
+  const before = (await nodeIds(page, 'Switch')).length;
+  await preview(page).locator('[id*="--n"][role="switch"]').first().click();
+  await expect(selectedType(page)).toHaveText('Switch');
+  await page.keyboard.press('Control+C');
+  await page.keyboard.press('Control+V');
+  await expect.poll(async () => (await nodeIds(page, 'Switch')).length).toBe(before + 1);
+  await page.keyboard.press('Control+X');
+  await expect.poll(async () => (await nodeIds(page, 'Switch')).length).toBe(before);
+  await page.getByRole('tab', { name: 'Outline' }).click();
+  await page.locator('#layers .lrow.sel').focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(selectedType(page)).not.toHaveText('Switch');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Control+V');
+  await expect.poll(async () => (await nodeIds(page, 'Switch')).length).toBe(before + 1);
+});

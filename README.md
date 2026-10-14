@@ -82,8 +82,13 @@ Also in the editor:
 - **Save / Open** stores the design as JSON so you can continue later. The
   design is also kept in the browser between visits.
 - **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z, **Delete** or **Backspace**
-  removes the selection, **Ctrl+D** duplicates it, **Alt+↑** selects the
-  parent, **Escape** the view.
+  removes the selection, **Ctrl+D** duplicates it, **Ctrl+C / Ctrl+X /
+  Ctrl+V** copy, cut and paste it (also into another design or tab),
+  **Alt+↑** selects the parent, **Escape** the view. In the outline the
+  arrow keys walk the tree.
+- A drop on the canvas lands before, into or after the control under the
+  pointer: the upper quarter is before, the lower after. The panels on the
+  left and right can be dragged wider.
 - **Checks** lists what would break the class or the view, and inputs
   whose entry goes nowhere.
 - The canvas can show a phone or tablet width, the Horizon, Quartz or

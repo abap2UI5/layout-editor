@@ -53,23 +53,24 @@
         <button class="rail-btn" data-panel="data" role="tab" title="Attributes and tables of the class">Data</button>
         <button class="rail-btn" data-panel="issues" role="tab" title="What would break the class or the view">Checks <span id="issueCount" class="dot hidden"></span></button>
       </nav>
-      <section class="panel" id="panel-insert">
+      <section class="panel" id="panel-insert" role="tabpanel">
         <div class="panel-head">
           <input id="insertSearch" type="search" placeholder="Search controls" aria-label="Search controls">
         </div>
         <div class="insert-target" id="insertTarget"></div>
         <div id="insertList" class="scroll"></div>
       </section>
-      <section class="panel hidden" id="panel-layers">
+      <section class="panel hidden" id="panel-layers" role="tabpanel">
         <div id="layers" class="scroll tree" role="tree" aria-label="Outline"></div>
       </section>
-      <section class="panel hidden" id="panel-data">
+      <section class="panel hidden" id="panel-data" role="tabpanel">
         <div id="dataPanel" class="scroll pad"></div>
       </section>
-      <section class="panel hidden" id="panel-issues">
+      <section class="panel hidden" id="panel-issues" role="tabpanel">
         <div id="issuesPanel" class="scroll pad"></div>
       </section>
     </aside>
+    <div class="resizer" id="resizeDrawer" title="Drag to resize, double-click to reset" aria-hidden="true"></div>
 
     <section class="stage">
       <div class="stage-bar">
@@ -116,6 +117,7 @@
       <nav class="crumbs" id="crumbs" aria-label="Selection path"></nav>
     </section>
 
+    <div class="resizer" id="resizeInspector" title="Drag to resize, double-click to reset" aria-hidden="true"></div>
     <aside class="inspector" id="inspector" aria-label="Properties"></aside>
   </main>
 
