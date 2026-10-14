@@ -20,6 +20,8 @@ function sample(def) {
 const HOME = {
   IconTabFilter: 'IconTabBar', IconTabSeparator: 'IconTabBar', 'core:Item': 'Select', RadioButton: 'RadioButtonGroup',
   SegmentedButtonItem: 'SegmentedButton', StandardListItem: 'List', CustomListItem: 'List', Column: 'Table', ColumnListItem: 'Table',
+  ObjectListItem: 'List', DisplayListItem: 'List', InputListItem: 'List', ObjectAttribute: 'ObjectHeader', Token: 'MultiInput',
+  TileContent: 'GenericTile', NumericContent: 'TileContent',
 };
 
 export function kitchenSink() {
@@ -57,8 +59,14 @@ export function kitchenSink() {
     for (const e of c.events || []) node.events[e] = `EV_${++ev}`;
     const home = HOME[type];
     if (home) {
-      parents[home] = parents[home] || (() => { const p = createNode(home); insertNode(d, p, box.id); return p; })();
-      insertNode(d, node, parents[home].id);
+      const place = (t) => {
+        if (parents[t]) return parents[t];
+        const p = createNode(t);
+        insertNode(d, p, HOME[t] ? place(HOME[t]).id : box.id);
+        parents[t] = p;
+        return p;
+      };
+      insertNode(d, node, place(home).id);
     } else {
       insertNode(d, node, box.id);
     }

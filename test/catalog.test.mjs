@@ -25,6 +25,7 @@ for (const [key, c] of Object.entries(CONTROLS)) {
       const real = md.props[p];
       assert.ok(real, `${key}.${p} is not a property in ${ui5.version}`);
       if (def.type === 'enum' && def.loose && real.type === 'string') continue; // typed as string, the values are UI5's
+      if (def.loose) continue; // a UI5 type of its own, written as text
       if (def.type === 'enum') {
         assert.ok(real.values, `${key}.${p} is ${real.type}, not an enum`);
         for (const v of def.values) assert.ok(real.values.includes(v), `${key}.${p}: ${v} is not a value of ${real.type} in ${ui5.version}`);
