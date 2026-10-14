@@ -1,24 +1,30 @@
-// The designer UI: palette, outline, preview, property and data panels,
-// code views and export. All state is the design document (model.js); every
-// edit goes through commit( ), which records undo, saves to localStorage and
-// re-renders.
+// The layout editor UI, after the pattern of the SAP Web IDE layout editor
+// and styled after SAP Fiori Horizon. One idea of its own shapes it: the class is the product, so the
+// code is never hidden - canvas and class sit side by side, a control and
+// its lines in the chain are selected together.
+//
+// Left: controls, outline, data and checks as tabs. Middle: the canvas (real
+// UI5 in a frame) and the class. Right: the properties. All state is the
+// design document (model.js); every edit goes through commit( ), which
+// records undo, saves to localStorage and re-renders.
 
-import { CONTROLS, CATEGORIES, getControl, splitType, NAMESPACES } from './catalog.js';
+import { CONTROLS, CATEGORIES, DESCRIPTIONS, getControl, splitType, NAMESPACES } from './catalog.js';
 import {
-  createDesign, createNode, clone, walk, findNode, aggNames, aggAccepts, canHaveChildren, insertNode, dropTarget, removeNode,
+  createNode, clone, walk, findNode, aggNames, aggAccepts, canHaveChildren, insertNode, dropTarget, removeNode,
   moveNode, shiftNode, duplicateNode, rowContext, bindableAggs, bindListToTable, unbindList, attributeUsage, renameAttribute,
   validate, previewModel, checkAttributeName, checkFieldName, checkEventName, checkClassName, SCALAR_TYPES, ATTRIBUTE_TYPES, DESIGN_VERSION,
 } from './model.js';
 import { toXml, fromXml } from './xml.js';
-import { generateClass, abapGitFiles, fileName } from './abap.js';
+import { generateClass, generateClassMap, abapGitFiles, fileName } from './abap.js';
 import { zip } from './zip.js';
 import { STARTERS } from './starters.js';
+import { PATTERNS } from './patterns.js';
 
 const STORE_KEY = 'abap2ui5-designer:design';
 const PREFS_KEY = 'abap2ui5-designer:prefs';
-const GLYPHS = {
-  Layout: '▤', Display: '¶', Input: '⌨', Lists: '☰', Parts: '◦',
-};
+const GLYPHS = { Layout: '▦', Display: 'T', Input: '⌨', Lists: '☰', Parts: '◦' };
+const KINDS = { s: 'Aa', b: '@', f: '#', x: 'ƒx' };
+const KIND_TITLE = 'Aa a value · @ bound to an attribute · # a field of the row · ƒx a UI5 expression';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -29,11 +35,14 @@ const state = {
   selected: 'root',
   undo: [],
   redo: [],
-  tab: 'preview',
-  rtab: 'props',
+  panel: 'insert',
+  view: 'split',
+  code: 'abap',
   mode: 'design',
+  collapsed: new Set(),
+  inspector: { filter: '', onlySet: false },
   previewReady: false,
-  prefs: { device: '100%', theme: 'sap_horizon', ui5: '' },
+  prefs: { device: '100%', theme: 'sap_horizon', ui5: '', view: 'split' },
 };
 
 function loadPrefs() {
@@ -41,6 +50,7 @@ function loadPrefs() {
   // ?ui5=<version|local> overrides the stored version, for links and tests
   const q = new URLSearchParams(location.search).get('ui5');
   if (q !== null) state.prefs.ui5 = q;
+  state.view = state.prefs.view || 'split';
 }
 function savePrefs() {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs)); } catch { /* private mode */ }
@@ -62,7 +72,8 @@ function persist() {
 }
 
 // Every change: snapshot for undo, apply, then re-render. `fn` may return
-// the id to select next.
+// the id to select next. Typing into one field merges into one undo step
+// (`mergeKey`) and keeps the focus where it is (`keepFocus`).
 function commit(fn, opts = {}) {
   const before = JSON.stringify(state.design);
   const next = fn(state.design);
@@ -82,23 +93,22 @@ function commit(fn, opts = {}) {
   renderAll(opts);
 }
 
-function undo() {
-  if (!state.undo.length) return;
-  state.redo.push(JSON.stringify(state.design));
-  state.design = JSON.parse(state.undo.pop());
+function restore(json) {
+  state.design = JSON.parse(json);
   state.lastMergeKey = null;
   if (!findNode(state.design.root, state.selected)) state.selected = 'root';
   persist();
   renderAll();
 }
+function undo() {
+  if (!state.undo.length) return;
+  state.redo.push(JSON.stringify(state.design));
+  restore(state.undo.pop());
+}
 function redo() {
   if (!state.redo.length) return;
   state.undo.push(JSON.stringify(state.design));
-  state.design = JSON.parse(state.redo.pop());
-  state.lastMergeKey = null;
-  if (!findNode(state.design.root, state.selected)) state.selected = 'root';
-  persist();
-  renderAll();
+  restore(state.redo.pop());
 }
 
 function replaceDesign(d) {
@@ -106,16 +116,32 @@ function replaceDesign(d) {
   state.redo = [];
   state.design = d;
   state.selected = d.root.aggs.content && d.root.aggs.content[0] ? d.root.aggs.content[0].id : 'root';
+  state.collapsed.clear();
   persist();
   renderAll();
 }
 
-function select(id) {
+function select(id, opts = {}) {
   if (!findNode(state.design.root, id)) id = 'root';
   state.selected = id;
-  renderOutline();
-  renderProps();
-  postPreview({ type: 'select', selected: id });
+  // a selected node is never hidden in a collapsed branch
+  for (const a of ancestors(id)) state.collapsed.delete(a.id);
+  renderLayers();
+  renderInspector();
+  renderCrumbs();
+  renderInsertTarget();
+  highlightCode(!opts.fromCode);
+  postPreview({ type: 'select', selected: id, label: labelOfSelection() });
+}
+
+function ancestors(id) {
+  const out = [];
+  let hit = findNode(state.design.root, id);
+  while (hit && hit.parent) {
+    out.unshift(hit.parent);
+    hit = findNode(state.design.root, hit.parent.id);
+  }
+  return out;
 }
 
 // ------------------------------------------------------------- dom helpers
@@ -166,12 +192,12 @@ async function copyText(text, what) {
     await navigator.clipboard.writeText(text);
     toast(`${what} copied`);
   } catch {
-    // clipboard refused (no permission, not a secure context): select it
-    // in the code view instead, so Ctrl+C works
-    showTab(what === 'XML' ? 'xml' : 'abap');
-    const pre = what === 'XML' ? $('#xmlCode') : $('#abapCode');
+    // clipboard refused (no permission, not a secure context): show the
+    // code and select it, so Ctrl+C works
+    setCode(what === 'XML' ? 'xml' : 'abap');
+    if (state.view === 'canvas') setView('split');
     const range = document.createRange();
-    range.selectNodeContents(pre);
+    range.selectNodeContents($('#code'));
     const sel = getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
@@ -179,52 +205,82 @@ async function copyText(text, what) {
   }
 }
 
-function label(node) {
+function displayType(type) {
+  return splitType(type).name;
+}
+
+function nodeLabel(node) {
   const p = node.props || {};
-  const show = p.text || p.title || p.headerText || p.label || p.placeholder || p.value || p.key;
-  if (!show) return '';
+  const show = p.text || p.title || p.headerText || p.placeholder || p.value || p.key;
+  if (!show || show.v === undefined || show.v === '') return '';
   if (show.m === 's') return show.v;
-  if (show.m === 'b') return `→ ${show.v}`;
-  if (show.m === 'f') return `{${show.v}}`;
+  if (show.m === 'b') return `@${show.v}`;
+  if (show.m === 'f') return `#${show.v}`;
   return show.v;
 }
 
-function displayType(type) {
-  const { ns, name } = splitType(type);
-  return ns && ns !== 'mvc' ? `${name}` : name;
+function labelOfSelection() {
+  const hit = findNode(state.design.root, state.selected);
+  return hit && hit.node.id !== 'root' ? displayType(hit.node.type) : '';
 }
 
 function apiLink(type) {
-  if (type === 'mvc:View') return 'https://sdk.openui5.org/api/sap.ui.core.mvc.XMLView';
   const { ns, name } = splitType(type);
   const lib = NAMESPACES[ns] || (state.design.namespaces || {})[ns];
   return lib ? `https://sdk.openui5.org/api/${lib}.${name}` : null;
 }
 
-// ------------------------------------------------------------- palette
+// ------------------------------------------------------------- panels
 
-function renderPalette() {
-  const q = $('#paletteSearch').value.trim().toLowerCase();
-  const box = $('#palette');
+function showPanel(panel) {
+  state.panel = panel;
+  for (const b of document.querySelectorAll('.rail-btn')) b.classList.toggle('active', b.dataset.panel === panel);
+  for (const p of ['insert', 'layers', 'data', 'issues']) $(`#panel-${p}`).classList.toggle('hidden', p !== panel);
+}
+
+// ------------------------------------------------------------- insert
+
+function renderInsert() {
+  const q = $('#insertSearch').value.trim().toLowerCase();
+  const box = $('#insertList');
   box.replaceChildren();
-  for (const cat of CATEGORIES) {
-    const items = Object.entries(CONTROLS).filter(([k, c]) => c.category === cat && (!q || k.toLowerCase().includes(q)));
-    if (!items.length) continue;
-    box.append(h('div', { class: 'pal-cat' },
-      h('h3', { text: cat === 'Parts' ? 'Parts (go inside a parent)' : cat }),
-      h('div', { class: 'pal-items' }, items.map(([type]) => h('div', {
-        class: 'pal-item',
+  const match = (...texts) => !q || texts.some((t) => t && t.toLowerCase().includes(q));
+
+  const pats = PATTERNS.filter((p) => match(p.title, p.text));
+  if (pats.length) {
+    box.append(h('div', { class: 'ins-group' }, h('h3', { text: 'Building blocks' }),
+      pats.map((p) => h('div', {
+        class: 'ins-item pattern',
         draggable: 'true',
-        title: `${type} - drag onto the preview or the outline, or click to add to the selection`,
-        'data-type': type,
-        ondragstart: (e) => {
-          e.dataTransfer.setData('text/plain', `dsg:new:${type}`);
-          e.dataTransfer.effectAllowed = 'copy';
-        },
-        onclick: () => addControl(type),
-      }, h('span', { class: 'glyph', text: GLYPHS[cat] }), displayType(type)))),
-    ));
+        'data-pattern': p.id,
+        title: 'Drag onto the canvas or the outline, or click to insert at the selection',
+        ondragstart: (e) => { e.dataTransfer.setData('text/plain', `dsg:pattern:${p.id}`); e.dataTransfer.effectAllowed = 'copy'; },
+        onclick: () => insertPattern(p.id, state.selected),
+      }, h('span', { class: 'ig', text: '◆' }), h('span', { class: 'in', text: p.title }), h('span', { class: 'id', text: p.text })))));
   }
+  for (const cat of CATEGORIES) {
+    const items = Object.keys(CONTROLS).filter((k) => CONTROLS[k].category === cat && match(k, DESCRIPTIONS[k]));
+    if (!items.length) continue;
+    box.append(h('div', { class: 'ins-group' },
+      h('h3', { text: cat === 'Parts' ? 'Parts - inside their parent' : cat }),
+      items.map((type) => h('div', {
+        class: 'ins-item',
+        draggable: 'true',
+        'data-type': type,
+        title: `${type} - drag onto the canvas or the outline, or click to insert at the selection`,
+        ondragstart: (e) => { e.dataTransfer.setData('text/plain', `dsg:new:${type}`); e.dataTransfer.effectAllowed = 'copy'; },
+        onclick: () => addControl(type),
+      }, h('span', { class: 'ig', text: GLYPHS[cat] }), h('span', { class: 'in', text: displayType(type) }), h('span', { class: 'id', text: DESCRIPTIONS[type] || '' })))));
+  }
+  if (!box.childElementCount) box.append(h('div', { class: 'empty', text: 'Nothing matches.' }));
+}
+
+// where a click in the insert panel puts the control
+function renderInsertTarget() {
+  const box = $('#insertTarget');
+  const hit = findNode(state.design.root, state.selected);
+  const where = !hit || hit.node.id === 'root' ? 'the view' : displayType(hit.node.type);
+  box.replaceChildren('A click inserts into ', h('b', { text: where }), canHaveChildren(hit ? hit.node : state.design.root) ? '' : ' (next to it)');
 }
 
 function addControl(type, onId = state.selected) {
@@ -234,31 +290,58 @@ function addControl(type, onId = state.selected) {
       toast(`${displayType(type)} does not fit here`);
       return undefined;
     }
-    const node = createNode(type);
-    return insertNode(d, node, t.parentId, t.agg, t.index);
+    return insertNode(d, createNode(type), t.parentId, t.agg, t.index);
   });
 }
 
-// a drop: "dsg:new:<type>" or "dsg:move:<id>" onto a node, or into an
-// aggregation (`agg`) / at a position (`index`)
+function insertPattern(id, onId, place) {
+  const pattern = PATTERNS.find((p) => p.id === id);
+  if (!pattern) return;
+  commit((d) => {
+    const nodes = pattern.nodes.map((spec) => createNode(spec.type, spec));
+    let t = place;
+    if (!t && pattern.agg) {
+      // a pattern meant for one aggregation (a page footer) goes there when
+      // the target, or one of its ancestors, has it free
+      const chain = [findNode(d.root, onId)?.node, ...ancestors(onId).reverse()].filter(Boolean);
+      const host = chain.find((n) => aggAccepts(n, pattern.agg, nodes[0].type));
+      if (host) t = { parentId: host.id, agg: pattern.agg, index: null };
+    }
+    t = t || dropTarget(d, onId || 'root', nodes[0].type);
+    if (!t) {
+      toast(`${pattern.title} does not fit here`);
+      return undefined;
+    }
+    let index = t.index;
+    let first = null;
+    for (const n of nodes) {
+      insertNode(d, n, t.parentId, t.agg, index);
+      if (index != null) index += 1;
+      first = first || n.id;
+    }
+    return first;
+  });
+}
+
+// a drop: "dsg:new:<type>", "dsg:pattern:<id>" or "dsg:move:<id>" onto a
+// node, or into an aggregation / at a position (`place`)
 function handleDrop(data, onId, place) {
-  const m = /^dsg:(new|move):(.+)$/.exec(data || '');
+  const m = /^dsg:(new|move|pattern):(.+)$/.exec(data || '');
   if (!m) return;
   const [, kind, what] = m;
-  if (kind === 'new') {
-    if (place) {
-      commit((d) => {
-        const p = findNode(d.root, place.parentId);
-        if (!p || !aggAccepts(p.node, place.agg, what)) {
-          toast(`${displayType(what)} does not fit here`);
-          return undefined;
-        }
-        return insertNode(d, createNode(what), place.parentId, place.agg, place.index);
-      });
-    } else {
-      addControl(what, onId);
-    }
-  } else if (kind === 'move') {
+  if (kind === 'pattern') {
+    insertPattern(what, onId, place);
+  } else if (kind === 'new') {
+    if (!place) { addControl(what, onId); return; }
+    commit((d) => {
+      const p = findNode(d.root, place.parentId);
+      if (!p || !aggAccepts(p.node, place.agg, what)) {
+        toast(`${displayType(what)} does not fit here`);
+        return undefined;
+      }
+      return insertNode(d, createNode(what), place.parentId, place.agg, place.index);
+    });
+  } else {
     commit((d) => {
       const hit = findNode(d.root, what);
       if (!hit) return undefined;
@@ -271,70 +354,83 @@ function handleDrop(data, onId, place) {
   }
 }
 
-// ------------------------------------------------------------- outline
+// ------------------------------------------------------------- layers
 
-function renderOutline() {
-  const box = $('#outline');
+function renderLayers() {
+  const box = $('#layers');
   const scrollTop = box.scrollTop;
   box.replaceChildren();
-  const d = state.design;
 
-  const row = (node, depth, extra = {}) => {
+  const row = (node, depth, extra) => {
     const isRoot = node.id === 'root';
-    const lbl = isRoot ? '' : label(node);
+    const kids = canHaveChildren(node) && aggNames(node).some((a) => (node.aggs[a] || []).length);
+    const collapsed = state.collapsed.has(node.id);
     const bound = Object.values(node.props || {}).some((v) => v && v.m === 'b');
+    const lbl = isRoot ? '' : nodeLabel(node);
     const el = h('div', {
-      class: `trow${state.selected === node.id ? ' sel' : ''}`,
+      class: `lrow${state.selected === node.id ? ' sel' : ''}`,
       role: 'treeitem',
       'aria-selected': state.selected === node.id ? 'true' : 'false',
-      style: `padding-left:${8 + depth * 14}px`,
+      'aria-expanded': kids ? String(!collapsed) : null,
+      style: `padding-left:${4 + depth * 14}px`,
       draggable: isRoot ? null : 'true',
       'data-id': node.id,
       onclick: (e) => { e.stopPropagation(); select(node.id); },
       ondragstart: (e) => { e.stopPropagation(); e.dataTransfer.setData('text/plain', `dsg:move:${node.id}`); e.dataTransfer.effectAllowed = 'move'; },
     },
-    h('span', { class: 'ttype', text: isRoot ? 'View' : displayType(node.type) }),
-    bound ? h('span', { class: 'bind-dot', title: 'bound to data', text: '●' }) : null,
-    lbl ? h('span', { class: 'tmeta', text: lbl }) : null,
-    extra.note ? h('span', { class: 'tmeta', text: extra.note }) : null);
+    h('button', {
+      class: 'caret',
+      tabindex: '-1',
+      'aria-label': collapsed ? 'Expand' : 'Collapse',
+      text: kids ? (collapsed ? '▸' : '▾') : '',
+      onclick: (e) => {
+        e.stopPropagation();
+        if (!kids) return;
+        if (collapsed) state.collapsed.delete(node.id); else state.collapsed.add(node.id);
+        renderLayers();
+      },
+    }),
+    h('span', { class: 'ltype', text: isRoot ? 'View' : displayType(node.type) }),
+    bound ? h('span', { class: 'bind', title: 'bound to data', text: '●' }) : null,
+    lbl ? h('span', { class: 'lmeta', text: lbl }) : null);
     wireTreeDrop(el, node, extra);
     return el;
   };
 
-  const walkOut = (node, depth, parent, agg, index) => {
+  const out = (node, depth, parent, agg, index) => {
     box.append(row(node, depth, { parent, agg, index }));
+    if (state.collapsed.has(node.id)) return;
     const c = getControl(node.type);
-    const names = aggNames(node);
-    const showAggRows = node.type !== 'mvc:View' && c && c.aggs && Object.keys(c.aggs).length > 1;
-    for (const a of names) {
+    const aggRows = node.type !== 'mvc:View' && c && c.aggs && Object.keys(c.aggs).length > 1;
+    for (const a of aggNames(node)) {
       const kids = node.aggs[a] || [];
       // an empty aggregation shows only on the selected control - enough to
       // drop into, without a tree full of empty slots
-      if (!kids.length && (!showAggRows || state.selected !== node.id)) continue;
+      if (!kids.length && (!aggRows || state.selected !== node.id)) continue;
       let childDepth = depth + 1;
-      if (showAggRows || (!c && a)) {
+      if (aggRows || (!c && a)) {
         const binding = node.props[a];
-        const aggRow = h('div', { class: 'trow agg', style: `padding-left:${8 + (depth + 1) * 14}px`, 'data-agg': a },
-          h('span', { class: 'tagg', text: a }),
-          binding && binding.m === 'b' ? h('span', { class: 'tmeta', text: `→ ${binding.v}` }) : null);
+        const aggRow = h('div', { class: 'lrow agg', style: `padding-left:${18 + (depth + 1) * 14}px`, 'data-agg': a },
+          h('span', { class: 'lagg', text: a }),
+          binding && binding.m === 'b' ? h('span', { class: 'lmeta', text: `@${binding.v}` }) : null);
         wireAggDrop(aggRow, node, a);
         box.append(aggRow);
         childDepth = depth + 2;
       }
-      kids.forEach((k, i) => walkOut(k, childDepth, node, a, i));
+      kids.forEach((k, i) => out(k, childDepth, node, a, i));
     }
   };
-  walkOut(d.root, 0, null, null, 0);
+  out(state.design.root, 0, null, null, 0);
   box.scrollTop = scrollTop;
-  const sel = box.querySelector('.trow.sel');
-  if (sel && (sel.offsetTop < box.scrollTop || sel.offsetTop > box.scrollTop + box.clientHeight - 24)) sel.scrollIntoView({ block: 'nearest' });
+  const sel = box.querySelector('.lrow.sel');
+  if (sel && !state.layersNoScroll) sel.scrollIntoView({ block: 'nearest' });
 }
 
 function clearDropMarks() {
   for (const el of document.querySelectorAll('.drop-before, .drop-after, .drop-inside')) el.classList.remove('drop-before', 'drop-after', 'drop-inside');
 }
 
-// where a drop on a tree row goes: the upper quarter before it, the lower
+// where a drop on a layer goes: the upper quarter before it, the lower
 // quarter after it, the middle into it (when it takes children)
 function treeDropPlace(e, node, extra) {
   const r = e.currentTarget.getBoundingClientRect();
@@ -373,38 +469,66 @@ function wireAggDrop(el, node, agg) {
   });
 }
 
-// ------------------------------------------------------------- properties
+// ------------------------------------------------------------- breadcrumbs
 
-function renderProps() {
-  const box = $('#rpane-props');
+function renderCrumbs() {
+  const box = $('#crumbs');
+  box.replaceChildren();
+  const hit = findNode(state.design.root, state.selected);
+  const path = hit ? [...ancestors(state.selected), hit.node] : [state.design.root];
+  path.forEach((n, i) => {
+    if (i) box.append(h('span', { class: 'sep', text: '›' }));
+    box.append(h('button', {
+      class: n.id === state.selected ? 'cur' : '',
+      text: n.id === 'root' ? 'View' : displayType(n.type),
+      title: n.id === 'root' ? 'The view' : nodeLabel(n) || displayType(n.type),
+      onclick: () => select(n.id),
+    }));
+  });
+}
+
+// ------------------------------------------------------------- inspector
+
+const PROP_GROUPS = [
+  ['Content', (d) => ['string', 'icon', 'uri'].includes(d.type)],
+  ['Appearance', (d) => ['enum', 'cssSize', 'int', 'float'].includes(d.type)],
+  ['Behaviour', (d) => d.type === 'boolean'],
+];
+
+function renderInspector() {
+  const box = $('#inspector');
+  const focus = rememberFocus(box);
+  const scroll = box.scrollTop;
   box.replaceChildren();
   const d = state.design;
   const hit = findNode(d.root, state.selected);
   if (!hit || hit.node.id === 'root') {
     box.append(h('div', { class: 'empty' },
-      h('p', { text: 'Select a control in the preview or the outline.' }),
-      h('p', { class: 'hint', text: 'Drag controls from the palette onto the preview or the outline. Bind properties to the attributes on the Data tab - they become public attributes of the class.' })));
+      h('div', { class: 'big', text: '{ }' }),
+      h('p', { text: 'Select a control on the canvas, in the outline or in the code.' }),
+      h('p', { class: 'hint', text: 'Drag controls from the left onto the canvas. Bind their properties to attributes on the Data tab - each becomes a public attribute of the class.' })));
     return;
   }
   const node = hit.node;
   const c = getControl(node.type);
   const link = apiLink(node.type);
+  const ctx = rowContext(d, node.id);
 
-  box.append(h('div', { class: 'ph' },
-    h('div', { class: 'title' }, displayType(node.type), link ? h('a', { href: link, target: '_blank', rel: 'noopener', text: 'API ↗' }) : null),
-    h('button', { class: 'icon', title: 'Move up', 'aria-label': 'Move up', onclick: () => commit((dd) => shiftNode(dd, node.id, -1)), text: '↑' }),
-    h('button', { class: 'icon', title: 'Move down', 'aria-label': 'Move down', onclick: () => commit((dd) => shiftNode(dd, node.id, 1)), text: '↓' }),
-    h('button', { class: 'icon', title: 'Duplicate (Ctrl+D)', 'aria-label': 'Duplicate', onclick: () => commit((dd) => duplicateNode(dd, node.id)), text: '⧉' }),
-    h('button', { class: 'icon danger', title: 'Delete (Del)', 'aria-label': 'Delete', onclick: () => commit((dd) => removeNode(dd, node.id)), text: '✕' }),
-  ));
-  if (!c) box.append(h('p', { class: 'hint', text: 'Imported control the palette does not know - its attributes are kept as they are.' }));
+  const filter = h('input', {
+    type: 'search', placeholder: 'Filter properties…', value: state.inspector.filter, 'aria-label': 'Filter properties', 'data-focus': 'filter',
+    oninput: (e) => { state.inspector.filter = e.target.value; renderInspector(); },
+  });
+  box.append(h('div', { class: 'insp-head' },
+    h('div', { class: 'insp-title' }, h('b', { text: displayType(node.type) }), link ? h('a', { href: link, target: '_blank', rel: 'noopener', text: 'UI5 API ↗' }) : null),
+    h('div', { class: 'insp-desc', text: DESCRIPTIONS[node.type] || (c ? '' : 'Imported control - kept as it is') }),
+    h('div', { class: 'insp-tools' }, filter,
+      h('label', {}, h('input', { type: 'checkbox', checked: state.inspector.onlySet, onchange: (e) => { state.inspector.onlySet = e.target.checked; renderInspector(); } }), 'set only'))));
 
-  // list binding
+  // rows of a list
   for (const agg of bindableAggs(node)) {
     const tables = d.attributes.filter((a) => a.type === 'table');
     const cur = node.props[agg] && node.props[agg].m === 'b' ? node.props[agg].v : '';
-    box.append(h('div', { class: 'section' },
-      h('h2', { text: `Rows (${agg})` }),
+    box.append(group('Rows', h('div', {},
       h('div', { class: 'add-row' },
         h('select', {
           'aria-label': `Bind ${agg} to a table`,
@@ -415,65 +539,44 @@ function renderProps() {
         }, h('option', { value: '', text: tables.length ? '— static items —' : '— no table attribute yet —' }), options(tables.map((t) => t.name), cur)),
         h('button', { onclick: () => newTableFor(node, agg), title: 'Create a table attribute and bind the rows to it' }, '+ Table')),
       h('p', { class: 'hint', text: cur
-        ? `One row per line of ${cur}. The template below repeats per row; its properties take the row's fields ({FIELD}).`
-        : 'Bind the rows to a table attribute and the control repeats its template per line.' }),
-    ));
+        ? `One line per row of ${cur}. The template inside repeats per row; its properties take the row's fields (#).`
+        : 'Bind to a table attribute and the template repeats per row.' }))));
   }
 
-  // properties
-  const ctx = rowContext(d, node.id);
-  const propDefs = c ? Object.entries(c.props || {}) : Object.keys(node.props).map((p) => [p, { type: 'string' }]);
-  const sec = h('div', { class: 'section' }, h('h2', { text: 'Properties' }));
-  for (const [p, def] of propDefs) {
-    if (bindableAggs(node).includes(p)) continue;
-    sec.append(propRow(node, p, def, ctx));
+  // properties, grouped
+  const q = state.inspector.filter.trim().toLowerCase();
+  const defs = (c ? Object.entries(c.props || {}) : Object.keys(node.props).map((p) => [p, { type: 'string' }]))
+    .filter(([p]) => !bindableAggs(node).includes(p))
+    .filter(([p]) => !q || p.toLowerCase().includes(q))
+    .filter(([p]) => !state.inspector.onlySet || isSet(node.props[p]));
+  for (const [title, test] of PROP_GROUPS) {
+    const rows = defs.filter(([, def]) => test(def));
+    if (!rows.length) continue;
+    box.append(group(title, h('div', {}, title === 'Content' ? h('p', { class: 'hint', text: KIND_TITLE }) : null, rows.map(([p, def]) => propRow(node, p, def, ctx)))));
   }
   if (!c) {
     const inp = h('input', { placeholder: 'add property…', spellcheck: 'false' });
-    sec.append(h('div', { class: 'add-row' }, inp, h('button', {
+    box.append(group('More', h('div', { class: 'add-row' }, inp, h('button', {
       onclick: () => {
         const n = inp.value.trim();
         if (/^[a-zA-Z][\w]*$/.test(n)) commit((dd) => { findNode(dd.root, node.id).node.props[n] = { m: 's', v: '' }; });
       },
-    }, 'Add')));
+    }, 'Add'))));
   }
-  box.append(sec);
 
   // events
-  if (c && c.events && c.events.length) {
-    const es = h('div', { class: 'section' }, h('h2', { text: 'Events' }),
-      h('p', { class: 'hint', text: 'An event name becomes client->_event( ) in the view and a WHEN branch in on_event.' }));
-    for (const ev of c.events) {
-      const val = node.events[ev] || '';
-      const inp = h('input', {
-        value: val,
-        placeholder: suggestEvent(node, ev),
-        spellcheck: 'false',
-        'aria-label': `Event ${ev}`,
-        oninput: (e) => {
-          const v = e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-          e.target.classList.toggle('invalid', !!v && !!checkEventName(v));
-          commit((dd) => {
-            const n = findNode(dd.root, node.id).node;
-            if (v) n.events[ev] = v; else delete n.events[ev];
-          }, { mergeKey: `ev:${node.id}:${ev}`, keepFocus: true });
-        },
-        onfocus: (e) => {
-          if (!e.target.value) {
-            e.target.value = e.target.placeholder;
-            e.target.dispatchEvent(new Event('input'));
-            e.target.select();
-          }
-        },
-      });
-      es.append(h('div', { class: 'erow' }, h('label', { text: ev }), inp));
+  if (c && c.events && c.events.length && (!q || c.events.some((e) => e.toLowerCase().includes(q)))) {
+    const evs = c.events.filter((e) => !q || e.toLowerCase().includes(q)).filter((e) => !state.inspector.onlySet || node.events[e]);
+    if (evs.length) {
+      box.append(group('Events', h('div', {},
+        h('p', { class: 'hint', text: 'A name becomes client->_event( ) in the view and a WHEN branch in on_event.' }),
+        evs.map((ev) => eventRow(node, ev)))));
     }
-    box.append(es);
   }
 
   // children
-  if (c && c.aggs) {
-    const cs = h('div', { class: 'section' }, h('h2', { text: 'Add inside' }));
+  if (c && c.aggs && !q && !state.inspector.onlySet) {
+    const rows = [];
     for (const agg of Object.keys(c.aggs)) {
       const allowed = Object.keys(CONTROLS).filter((t) => aggAccepts(node, agg, t));
       if (!allowed.length) continue;
@@ -481,10 +584,47 @@ function renderProps() {
         'aria-label': `Add to ${agg}`,
         onchange: () => { if (sel.value) commit((dd) => insertNode(dd, createNode(sel.value), node.id, agg)); },
       }, h('option', { value: '', text: `+ add to ${agg}…` }), options(allowed, null, Object.fromEntries(allowed.map((t) => [t, displayType(t)]))));
-      cs.append(h('div', { class: 'add-row' }, sel));
+      rows.push(h('div', { class: 'add-row' }, sel));
     }
-    if (cs.childElementCount > 1) box.append(cs);
+    if (rows.length) box.append(group('Children', h('div', {}, rows), false));
   }
+  box.scrollTop = scroll;
+  restoreFocus(box, focus);
+}
+
+function group(title, body, open = true) {
+  return h('details', { class: 'group', open: open ? 'open' : null }, h('summary', {}, h('h2', { text: title })), h('div', { class: 'gbody' }, body));
+}
+
+function isSet(v) {
+  return !!v && (v.m !== 's' || (v.v !== '' && v.v != null));
+}
+
+function eventRow(node, ev) {
+  const val = node.events[ev] || '';
+  const inp = h('input', {
+    value: val,
+    placeholder: suggestEvent(node, ev),
+    spellcheck: 'false',
+    'aria-label': `Event ${ev}`,
+    'data-focus': `ev-${ev}`,
+    oninput: (e) => {
+      const v = e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+      e.target.classList.toggle('invalid', !!v && !!checkEventName(v));
+      commit((dd) => {
+        const n = findNode(dd.root, node.id).node;
+        if (v) n.events[ev] = v; else delete n.events[ev];
+      }, { mergeKey: `ev:${node.id}:${ev}`, keepFocus: true });
+    },
+    onfocus: (e) => {
+      if (!e.target.value) {
+        e.target.value = e.target.placeholder;
+        e.target.dispatchEvent(new Event('input'));
+        e.target.select();
+      }
+    },
+  });
+  return h('div', { class: 'event' }, h('label', { text: ev }), inp);
 }
 
 function suggestEvent(node, ev) {
@@ -521,13 +661,13 @@ function propRow(node, p, def, ctx) {
   const d = state.design;
   const value = node.props[p];
   const m = value ? value.m : 's';
-  const set = !!value && (value.m !== 's' || value.v !== '');
-  const modes = { s: 'Value', b: 'Bind', x: 'Expr' };
-  if (ctx || m === 'f') modes.f = 'Field';
+  const kinds = { s: KINDS.s, b: KINDS.b, x: KINDS.x };
+  if (ctx || m === 'f') kinds.f = KINDS.f;
   const update = (fn, opts) => commit((dd) => { fn(findNode(dd.root, node.id).node); }, opts);
 
-  const modeSel = h('select', {
-    class: 'mode',
+  const kind = h('select', {
+    class: `kind k-${m}`,
+    title: KIND_TITLE,
     'aria-label': `${p}: kind of value`,
     onchange: (e) => update((n) => {
       const mm = e.target.value;
@@ -538,9 +678,10 @@ function propRow(node, p, def, ctx) {
       } else if (mm === 'f') n.props[p] = { m: 'f', v: ctx && ctx.fields[0] ? ctx.fields[0].name : '' };
       else n.props[p] = { m: 'x', v: value && value.m === 's' ? value.v : '' };
     }),
-  }, options(Object.keys(modes), m, modes));
+  }, options(Object.keys(kinds), m, kinds));
 
   let editor;
+  const focusKey = `p-${p}`;
   if (m === 's') {
     const v = value ? value.v : '';
     if (def.type === 'enum' || def.type === 'boolean') {
@@ -553,6 +694,7 @@ function propRow(node, p, def, ctx) {
       editor = h('input', {
         value: v,
         'aria-label': p,
+        'data-focus': focusKey,
         spellcheck: def.type === 'string' ? 'true' : 'false',
         placeholder: def.hint || (def.type === 'cssSize' ? 'e.g. 10rem' : def.type === 'icon' ? 'sap-icon://…' : ''),
         oninput: (e) => update((n) => { if (e.target.value !== '') n.props[p] = { m: 's', v: e.target.value }; else delete n.props[p]; }, { mergeKey: `p:${node.id}:${p}`, keepFocus: true }),
@@ -578,13 +720,14 @@ function propRow(node, p, def, ctx) {
     editor = h('input', {
       value: value.v || '',
       'aria-label': `${p}: expression`,
+      'data-focus': focusKey,
       spellcheck: 'false',
-      placeholder: "{= ${/X} > 0 }",
+      placeholder: '{= ${/X} > 0 }',
       oninput: (e) => update((n) => { n.props[p] = { m: 'x', v: e.target.value }; }, { mergeKey: `p:${node.id}:${p}`, keepFocus: true }),
     });
   }
-  return h('div', { class: `prow${set ? ' set' : ''}`, title: `${p} : ${def.type}${def.values ? ` (${def.values.join(', ')})` : ''}` },
-    h('label', { text: p }), modeSel, h('div', { class: 'val' }, editor));
+  return h('div', { class: `prop${isSet(value) ? ' set' : ''}`, 'data-prop': p, title: `${p} : ${def.type}${def.values ? ` (${def.values.join(', ')})` : ''}` },
+    h('label', { text: p }), h('div', { class: 'val' }, editor), kind);
 }
 
 function newAttrFor(node, p, def) {
@@ -604,11 +747,11 @@ function newAttrFor(node, p, def) {
 // ------------------------------------------------------------- data
 
 function renderData() {
-  const box = $('#rpane-data');
+  const box = $('#dataPanel');
   const focus = rememberFocus(box);
   box.replaceChildren();
   const d = state.design;
-  box.append(h('p', { class: 'hint', text: 'The data of the app: public attributes of the class, bound with client->_bind( ). Values here seed model_init and the preview.' }));
+  box.append(h('p', { class: 'hint', text: 'Public attributes of the class, bound with client->_bind( ). The values seed model_init and the canvas.' }));
   d.attributes.forEach((a, idx) => box.append(attrCard(a, idx)));
   box.append(h('div', { class: 'add-row' },
     h('button', { onclick: () => addAttribute('string') }, '+ Attribute'),
@@ -658,7 +801,7 @@ function attrCard(a, idx) {
     title: uses ? `Delete - ${uses} binding(s) use it` : 'Delete',
     'aria-label': 'Delete attribute',
     onclick: () => {
-      if (uses && !confirm(`${a.name} is bound ${uses} time(s). Delete it anyway? The bindings stay and show as problems.`)) return;
+      if (uses && !confirm(`${a.name} is bound ${uses} time(s). Delete it anyway? The bindings stay and show up under Checks.`)) return;
       commit((dd) => { dd.attributes.splice(idx, 1); });
     },
   }, '✕');
@@ -697,7 +840,7 @@ function attrCard(a, idx) {
       table.append(h('tr', {}, a.fields.map((f) => h('td', {}, scalarInput(f.type, r[f.name], (v) => upd((at) => { at.rows[ri][f.name] = v; }, `a${idx}-r${ri}-${f.name}`), `a${idx}-r${ri}-${f.name}`))),
         h('td', {}, h('button', { class: 'icon danger', 'aria-label': 'Delete row', title: 'Delete row', onclick: () => commit((dd) => { dd.attributes[idx].rows.splice(ri, 1); }) }, '✕'))));
     });
-    card.append(h('div', { class: 'hint', style: 'margin:8px 0 0', text: 'Sample rows (seed model_init and the preview)' }),
+    card.append(h('div', { class: 'hint', style: 'margin:8px 0 0', text: 'Sample rows - they seed model_init and the canvas' }),
       h('div', { class: 'rows-wrap' }, table),
       h('button', { style: 'margin-top:6px', onclick: () => commit((dd) => { (dd.attributes[idx].rows = dd.attributes[idx].rows || []).push({}); }) }, '+ Row'));
   }
@@ -747,11 +890,11 @@ function restoreFocus(box, f) {
   try { if (f.start != null) el.setSelectionRange(f.start, f.end); } catch { /* number/date inputs */ }
 }
 
-// ------------------------------------------------------------- problems
+// ------------------------------------------------------------- checks
 
 function renderIssues() {
   const issues = validate(state.design);
-  const box = $('#rpane-issues');
+  const box = $('#issuesPanel');
   box.replaceChildren();
   const errors = issues.filter((i) => i.level === 'error').length;
   const warns = issues.filter((i) => i.level === 'warning').length;
@@ -759,49 +902,82 @@ function renderIssues() {
   badge.textContent = String(errors || warns);
   badge.classList.toggle('hidden', !(errors || warns));
   badge.classList.toggle('warn', !errors);
-  if (!issues.length) {
-    box.append(h('div', { class: 'empty', text: 'No problems - the class is ready to download.' }));
-  }
+  if (!issues.length) box.append(h('div', { class: 'empty', text: 'All clear - the class is ready to export.' }));
   for (const i of issues) {
-    box.append(h('div', { class: `issue ${i.level}`, onclick: () => { if (i.node) { select(i.node); showRTab('props'); } } },
+    box.append(h('div', { class: `issue ${i.level}`, onclick: () => { if (i.node) select(i.node); } },
       h('span', { class: 'lvl', text: i.level === 'error' ? '✕' : i.level === 'warning' ? '!' : 'i' }), h('span', { text: i.text })));
   }
-  $('#btnZip').title = errors ? `${errors} problem(s) - the class may not activate. See the Problems tab.` : "Download the class as an abapGit ZIP - pull it with abapGit's offline import";
+  $('#btnZip').title = errors ? `${errors} problem(s) - the class may not activate. See Checks.` : "The class with its abapGit files - abapGit: New Offline, Import ZIP";
   return issues;
 }
 
-// ------------------------------------------------------------- code views
+// ------------------------------------------------------------- code
 
 const ABAP_KW = /\b(CLASS|DEFINITION|PUBLIC|PROTECTED|PRIVATE|SECTION|INTERFACES|TYPES|BEGIN|OF|END|TYPE|DATA|STANDARD|TABLE|WITH|EMPTY|KEY|REF|TO|METHODS|ENDCLASS|IMPLEMENTATION|METHOD|ENDMETHOD|IF|ELSEIF|ELSE|ENDIF|CASE|WHEN|ENDCASE|VALUE|LENGTH|DECIMALS|ME)\b/g;
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function highlightAbap(src) {
-  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return src.split('\n').map((line) => {
-    if (/^\s*"/.test(line) || /^\*/.test(line)) return `<span class="cmt">${esc(line)}</span>`;
-    // strings first, keywords outside them
-    const parts = line.split(/(`(?:[^`]|``)*`|'[^']*'|\|(?:[^|\\]|\\.)*\|)/);
-    return parts.map((p, i) => (i % 2 ? `<span class="str">${esc(p)}</span>` : esc(p).replace(ABAP_KW, '<span class="kw">$1</span>'))).join('');
-  }).join('\n');
+function highlightAbapLine(line) {
+  if (/^\s*"/.test(line) || /^\*/.test(line)) return `<span class="cmt">${esc(line)}</span>`;
+  const parts = line.split(/(`(?:[^`]|``)*`|'[^']*'|\|(?:[^|\\]|\\.)*\|)/);
+  return parts.map((p, i) => (i % 2 ? `<span class="str">${esc(p)}</span>` : esc(p).replace(ABAP_KW, '<span class="kw">$1</span>'))).join('');
 }
 
-function highlightXml(src) {
-  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return esc(src)
-    .replace(/(&lt;\/?)([\w:.]+)/g, '$1<span class="tag">$2</span>')
-    .replace(/(="[^"]*")/g, '<span class="str">$1</span>');
+function highlightXmlLine(line) {
+  return esc(line).replace(/(&lt;\/?)([\w:.]+)/g, '$1<span class="tag">$2</span>').replace(/(="[^"]*")/g, '<span class="str">$1</span>');
 }
 
-let codeCache = { abap: null, xml: null };
+let codeCache = { key: null };
 function renderCode() {
   const d = state.design;
-  const abap = generateClass(d);
-  const xml = toXml(d);
-  codeCache = { abap, xml };
-  if (state.tab === 'abap') {
-    $('#abapCode').innerHTML = highlightAbap(abap);
-    $('#abapInfo').textContent = `${fileName(d.className, 'clas.abap')} · ${abap.split('\n').length - 1} lines`;
+  const pre = $('#code');
+  const key = `${state.code}:${JSON.stringify(d)}`;
+  if (codeCache.key === key) { highlightCode(false); return; }
+  codeCache = { key };
+  let lines;
+  let nodeIds;
+  if (state.code === 'abap') {
+    const map = generateClassMap(d);
+    lines = map.source.replace(/\n$/, '').split('\n');
+    nodeIds = map.nodeIds;
+    $('#codeInfo').textContent = `${fileName(d.className, 'clas.abap')} · ${lines.length} lines`;
+  } else {
+    lines = toXml(d).split('\n');
+    nodeIds = [];
+    $('#codeInfo').textContent = 'what the class builds';
   }
-  if (state.tab === 'xml') $('#xmlCode').innerHTML = highlightXml(xml);
+  const hl = state.code === 'abap' ? highlightAbapLine : highlightXmlLine;
+  pre.innerHTML = lines.map((l, i) => {
+    const n = nodeIds[i] && nodeIds[i] !== 'root' ? ` data-node="${nodeIds[i]}"` : '';
+    return `<span class="ln" data-n="${i + 1}"${n}>${hl(l) || ' '}</span>`;
+  }).join('');
+  highlightCode(false);
+}
+
+// mark the selected control's lines, and bring the first into view
+function highlightCode(scroll) {
+  const pre = $('#code');
+  for (const el of pre.querySelectorAll('.ln.hi')) el.classList.remove('hi');
+  const lines = pre.querySelectorAll(`.ln[data-node="${CSS.escape(state.selected)}"]`);
+  lines.forEach((el) => el.classList.add('hi'));
+  if (scroll && lines[0] && state.view !== 'canvas') {
+    const top = lines[0].offsetTop - pre.clientHeight / 3;
+    if (lines[0].offsetTop < pre.scrollTop || lines[0].offsetTop > pre.scrollTop + pre.clientHeight - 30) pre.scrollTo({ top, behavior: 'smooth' });
+  }
+}
+
+function setCode(code) {
+  state.code = code;
+  for (const b of document.querySelectorAll('[data-code]')) b.classList.toggle('active', b.dataset.code === code);
+  renderCode();
+}
+
+function setView(view) {
+  state.view = view;
+  state.prefs.view = view;
+  savePrefs();
+  for (const b of document.querySelectorAll('[data-view]')) b.classList.toggle('active', b.dataset.view === view);
+  $('#stageBody').className = `stage-body view-${view}`;
+  highlightCode(true);
 }
 
 // ------------------------------------------------------------- preview
@@ -828,67 +1004,113 @@ function postPreview(msg) {
 function sendPreview(now) {
   clearTimeout(previewTimer);
   const send = () => postPreview({
-    type: 'render', xml: toXml(state.design, { preview: true }), model: previewModel(state.design), selected: state.selected, mode: state.mode,
+    type: 'render', xml: toXml(state.design, { preview: true }), model: previewModel(state.design), selected: state.selected, mode: state.mode, label: labelOfSelection(),
   });
   if (now) send(); else previewTimer = setTimeout(send, 120);
+}
+
+function onToolbarAction(action, id) {
+  if (action === 'parent') {
+    const hit = findNode(state.design.root, id);
+    if (hit && hit.parent) select(hit.parent.id);
+  } else if (action === 'up') commit((d) => shiftNode(d, id, -1));
+  else if (action === 'down') commit((d) => shiftNode(d, id, 1));
+  else if (action === 'dup') commit((d) => duplicateNode(d, id));
+  else if (action === 'del') commit((d) => removeNode(d, id));
 }
 
 window.addEventListener('message', (e) => {
   const msg = e.data || {};
   if (msg.source !== 'dsg-preview' || e.source !== $('#preview').contentWindow) return;
+  const count = () => { document.body.dataset.renders = String(Number(document.body.dataset.renders || 0) + 1); };
   if (msg.type === 'ready') {
     state.previewReady = true;
     $('#ui5version').placeholder = `UI5 ${msg.version}`;
     sendPreview(true);
   } else if (msg.type === 'select') {
     select(msg.id);
-    showRTab('props');
+  } else if (msg.type === 'action') {
+    onToolbarAction(msg.action, msg.id);
   } else if (msg.type === 'drop') {
     handleDrop(msg.data, msg.onId);
   } else if (msg.type === 'key') {
     onKey({ key: msg.key, ctrlKey: msg.ctrl, metaKey: false, shiftKey: msg.shift, preventDefault() {}, target: document.body });
   } else if (msg.type === 'error') {
     document.body.dataset.previewError = msg.message;
-    document.body.dataset.renders = String(Number(document.body.dataset.renders || 0) + 1);
+    count();
   } else if (msg.type === 'rendered') {
     delete document.body.dataset.previewError;
-    document.body.dataset.renders = String(Number(document.body.dataset.renders || 0) + 1);
+    count();
   }
 });
 
-// ------------------------------------------------------------- tabs
+// ------------------------------------------------------------- command palette
 
-function showTab(tab) {
-  state.tab = tab;
-  for (const b of document.querySelectorAll('[data-tab]')) b.classList.toggle('active', b.dataset.tab === tab);
-  for (const t of ['preview', 'abap', 'xml']) $(`#stage-${t}`).classList.toggle('hidden', t !== tab);
-  $('#previewTools').classList.toggle('hidden', tab !== 'preview');
-  renderCode();
+function commands() {
+  const list = [];
+  const sel = findNode(state.design.root, state.selected);
+  for (const p of PATTERNS) list.push({ kind: 'block', title: p.title, detail: p.text, run: () => insertPattern(p.id, state.selected) });
+  for (const t of Object.keys(CONTROLS)) list.push({ kind: 'insert', title: displayType(t), detail: DESCRIPTIONS[t], run: () => addControl(t) });
+  walk(state.design.root, (n) => {
+    if (n.id !== 'root') list.push({ kind: 'go to', title: displayType(n.type), detail: nodeLabel(n), run: () => select(n.id) });
+    return true;
+  });
+  const action = (title, run, detail) => list.push({ kind: 'action', title, detail, run });
+  action('Show layout and code', () => setView('split'));
+  action('Export abapGit ZIP', exportZip);
+  action('Copy ABAP', () => copyText(generateClass(state.design), 'ABAP'));
+  action('New from template', newDialog);
+  action('Import UI5 XML view', importDialog);
+  action('Save design', saveDesign);
+  action('Open design', () => openFile('.json,.xml'));
+  action('Show layout only', () => setView('canvas'));
+  action('Show code only', () => setView('code'));
+  action('Undo', undo, 'Ctrl+Z');
+  action('Redo', redo, 'Ctrl+Shift+Z');
+  if (sel && sel.parent) {
+    action('Delete selection', () => commit((d) => removeNode(d, state.selected)), 'Del');
+    action('Duplicate selection', () => commit((d) => duplicateNode(d, state.selected)), 'Ctrl+D');
+    action('Select parent', () => select(sel.parent.id), 'Alt+↑');
+  }
+  return list;
 }
 
-function showRTab(tab) {
-  state.rtab = tab;
-  for (const b of document.querySelectorAll('[data-rtab]')) b.classList.toggle('active', b.dataset.rtab === tab);
-  for (const t of ['props', 'data', 'issues']) $(`#rpane-${t}`).classList.toggle('hidden', t !== tab);
-}
-
-// ------------------------------------------------------------- render all
-
-function renderAll(opts = {}) {
-  const d = state.design;
-  const cn = $('#className');
-  if (document.activeElement !== cn) cn.value = d.className;
-  cn.classList.toggle('invalid', !!checkClassName(d.className));
-  if (document.activeElement !== $('#description')) $('#description').value = d.description || '';
-  renderOutline();
-  // keep the input being typed into: re-rendering the panel would drop it
-  if (!opts.keepFocus || !$('#rpane-props').contains(document.activeElement)) renderProps();
-  if (!opts.keepFocus || !$('#rpane-data').contains(document.activeElement)) renderData();
-  renderIssues();
-  renderCode();
-  sendPreview();
-  $('#btnUndo').disabled = !state.undo.length;
-  $('#btnRedo').disabled = !state.redo.length;
+function openPalette() {
+  const dlg = $('#cmdk');
+  const input = $('#cmdkInput');
+  const listBox = $('#cmdkList');
+  const all = commands();
+  let active = 0;
+  let shown = [];
+  const render = () => {
+    const q = input.value.trim().toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+    shown = all.filter((c) => words.every((w) => `${c.kind} ${c.title} ${c.detail || ''}`.toLowerCase().includes(w))).slice(0, 60);
+    active = Math.min(active, Math.max(0, shown.length - 1));
+    listBox.replaceChildren(...shown.map((c, i) => h('div', {
+      class: `cmdk-item${i === active ? ' active' : ''}`,
+      role: 'option',
+      'aria-selected': i === active ? 'true' : 'false',
+      onmousemove: () => { if (active !== i) { active = i; render(); } },
+      onclick: () => run(i),
+    }, h('span', { class: 'ck', text: c.kind }), h('span', { text: c.title }), c.detail ? h('span', { class: 'cd', text: c.detail }) : null)));
+    listBox.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
+  };
+  const run = (i) => {
+    const c = shown[i];
+    dlg.close();
+    if (c) c.run();
+  };
+  input.value = '';
+  input.oninput = () => { active = 0; render(); };
+  input.onkeydown = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, shown.length - 1); render(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); render(); }
+    else if (e.key === 'Enter') { e.preventDefault(); run(active); }
+  };
+  render();
+  dlg.showModal();
+  input.focus();
 }
 
 // ------------------------------------------------------------- dialogs
@@ -901,8 +1123,8 @@ function dialog(title, body, buttons) {
 }
 
 function newDialog() {
-  dialog('New design', h('div', {},
-    h('p', { class: 'hint', text: 'Start from a template. The current design is replaced - Undo brings it back.' }),
+  dialog('Start from a template', h('div', {},
+    h('p', { class: 'hint', text: 'The current design is replaced - Undo brings it back.' }),
     h('div', { class: 'starters' }, STARTERS.map((s) => h('button', {
       class: 'starter',
       onclick: () => { replaceDesign(s.make()); $('#dlg').close(); toast(`New: ${s.title}`); },
@@ -912,7 +1134,7 @@ function newDialog() {
 function importDialog() {
   const ta = h('textarea', { placeholder: '<mvc:View xmlns="sap.m" xmlns:mvc="sap.ui.core.mvc">…</mvc:View>', spellcheck: 'false' });
   dialog('Import a UI5 XML view', h('div', {},
-    h('p', { class: 'hint', text: 'Paste a view, or open a .xml file. Bindings come in as expressions, event handlers are dropped (abap2UI5 events are named, not controller methods). The data attributes stay.' }),
+    h('p', { class: 'hint', text: 'Paste a view or open a .xml file. Bindings come in as expressions; event handlers are dropped, because abap2UI5 events are names, not controller methods. The data attributes stay.' }),
     ta), [
     { text: 'Cancel', action: () => true },
     { text: 'Open file…', action: () => { openFile('.xml'); return true; } },
@@ -932,9 +1154,7 @@ function importDialog() {
 }
 
 function importXmlText(text) {
-  const base = clone(state.design);
-  const d = fromXml(text, base);
-  replaceDesign(d);
+  replaceDesign(fromXml(text, clone(state.design)));
   toast('View imported');
 }
 
@@ -951,7 +1171,7 @@ function openFile(accept) {
         importXmlText(text);
       } else {
         const d = JSON.parse(text);
-        if (!d || !d.root || d.version !== DESIGN_VERSION) throw new Error('Not a designer file');
+        if (!d || !d.root || d.version !== DESIGN_VERSION) throw new Error('not a designer file');
         replaceDesign(d);
         toast(`Opened ${f.name}`);
       }
@@ -962,15 +1182,35 @@ function openFile(accept) {
   inp.click();
 }
 
+function saveDesign() {
+  download(`${state.design.className.toLowerCase().replace(/\//g, '#')}.design.json`, JSON.stringify(state.design, null, 1), 'application/json');
+  toast('Design saved');
+}
+
 // ------------------------------------------------------------- export
 
 function exportZip() {
   const d = state.design;
   const errors = validate(d).filter((i) => i.level === 'error');
-  if (errors.length && !confirm(`${errors.length} problem(s) - the class may not activate:\n\n${errors.slice(0, 5).map((e) => '• ' + e.text).join('\n')}\n\nDownload anyway?`)) return;
+  if (errors.length && !confirm(`${errors.length} problem(s) - the class may not activate:\n\n${errors.slice(0, 5).map((e) => '• ' + e.text).join('\n')}\n\nExport anyway?`)) return;
   const bytes = zip(abapGitFiles(d));
   download(`${d.className.toLowerCase().replace(/\//g, '#')}.zip`, new Blob([bytes], { type: 'application/zip' }));
-  toast('abapGit ZIP downloaded - abapGit → New Offline → Import ZIP');
+  toast('Exported - abapGit: New Offline, Import ZIP');
+}
+
+// ------------------------------------------------------------- menus
+
+function wireMenu(button, menu) {
+  const close = () => { menu.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+  button.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = menu.hidden;
+    for (const m of document.querySelectorAll('.menu')) m.hidden = true;
+    menu.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+  });
+  menu.addEventListener('click', close);
+  document.addEventListener('click', (e) => { if (!menu.contains(e.target)) close(); });
 }
 
 // ------------------------------------------------------------- keyboard
@@ -979,39 +1219,64 @@ function onKey(e) {
   const t = e.target;
   const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   const ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); return; }
   if (ctrl && !typing && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if (ctrl && !typing && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
   if (typing) return;
-  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selected !== 'root') { e.preventDefault(); commit((d) => removeNode(d, state.selected)); }
-  if (ctrl && (e.key === 'd' || e.key === 'D') && state.selected !== 'root') { e.preventDefault(); commit((d) => duplicateNode(d, state.selected)); }
+  const sel = state.selected;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && sel !== 'root') { e.preventDefault(); commit((d) => removeNode(d, sel)); }
+  if (ctrl && (e.key === 'd' || e.key === 'D') && sel !== 'root') { e.preventDefault(); commit((d) => duplicateNode(d, sel)); }
+  if (e.altKey && e.key === 'ArrowUp') { const hit = findNode(state.design.root, sel); if (hit && hit.parent) select(hit.parent.id); }
   if (e.key === 'Escape') select('root');
+}
+
+// ------------------------------------------------------------- render all
+
+function renderAll(opts = {}) {
+  const d = state.design;
+  const cn = $('#className');
+  if (document.activeElement !== cn) cn.value = d.className;
+  cn.classList.toggle('invalid', !!checkClassName(d.className));
+  if (document.activeElement !== $('#description')) $('#description').value = d.description || '';
+  renderLayers();
+  // keep the input being typed into: re-rendering its panel would drop it
+  if (!opts.keepFocus || !$('#inspector').contains(document.activeElement)) renderInspector();
+  if (!opts.keepFocus || !$('#dataPanel').contains(document.activeElement)) renderData();
+  renderIssues();
+  renderCrumbs();
+  renderInsertTarget();
+  renderCode();
+  sendPreview();
+  $('#btnUndo').disabled = !state.undo.length;
+  $('#btnRedo').disabled = !state.redo.length;
 }
 
 // ------------------------------------------------------------- wiring
 
 function wire() {
-  $('#paletteSearch').addEventListener('input', renderPalette);
+  $('#insertSearch').addEventListener('input', renderInsert);
   $('#className').addEventListener('input', (e) => {
     const v = e.target.value.toUpperCase().replace(/\s/g, '');
     commit((d) => { d.className = v; }, { mergeKey: 'className', keepFocus: true });
   });
   $('#description').addEventListener('input', (e) => commit((d) => { d.description = e.target.value; }, { mergeKey: 'description', keepFocus: true }));
+  wireMenu($('#btnFile'), $('#fileMenu'));
+  wireMenu($('#btnExport'), $('#exportMenu'));
   $('#btnNew').onclick = newDialog;
   $('#btnOpen').onclick = () => openFile('.json,.xml');
-  $('#btnSave').onclick = () => {
-    download(`${state.design.className.toLowerCase().replace(/\//g, '#')}.design.json`, JSON.stringify(state.design, null, 1), 'application/json');
-    toast('Design saved');
-  };
+  $('#btnSave').onclick = saveDesign;
   $('#btnImport').onclick = importDialog;
   $('#btnUndo').onclick = undo;
   $('#btnRedo').onclick = redo;
-  $('#btnCopy').onclick = () => copyText(generateClass(state.design), 'ABAP');
-  $('#btnCopy2').onclick = () => copyText(generateClass(state.design), 'ABAP');
-  $('#btnCopyXml').onclick = () => copyText(toXml(state.design), 'XML');
+  $('#btnCmd').onclick = openPalette;
   $('#btnZip').onclick = exportZip;
+  $('#btnZip2').onclick = exportZip;
+  $('#btnCopy').onclick = () => copyText(generateClass(state.design), 'ABAP');
+  $('#btnCopyXml').onclick = () => copyText(toXml(state.design), 'XML');
   $('#btnDownloadAbap').onclick = () => download(fileName(state.design.className, 'clas.abap'), generateClass(state.design), 'text/plain');
-  for (const b of document.querySelectorAll('[data-tab]')) b.onclick = () => showTab(b.dataset.tab);
-  for (const b of document.querySelectorAll('[data-rtab]')) b.onclick = () => showRTab(b.dataset.rtab);
+  for (const b of document.querySelectorAll('.rail-btn')) b.onclick = () => showPanel(b.dataset.panel);
+  for (const b of document.querySelectorAll('[data-view]')) b.onclick = () => setView(b.dataset.view);
+  for (const b of document.querySelectorAll('[data-code]')) b.onclick = () => setCode(b.dataset.code);
   for (const b of document.querySelectorAll('[data-mode]')) {
     b.onclick = () => {
       state.mode = b.dataset.mode;
@@ -1019,33 +1284,40 @@ function wire() {
       postPreview({ type: 'mode', mode: state.mode });
     };
   }
-  const device = $('#device');
-  device.value = state.prefs.device;
-  $('#deviceFrame').style.width = state.prefs.device;
-  device.onchange = () => { state.prefs.device = device.value; $('#deviceFrame').style.width = device.value; savePrefs(); };
+  // a click on a line of the class selects the control it writes
+  $('#code').addEventListener('click', (e) => {
+    const ln = e.target.closest('.ln[data-node]');
+    if (ln && !getSelection().toString()) select(ln.dataset.node, { fromCode: true });
+  });
+  const setDevice = (w) => {
+    state.prefs.device = w;
+    $('#deviceFrame').style.width = w;
+    for (const b of document.querySelectorAll('[data-device]')) b.classList.toggle('active', b.dataset.device === w);
+  };
+  setDevice(state.prefs.device);
+  for (const b of document.querySelectorAll('[data-device]')) b.onclick = () => { setDevice(b.dataset.device); savePrefs(); };
   const theme = $('#theme');
   theme.value = state.prefs.theme;
   theme.onchange = () => { state.prefs.theme = theme.value; savePrefs(); loadPreview(); };
   const ver = $('#ui5version');
-  ver.value = state.prefs.ui5 === 'local' ? '' : state.prefs.ui5;
+  ver.value = state.prefs.ui5 && !state.prefs.ui5.startsWith('local') ? state.prefs.ui5 : '';
   ver.onchange = () => {
     const v = ver.value.trim();
     if (v && !/^\d+\.\d+\.\d+$/.test(v)) { ver.classList.add('invalid'); toast('A version like 1.71.80, or empty for the latest'); return; }
     ver.classList.remove('invalid');
     state.prefs.ui5 = v;
-    // Horizon exists from 1.102 on - an older release falls back to Quartz
     if (v && /^1\.(\d+)\./.test(v) && Number(RegExp.$1) < 102 && state.prefs.theme === 'sap_horizon') { state.prefs.theme = 'sap_fiori_3'; theme.value = 'sap_fiori_3'; }
     savePrefs();
     loadPreview();
   };
   document.addEventListener('keydown', onKey);
 
-  // the whole preview stage takes drops too (on the frame border, empty space)
-  const stage = $('#stage-preview');
-  stage.addEventListener('dragover', (e) => e.preventDefault());
-  stage.addEventListener('drop', (e) => { e.preventDefault(); handleDrop(e.dataTransfer.getData('text/plain'), 'root'); });
-  $('#outline').addEventListener('dragover', (e) => e.preventDefault());
-  $('#outline').addEventListener('drop', (e) => { e.preventDefault(); clearDropMarks(); handleDrop(e.dataTransfer.getData('text/plain'), 'root'); });
+  // the canvas around the frame takes drops too
+  const pane = $('#canvasPane');
+  pane.addEventListener('dragover', (e) => e.preventDefault());
+  pane.addEventListener('drop', (e) => { e.preventDefault(); handleDrop(e.dataTransfer.getData('text/plain'), 'root'); });
+  $('#layers').addEventListener('dragover', (e) => e.preventDefault());
+  $('#layers').addEventListener('drop', (e) => { e.preventDefault(); clearDropMarks(); handleDrop(e.dataTransfer.getData('text/plain'), 'root'); });
 }
 
 // ------------------------------------------------------------- start
@@ -1054,9 +1326,10 @@ loadPrefs();
 state.design = loadDesign();
 state.selected = state.design.root.aggs.content && state.design.root.aggs.content[0] ? state.design.root.aggs.content[0].id : 'root';
 wire();
-renderPalette();
+setView(state.view);
+renderInsert();
 renderAll();
 loadPreview();
 
 // for the browser tests and the curious: the state and the generators
-window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop };
+window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop, openPalette };

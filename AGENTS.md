@@ -1,6 +1,8 @@
-# AGENTS.md — abap2UI5 View Designer
+# AGENTS.md — abap2UI5 Layout Editor
 
-A browser app that turns a drag-and-drop design into ONE abap2UI5 app class.
+A browser app that turns a drag-and-drop layout into ONE abap2UI5 app class,
+after the pattern of the SAP Web IDE layout editor, styled after SAP Fiori
+Horizon (no SAP code, icons, fonts or logos in the repository).
 Static files, no build step, no runtime of its own in the generated code.
 English for everything: code, comments, commits, docs.
 

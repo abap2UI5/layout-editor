@@ -99,8 +99,9 @@ function eleCall(verb, name, ns) {
 
 // The view_display body: the chain lines, without the method frame
 export function viewChain(design, indent = 4) {
-  const out = []; // { text, kind: 'ele'|'tag'|'a'|'end'|'start', blank }
+  const out = []; // { text, kind: 'ele'|'tag'|'a'|'end'|'start', blank, node }
   const base = indent + 4;
+  let owner = 'root'; // the design node the lines being written belong to
   out.push({ text: `${' '.repeat(indent)}DATA(view) = z2ui5_cl_ui5_view_builder=>factory(`, kind: 'start' });
 
   // the mvc:View root with its namespace declarations
@@ -113,11 +114,16 @@ export function viewChain(design, indent = 4) {
   // a trailing end( ) can go: stringify( ) renders from the root anyway
   while (out.length && out[out.length - 1].kind === 'end') out.pop();
   const lines = [];
+  // which design node each line belongs to, for the code view that links
+  // a line to its control - a blank line belongs to none
+  const nodeIds = [];
   for (const seg of out) {
-    if (seg.blank) lines.push('');
+    if (seg.blank) { lines.push(''); nodeIds.push(null); }
     lines.push(seg.text);
+    nodeIds.push(seg.node || 'root');
   }
   lines[lines.length - 1] += ' ).';
+  lines.nodeIds = nodeIds;
   return lines;
 
   function pushAttrs(attrs, col) {
@@ -126,8 +132,8 @@ export function viewChain(design, indent = 4) {
     for (const [n, expr] of attrs) {
       const head = `${' '.repeat(col)})->a( n = ${abapString(n).padEnd(width)} ${expr.p} = `;
       const [first, ...rest] = expr.pieces;
-      out.push({ text: head + first, kind: 'a' });
-      for (const piece of rest) out.push({ text: `${' '.repeat(head.length - 3)}&& ${piece}`, kind: 'a' });
+      out.push({ text: head + first, kind: 'a', node: owner });
+      for (const piece of rest) out.push({ text: `${' '.repeat(head.length - 3)}&& ${piece}`, kind: 'a', node: owner });
     }
   }
 
@@ -157,9 +163,11 @@ export function viewChain(design, indent = 4) {
         for (const ch of children) prev = emitNode(ch, parentCol + 4, prev, parentHasAttrs);
       } else {
         const col = parentCol + 4;
-        out.push({ text: `${' '.repeat(col)})->${eleCall('ele', agg, parentNs)}`, kind: 'ele', blank: blankBeforeEle(prev, parentHasAttrs) });
+        const parentOwner = owner;
+        out.push({ text: `${' '.repeat(col)})->${eleCall('ele', agg, parentNs)}`, kind: 'ele', blank: blankBeforeEle(prev, parentHasAttrs), node: owner });
         let p2 = null;
         for (const ch of children) p2 = emitNode(ch, col + 4, p2, false);
+        owner = parentOwner;
         pushEnd(col);
         prev = 'ele';
       }
@@ -169,16 +177,21 @@ export function viewChain(design, indent = 4) {
   function emitNode(node, col, prev, parentHasAttrs) {
     const { ns, name } = splitType(node.type);
     const attrs = nodeAttrs(node);
+    const parentOwner = owner;
+    owner = node.id;
     if (!hasChildren(node)) {
-      out.push({ text: `${' '.repeat(col)})->${eleCall('tag', name, ns)}`, kind: 'tag', blank: prev !== 'tag' });
+      out.push({ text: `${' '.repeat(col)})->${eleCall('tag', name, ns)}`, kind: 'tag', blank: prev !== 'tag', node: owner });
       pushAttrs(attrs, col + 4);
+      owner = parentOwner;
       return 'tag';
     }
-    out.push({ text: `${' '.repeat(col)})->${eleCall('ele', name, ns)}`, kind: 'ele', blank: blankBeforeEle(prev, parentHasAttrs) });
+    out.push({ text: `${' '.repeat(col)})->${eleCall('ele', name, ns)}`, kind: 'ele', blank: blankBeforeEle(prev, parentHasAttrs), node: owner });
     pushAttrs(attrs, col + 4);
     const groups = aggNames(node).map((a) => [a, node.aggs[a] || [], isDirectAgg(node, a), ns]);
     emitChildren(groups, col, attrs.length > 0);
+    owner = node.id;
     pushEnd(col);
+    owner = parentOwner;
     return 'ele';
   }
 
@@ -188,7 +201,7 @@ export function viewChain(design, indent = 4) {
 
   function pushEnd(col) {
     const last = out[out.length - 1];
-    out.push({ text: `${' '.repeat(col)})->end(`, kind: 'end', blank: last.kind !== 'end' });
+    out.push({ text: `${' '.repeat(col)})->end(`, kind: 'end', blank: last.kind !== 'end', node: owner });
   }
 }
 
@@ -338,6 +351,18 @@ export function generateClass(design) {
   L.push('');
   L.push('ENDCLASS.');
   return L.map((l) => l.replace(/\s+$/, '')).join('\n') + '\n';
+}
+
+// The class source with, per line, the design node it belongs to (null for
+// every line outside the view chain) - what the code view links to the
+// canvas with
+export function generateClassMap(design) {
+  const source = generateClass(design);
+  const lines = source.split('\n');
+  const chain = viewChain(design, 4);
+  const start = lines.indexOf(chain[0]);
+  const nodeIds = lines.map((_, i) => (i >= start && i < start + chain.length ? chain.nodeIds[i - start] : null));
+  return { source, nodeIds };
 }
 
 // ------------------------------------------------------------- abapGit files

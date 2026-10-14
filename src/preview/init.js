@@ -18,6 +18,8 @@ sap.ui.define([
   var rendering = false;
   var mode = 'design';
   var selected = null;
+  var selectedLabel = '';
+  var tools = null;
   var lastXml = null;
 
   var PreviewController = Controller.extend('designer.PreviewController', {
@@ -68,7 +70,48 @@ sap.ui.define([
     var el = domOf(selected);
     mark('dsg-sel', el);
     if (el && scroll && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+    placeTools();
   }
+
+  // the toolbar on the selected control: its name, and select parent / move
+  // up / move down / duplicate / delete - the designer does the edit
+  function toolButton(action, text, title) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.setAttribute('data-action', action);
+    return b;
+  }
+  function placeTools() {
+    if (!tools) {
+      tools = document.createElement('div');
+      tools.id = 'dsg-tools';
+      tools.appendChild(document.createElement('span'));
+      tools.appendChild(toolButton('parent', '↖', 'Select parent'));
+      tools.appendChild(toolButton('up', '↑', 'Move up'));
+      tools.appendChild(toolButton('down', '↓', 'Move down'));
+      tools.appendChild(toolButton('dup', '⧉', 'Duplicate'));
+      tools.appendChild(toolButton('del', '✕', 'Delete'));
+      tools.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('button');
+        if (b && selected) post({ type: 'action', action: b.getAttribute('data-action'), id: selected });
+      });
+      document.body.appendChild(tools);
+    }
+    var el = domOf(selected);
+    if (!el || mode !== 'design') { tools.style.display = 'none'; return; }
+    var r = el.getBoundingClientRect();
+    tools.firstChild.textContent = selectedLabel;
+    tools.style.display = 'flex';
+    var top = r.top - tools.offsetHeight - 4;
+    if (top < 2) top = Math.min(r.bottom + 4, window.innerHeight - tools.offsetHeight - 2);
+    tools.style.top = Math.max(2, top) + 'px';
+    tools.style.left = Math.max(2, Math.min(r.left, window.innerWidth - tools.offsetWidth - 2)) + 'px';
+  }
+  window.addEventListener('scroll', function () { if (tools) placeTools(); }, true);
+  window.addEventListener('resize', function () { if (tools) placeTools(); });
 
   function render(msg) {
     if (rendering) { pending = msg; return; }
@@ -103,13 +146,16 @@ sap.ui.define([
     if (msg.type === 'render') {
       mode = msg.mode || mode;
       selected = msg.selected || null;
+      selectedLabel = msg.label || '';
       render(msg);
     } else if (msg.type === 'select') {
       selected = msg.selected;
+      selectedLabel = msg.label || '';
       highlight(true);
     } else if (msg.type === 'mode') {
       mode = msg.mode;
       mark('dsg-hover', null);
+      placeTools();
     }
   });
 
@@ -117,7 +163,7 @@ sap.ui.define([
   ['pointerdown', 'mousedown', 'click', 'dblclick'].forEach(function (type) {
     document.addEventListener(type, function (e) {
       if (mode !== 'design') return;
-      if (errorBox.contains(e.target)) return;
+      if (errorBox.contains(e.target) || (tools && tools.contains(e.target))) return;
       e.preventDefault();
       e.stopPropagation();
       if (type === 'click') {
@@ -129,7 +175,7 @@ sap.ui.define([
   });
 
   document.addEventListener('mouseover', function (e) {
-    if (mode !== 'design') return;
+    if (mode !== 'design' || (tools && tools.contains(e.target))) return;
     mark('dsg-hover', domOf(nodeIdOf(e.target)));
   }, true);
 
