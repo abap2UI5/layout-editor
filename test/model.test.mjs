@@ -186,6 +186,14 @@ test('B10: a design from a file gets ids the canvas can find', () => {
   walkIds(d.root);
   assert.equal(new Set(ids).size, ids.length, 'all ids unique');
   assert.deepEqual(page(d).aggs.content[1].props, {});
-  assert.throws(() => normalizeDesign({ version: 99, root: {} }), /not a designer file/);
+  assert.throws(() => normalizeDesign({ version: 99, root: {} }), /version 99/);
   assert.throws(() => normalizeDesign('x'), /not a designer file/);
+});
+
+test('a design of an older version is migrated, a newer one refused', () => {
+  const d = createDesign();
+  d.version = 99;
+  assert.throws(() => normalizeDesign(d), /version 99/);
+  d.version = 0;
+  assert.throws(() => normalizeDesign(d), /no migration/);
 });

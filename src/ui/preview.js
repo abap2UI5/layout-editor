@@ -19,7 +19,15 @@ function previewUrl() {
 
 export function loadPreview() {
   state.previewReady = false;
+  previewStatus(`Loading UI5${state.prefs.ui5 ? ` ${state.prefs.ui5}` : ''}…`);
   $('#preview').src = previewUrl();
+}
+
+// the line over the canvas: what UI5 is doing, or what went wrong
+function previewStatus(text, level) {
+  const el = $('#previewStatus');
+  el.textContent = text || '';
+  el.className = `preview-status${text ? '' : ' hidden'}${level ? ` ${level}` : ''}`;
 }
 
 export function postPreview(msg) {
@@ -52,6 +60,7 @@ window.addEventListener('message', (e) => {
   const count = () => { document.body.dataset.renders = String(Number(document.body.dataset.renders || 0) + 1); };
   if (msg.type === 'ready') {
     state.previewReady = true;
+    previewStatus('');
     $('#ui5version').placeholder = `UI5 ${msg.version}`;
     sendPreview(true);
   } else if (msg.type === 'select') {
@@ -64,9 +73,11 @@ window.addEventListener('message', (e) => {
     onKey({ key: msg.key, ctrlKey: msg.ctrl, metaKey: false, shiftKey: msg.shift, altKey: msg.alt, preventDefault() {}, target: document.body });
   } else if (msg.type === 'error') {
     document.body.dataset.previewError = msg.message;
+    previewStatus(msg.boot ? 'UI5 did not load - see the canvas' : `The view ${msg.runtime ? 'failed at runtime' : 'does not render'}: ${msg.message}`, 'error');
     count();
   } else if (msg.type === 'rendered') {
     delete document.body.dataset.previewError;
+    previewStatus('');
     count();
   }
 });

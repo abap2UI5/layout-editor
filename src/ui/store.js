@@ -61,6 +61,24 @@ export function loadDesign() {
   return STARTERS.find((s) => s.id === 'form').make();
 }
 
+// A design in a link: #d=<base64 of the deflated JSON> - a few kilobytes
+// for a page, well inside what a browser takes in a URL
+export async function designToLink(d) {
+  const bytes = new TextEncoder().encode(JSON.stringify(d));
+  const packed = await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(packed))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `${location.origin}${location.pathname}#d=${b64}`;
+}
+
+export async function designFromLink(hash) {
+  const m = /^#d=([A-Za-z0-9_-]+)$/.exec(hash || '');
+  if (!m) return null;
+  const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+  const bytes = Uint8Array.from(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)), (c) => c.charCodeAt(0));
+  const json = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  return normalizeDesign(JSON.parse(json));
+}
+
 // `json`: the design as text when the caller has it already
 function persist(json) {
   try { localStorage.setItem(STORE_KEY, json || JSON.stringify(state.design)); } catch { /* quota or private mode */ }
@@ -111,7 +129,22 @@ export function redo() {
   restore(state.redo.pop());
 }
 
+// The designs that were replaced - by New, Open, Import or a shared link -
+// so one can go back to them: the last eight, newest first
+const RECENT_KEY = 'abap2ui5-designer:recent';
+export function recentDesigns() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; }
+}
+function rememberRecent(d) {
+  if (!d || !d.root) return;
+  const json = JSON.stringify(d);
+  const list = recentDesigns().filter((r) => r.json !== json);
+  list.unshift({ className: d.className, description: d.description || '', at: Date.now(), json });
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 8))); } catch { /* quota */ }
+}
+
 export function replaceDesign(d) {
+  rememberRecent(state.design);
   state.undo.push(JSON.stringify(state.design));
   state.redo = [];
   state.design = d;

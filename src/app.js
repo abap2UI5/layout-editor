@@ -11,7 +11,7 @@
 import { validate, checkClassName } from './model.js';
 import { generateClass, fileName } from './abap.js';
 import { toXml } from './xml.js';
-import { state, on, loadPrefs, savePrefs, loadDesign, commit, undo, redo, select, showPanel, labelOfSelection } from './ui/store.js';
+import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection } from './ui/store.js';
 import { $, toast, download } from './ui/dom.js';
 import { renderInsert, renderInsertTarget } from './ui/insert.js';
 import { renderLayers, onLayersKey, clearDropMarks, renderCrumbs } from './ui/layers.js';
@@ -21,7 +21,7 @@ import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code
 import { loadPreview, postPreview, sendPreview } from './ui/preview.js';
 import { handleDrop, copySelection, pasteSelection } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
-import { newDialog, importDialog, openFile, saveDesign, exportZip } from './ui/files.js';
+import { newDialog, importDialog, recentDialog, shareLink, openFile, saveDesign, exportZip } from './ui/files.js';
 import { onKey } from './ui/keys.js';
 
 
@@ -110,6 +110,8 @@ function wire() {
   $('#btnOpen').onclick = () => openFile('.json,.xml');
   $('#btnSave').onclick = saveDesign;
   $('#btnImport').onclick = importDialog;
+  $('#btnRecent').onclick = recentDialog;
+  $('#btnShare').onclick = shareLink;
   $('#btnUndo').onclick = undo;
   $('#btnRedo').onclick = redo;
   $('#btnCmd').onclick = openPalette;
@@ -191,6 +193,14 @@ setView(state.view);
 renderInsert();
 renderAll();
 loadPreview();
+
+// a shared link: its design replaces the current one (Recent keeps that)
+if (location.hash.startsWith('#d=')) {
+  designFromLink(location.hash).then((d) => {
+    if (d) { replaceDesign(d); toast(`Opened ${d.className} from the link`); }
+  }).catch((err) => toast(`The link holds no design: ${err.message}`))
+    .finally(() => history.replaceState(null, '', location.pathname + location.search));
+}
 
 // for the browser tests and the curious: the state and the generators
 window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection };

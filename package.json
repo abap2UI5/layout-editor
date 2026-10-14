@@ -14,6 +14,8 @@
     "verify:abap": "node tools/verify-abap.mjs",
     "test:e2e": "playwright test",
     "ui5:metadata": "node tools/ui5-metadata.mjs 1.71.80",
+    "ui5:trees": "node tools/ui5-trees.mjs 1.144.0 1.71.80",
+    "test:e2e:local": "UI5_RESOURCES=.ui5/1.144.0 UI5_RESOURCES_171=.ui5/1.71.80 playwright test",
     "verify": "npm test && npm run check:abap && npm run verify:abap && npm run test:e2e"
   },
   "devDependencies": {

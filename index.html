@@ -28,6 +28,7 @@
           <button id="btnOpen" role="menuitem">Open design (.json)…</button>
           <button id="btnSave" role="menuitem">Save design (.json)</button>
           <button id="btnImport" role="menuitem">Import UI5 XML view…</button>
+          <button id="btnRecent" role="menuitem">Recent designs…</button>
         </div>
       </div>
       <button id="btnUndo" class="ghost icon" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
@@ -40,6 +41,7 @@
           <button id="btnDownloadAbap" role="menuitem">ABAP source (.clas.abap)</button>
           <button id="btnCopy" role="menuitem">Copy ABAP to clipboard</button>
           <button id="btnCopyXml" role="menuitem">Copy XML view</button>
+          <button id="btnShare" role="menuitem" title="A link that carries the design">Copy share link</button>
         </div>
       </div>
     </div>
@@ -99,6 +101,7 @@
       </div>
       <div class="stage-body view-split" id="stageBody">
         <div class="canvas-pane" id="canvasPane">
+          <div id="previewStatus" class="preview-status hidden" role="status" aria-live="polite"></div>
           <div class="device-frame" id="deviceFrame">
             <iframe id="preview" title="Preview"></iframe>
           </div>

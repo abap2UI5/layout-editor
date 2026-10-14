@@ -56,8 +56,21 @@ export function createDesign() {
 
 // A design that comes from a file: ids the canvas can find (n + base36,
 // unique), else new ones - and the shape the editor relies on
+// One step per version of the design format, from the version before it;
+// a design of an older version is brought up step by step
+const MIGRATIONS = {
+  // 2: (d) => { ...; d.version = 2; },
+};
+
 export function normalizeDesign(d) {
-  if (!d || typeof d !== 'object' || !d.root || d.version !== DESIGN_VERSION) throw new Error('not a designer file');
+  if (!d || typeof d !== 'object' || !d.root || typeof d.version !== 'number') throw new Error('not a designer file');
+  if (d.version > DESIGN_VERSION) throw new Error(`a design of version ${d.version} - this editor reads up to ${DESIGN_VERSION}`);
+  while (d.version < DESIGN_VERSION) {
+    const step = MIGRATIONS[d.version + 1];
+    if (!step) throw new Error(`no migration from design version ${d.version}`);
+    step(d);
+    d.version += 1;
+  }
   d.className = String(d.className || 'ZCL_MY_APP');
   d.description = String(d.description || '');
   d.attributes = Array.isArray(d.attributes) ? d.attributes : [];

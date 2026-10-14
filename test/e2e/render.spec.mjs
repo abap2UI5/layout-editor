@@ -20,8 +20,37 @@ for (const [id, design] of allDesigns()) {
       const n = await frame.locator(`[id$="--${nid}"], [id*="--${nid}-"]`).count();
       if (!n) missing.push(nid);
     }
-    // a template row is cloned rather than shown, the content of a tab that
-    // is not selected is not rendered, nor are a Select's items until it opens
-    expect(missing.length, `not in the page: ${missing.length} of ${ids.length}`).toBeLessThan(ids.length / 3);
+    // what UI5 does not put in the page: the content of a tab that is not
+    // selected, the items of a dropdown until it opens, the pages of a
+    // carousel after the first - and what depends on the width of the
+    // canvas: what an overflow toolbar moves into its menu, the links a
+    // breadcrumb folds, a column with a minimum screen width, the content
+    // of a tile that is not loaded
+    const expected = hiddenByUi5(design.root);
+    const where = {};
+    const place = (n, path) => { where[n.id] = `${path}/${n.type}`; for (const [a, l] of Object.entries(n.aggs || {})) l.forEach((ch) => place(ch, `${path}/${n.type}.${a}`)); };
+    place(design.root, '');
+    const unexpected = missing.filter((id) => !expected.has(id)).map((id) => where[id]);
+    expect(unexpected, `not in the page though it should be: ${unexpected.join(', ')}`).toEqual([]);
   });
+}
+
+function hiddenByUi5(root) {
+  const hidden = new Set();
+  const mark = (n) => { hidden.add(n.id); for (const l of Object.values(n.aggs || {})) l.forEach(mark); };
+  const walk = (n) => {
+    for (const [agg, list] of Object.entries(n.aggs || {})) {
+      list.forEach((ch, i) => {
+        if ((n.type === 'IconTabBar' && i > 0) || (n.type === 'Carousel' && i > 0)) mark(ch);
+        else if (['Select', 'ComboBox', 'MultiComboBox'].includes(n.type) && agg === 'items') mark(ch);
+        else if (n.type === 'MultiInput' && agg === 'tokens') mark(ch);
+        else if (n.type === 'OverflowToolbar' || n.type === 'Breadcrumbs') mark(ch);
+        else if (n.type === 'Table' && agg === 'columns' && ch.props.minScreenWidth) mark(ch);
+        else if (n.type === 'GenericTile' && n.props.state && n.props.state.v !== 'Loaded') mark(ch);
+        else walk(ch);
+      });
+    }
+  };
+  walk(root);
+  return hidden;
 }

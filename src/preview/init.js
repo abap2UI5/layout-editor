@@ -217,5 +217,19 @@ sap.ui.define([
     post({ type: 'key', key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey });
   });
 
+  // an error after the view was created - in a renderer, a formatter, an
+  // event - would otherwise end in the console only
+  window.addEventListener('error', function (e) {
+    var text = e.message || String(e.error || 'error');
+    showError('The view failed at runtime: ' + text);
+    post({ type: 'error', message: text, runtime: true });
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    var text = r && r.message ? r.message : String(r);
+    showError('The view failed at runtime: ' + text);
+    post({ type: 'error', message: text, runtime: true });
+  });
+
   post({ type: 'ready', version: sap.ui.version });
 });

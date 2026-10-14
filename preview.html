@@ -43,6 +43,18 @@
 </head>
 <body class="sapUiBody">
   <div id="dsg-loading">Loading UI5…</div>
+  <script>
+    // UI5 that has not booted after a while: say so, instead of a spinner
+    // for ever - the CDN may be out of reach (see ?ui5=local in the README)
+    setTimeout(function () {
+      var el = document.getElementById('dsg-loading');
+      if (!el || !el.parentNode) return;
+      el.innerHTML = '<div style="max-width:28rem;text-align:center;line-height:1.5"><b>UI5 is not loading.</b><br>' +
+        'The canvas loads OpenUI5 from sdk.openui5.org. Without access to it, serve a local tree (README: <code>?ui5=local</code>), ' +
+        'or check the version in the toolbar.</div>';
+      window.parent.postMessage({ source: 'dsg-preview', type: 'error', message: 'UI5 did not load', boot: true }, '*');
+    }, 25000);
+  </script>
   <div id="content"></div>
   <div id="dsg-error"></div>
 </body>

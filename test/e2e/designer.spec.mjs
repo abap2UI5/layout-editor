@@ -220,3 +220,24 @@ test('copy and paste, by key and across the outline', async ({ designer: page })
   await page.keyboard.press('Control+V');
   await expect.poll(async () => (await nodeIds(page, 'Switch')).length).toBe(before + 1);
 });
+
+test('a shared link carries the design, Recent brings the replaced one back', async ({ designer: page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => window.designer.commit((d) => { d.className = 'ZCL_SHARED'; }));
+  await page.locator('#btnExport').click();
+  await page.locator('#btnShare').click();
+  const url = await page.evaluate(() => navigator.clipboard.readText());
+  expect(url).toContain('#d=');
+  await page.evaluate(() => window.designer.commit((d) => { d.className = 'ZCL_BEFORE'; }));
+  // a second tab opens the link: it finds ZCL_BEFORE in the browser store,
+  // the link replaces it, Recent brings it back
+  const tab = await context.newPage();
+  await tab.goto(url);
+  await expect(tab.locator('#className')).toHaveValue('ZCL_SHARED');
+  expect(tab.url()).not.toContain('#d=');
+  await tab.locator('#btnFile').click();
+  await tab.locator('#btnRecent').click();
+  await tab.locator('#dlg .starter', { hasText: 'ZCL_BEFORE' }).click();
+  await expect(tab.locator('#className')).toHaveValue('ZCL_BEFORE');
+  await tab.close();
+});

@@ -80,7 +80,9 @@ Also in the editor:
 - **Import XML** brings in an existing UI5 XML view. Controls the palette
   does not know are kept as they are.
 - **Save / Open** stores the design as JSON so you can continue later. The
-  design is also kept in the browser between visits.
+  design is also kept in the browser between visits; what New, Open or
+  Import replaced is under *Recent designs*. **Copy share link** puts the
+  whole design into a URL - open it anywhere, the editor loads it.
 - **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z, **Delete** or **Backspace**
   removes the selection, **Ctrl+D** duplicates it, **Ctrl+C / Ctrl+X /
   Ctrl+V** copy, cut and paste it (also into another design or tab),
@@ -125,12 +127,16 @@ npm run serve          # http://127.0.0.1:8080/
 npm run verify         # all four checks above
 ```
 
-The preview loads UI5 from the OpenUI5 CDN. Without network access, point
-the server at local OpenUI5 trees (each `@openui5/*` package's `src/`
-copied into one folder) and open the editor with `?ui5=local`:
+The preview loads UI5 from the OpenUI5 CDN. Without access to it, serve
+local OpenUI5 trees and open the editor with `?ui5=local`.
+`npm run ui5:trees` assembles them from the `@openui5/*` npm packages into
+`.ui5/` (CI does the same, cached, so the browser tests never depend on
+the CDN):
 
 ```bash
-UI5_RESOURCES=/path/to/ui5-1.144 UI5_RESOURCES_171=/path/to/ui5-1.71 npm run test:e2e
+npm run ui5:trees          # .ui5/1.144.0 and .ui5/1.71.80
+npm run test:e2e:local     # the browser tests on them
+UI5_RESOURCES=.ui5/1.144.0 npm run serve   # the editor with ?ui5=local
 ```
 
 `npm run ui5:metadata` regenerates `test/ui5-1.71.json` from a real UI5

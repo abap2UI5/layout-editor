@@ -2,9 +2,10 @@
 import { STARTERS } from '../starters.js';
 import { fromXml, importReport } from '../xml.js';
 import { clone, walk, normalizeDesign, validate, checkAttributeName } from '../model.js';
+import { copyText } from './code.js';
 import { abapGitFiles } from '../abap.js';
 import { zip } from '../zip.js';
-import { state, commit, replaceDesign, showPanel } from './store.js';
+import { state, commit, replaceDesign, showPanel, recentDesigns, designToLink } from './store.js';
 import { $, h, toast, download, dialog } from './dom.js';
 
 export function newDialog() {
@@ -14,6 +15,31 @@ export function newDialog() {
       class: 'starter',
       onclick: () => { replaceDesign(s.make()); $('#dlg').close(); toast(`New: ${s.title}`); },
     }, h('b', { text: s.title }), h('span', { text: s.text }))))), [{ text: 'Cancel', action: () => true }]);
+}
+
+// the designs New, Open, Import or a link replaced - back with one click
+export function recentDialog() {
+  const list = recentDesigns();
+  const when = (t) => new Date(t).toLocaleString();
+  dialog('Recent designs', list.length
+    ? h('div', { class: 'starters' }, list.map((r) => h('button', {
+      class: 'starter',
+      onclick: () => {
+        try { replaceDesign(normalizeDesign(JSON.parse(r.json))); $('#dlg').close(); toast(`Back to ${r.className}`); } catch (err) { toast(err.message); }
+      },
+    }, h('b', { text: r.className }), h('span', { text: r.description || ' ' }), h('span', { class: 'muted', text: when(r.at) }))))
+    : h('p', { class: 'hint', text: 'Nothing yet - a design lands here when New, Open, Import or a shared link replaces it.' }),
+  [{ text: 'Close', action: () => true }]);
+}
+
+// a link that carries the design - open it anywhere, the editor loads it
+export async function shareLink() {
+  try {
+    const url = await designToLink(state.design);
+    await copyText(url, 'Link');
+  } catch (err) {
+    toast(`No link: ${err.message}`);
+  }
 }
 
 export function importDialog() {
