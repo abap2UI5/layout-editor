@@ -143,11 +143,42 @@ test('a UI5 XML view imports into an editable design', async ({ designer: page }
     </Page>
   </mvc:View>`);
   await page.locator('#dlg').getByRole('button', { name: 'Import' }).click();
+  // the summary: what was dropped
+  await expect(page.locator('#dlg')).toContainText('1 event handler(s) dropped');
+  await page.locator('#dlg').getByRole('button', { name: 'OK' }).click();
   await expect(preview(page).getByText('Go')).toBeVisible();
   const abap = await abapOf(page);
   expect(abap).toContain(')->tag( `Button`');
   expect(abap).toContain('v = `{/SOME/PATH}`');
   expect(abap).not.toContain('onGo');
+});
+
+test('an imported binding without an attribute can become one', async ({ designer: page }) => {
+  await page.locator('#btnFile').click();
+  await page.locator('#btnImport').click();
+  await page.locator('#dlg textarea').fill(`<mvc:View xmlns="sap.m" xmlns:mvc="sap.ui.core.mvc">
+    <Page title="Imported"><Input value="{/NAME}"/><Input value="{/STREET}"/><List items="{/T_ORDERS}"/></Page>
+  </mvc:View>`);
+  await page.locator('#dlg').getByRole('button', { name: 'Import' }).click();
+  await expect(page.locator('#dlg')).toContainText('{/STREET}, {/T_ORDERS}');
+  await page.locator('#dlg').getByRole('button', { name: /Create 2 attribute/ }).click();
+  const abap = await abapOf(page);
+  expect(abap).toContain('v = client->_bind( name )');
+  expect(abap).toContain('v = client->_bind( street )');
+  expect(abap).toContain('v = client->_bind( t_orders )');
+  expect(abap).toMatch(/DATA t_orders +TYPE STANDARD TABLE OF ty_s_orders/);
+  await expect(page.locator('#panel-data')).toBeVisible();
+});
+
+test('an imported property the palette does not know shows in the properties and can go', async ({ designer: page }) => {
+  await page.evaluate(() => window.designer.commit((d) => { d.root.aggs.content[0].aggs.content[0].props.class = { m: 's', v: 'sapUiSmallMargin' }; }));
+  const formId = (await nodeIds(page, 'form:SimpleForm'))[0];
+  await page.evaluate((id) => window.designer.select(id), formId);
+  const row = prop(page, 'class');
+  await expect(row.locator('.val input')).toHaveValue('sapUiSmallMargin');
+  expect(await abapOf(page)).toContain('n = `class`');
+  await page.locator('#inspector').getByRole('button', { name: 'Remove class' }).click();
+  expect(await abapOf(page)).not.toContain('n = `class`');
 });
 
 test('a new design from a template', async ({ designer: page }) => {
@@ -157,4 +188,116 @@ test('a new design from a template', async ({ designer: page }) => {
   await waitRendered(page);
   await expect(preview(page).getByText('Notebook')).toBeVisible();
   expect(await abapOf(page)).toContain('CLASS zcl_my_table DEFINITION PUBLIC.');
+});
+
+test('a drop on the canvas lands before, into or after the control under the pointer', async ({ designer: page }) => {
+  const formId = (await nodeIds(page, 'form:SimpleForm'))[0];
+  const order = () => page.evaluate(() => window.designer.state.design.root.aggs.content[0].aggs.content.map((n) => n.type));
+  await page.evaluate((id) => window.designer.handleDrop('dsg:new:Button', id, null, 'before'), formId);
+  expect(await order()).toEqual(['Button', 'form:SimpleForm']);
+  await page.evaluate((id) => window.designer.handleDrop('dsg:new:Title', id, null, 'after'), formId);
+  expect(await order()).toEqual(['Button', 'form:SimpleForm', 'Title']);
+  await page.evaluate((id) => window.designer.handleDrop('dsg:new:Text', id, null, 'inside'), formId);
+  expect(await order()).toEqual(['Button', 'form:SimpleForm', 'Title']);
+  const inForm = await page.evaluate((id) => { let hit; const walk = (n) => { if (n.id === id) hit = n; Object.values(n.aggs).flat().forEach(walk); }; walk(window.designer.state.design.root); return hit.aggs.content.at(-1).type; }, formId);
+  expect(inForm).toBe('Text');
+});
+
+test('copy and paste, by key and across the outline', async ({ designer: page }) => {
+  const before = (await nodeIds(page, 'Switch')).length;
+  await preview(page).locator('[id*="--n"][role="switch"]').first().click();
+  await expect(selectedType(page)).toHaveText('Switch');
+  await page.keyboard.press('Control+C');
+  await page.keyboard.press('Control+V');
+  await expect.poll(async () => (await nodeIds(page, 'Switch')).length).toBe(before + 1);
+  await page.keyboard.press('Control+X');
+  await expect.poll(async () => (await nodeIds(page, 'Switch')).length).toBe(before);
+  await page.getByRole('tab', { name: 'Outline' }).click();
+  await page.locator('#layers .lrow.sel').focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(selectedType(page)).not.toHaveText('Switch');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Control+V');
+  await expect.poll(async () => (await nodeIds(page, 'Switch')).length).toBe(before + 1);
+});
+
+test('a shared link carries the design, Recent brings the replaced one back', async ({ designer: page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => window.designer.commit((d) => { d.className = 'ZCL_SHARED'; }));
+  await page.locator('#btnExport').click();
+  await page.locator('#btnShare').click();
+  const url = await page.evaluate(() => navigator.clipboard.readText());
+  expect(url).toContain('#d=');
+  await page.evaluate(() => window.designer.commit((d) => { d.className = 'ZCL_BEFORE'; }));
+  // a second tab opens the link: it finds ZCL_BEFORE in the browser store,
+  // the link replaces it, Recent brings it back
+  const tab = await context.newPage();
+  await tab.goto(url);
+  await expect(tab.locator('#className')).toHaveValue('ZCL_SHARED');
+  expect(tab.url()).not.toContain('#d=');
+  await tab.locator('#btnFile').click();
+  await tab.locator('#btnRecent').click();
+  await tab.locator('#dlg .starter', { hasText: 'ZCL_BEFORE' }).click();
+  await expect(tab.locator('#className')).toHaveValue('ZCL_BEFORE');
+  await tab.close();
+});
+
+test('any UI5 control by class name: the canvas describes it, the properties know its types', async ({ designer: page }) => {
+  await page.locator('#insertByName').fill('sap.m.Avatar');
+  await page.locator('#insertByName').press('Enter');
+  await expect(selectedType(page)).toHaveText('Avatar');
+  await expect(page.locator('#inspector .insp-desc')).toContainText('sap.m.Avatar - from the UI5 runtime');
+  // an enum from the runtime is a dropdown
+  await expect(prop(page, 'displaySize').locator('.val select')).toBeVisible();
+  await prop(page, 'displaySize').locator('.val select').selectOption('L');
+  await prop(page, 'initials').locator('.val input').fill('AB');
+  const abap = await abapOf(page);
+  expect(abap).toContain(')->tag( `Avatar`');
+  expect(abap).toContain('v = `AB`');
+  await expect(preview(page).locator('.sapFAvatar, .sapMAvatar').first()).toBeVisible();
+  // it stays in the palette for the next insert, and Checks says it is unchecked
+  await expect(page.locator('.ins-item.runtime[data-type="Avatar"]')).toBeVisible();
+  await page.getByRole('tab', { name: 'Checks' }).click();
+  await expect(page.locator('#issuesPanel')).toContainText('not checked against UI5 1.71');
+});
+
+test('a tree gets its nodes from a table with a table field, in one click', async ({ designer: page }) => {
+  await page.locator('.ins-item[data-type="Tree"]').click();
+  await expect(selectedType(page)).toHaveText('Tree');
+  await page.locator('#toast .toast-action', { hasText: 'Create nodes table' }).click();
+  await expect(preview(page).getByText('First', { exact: true })).toBeVisible();
+  const abap = await abapOf(page);
+  expect(abap).toContain("parameters:\\{arrayNames:['NODES']\\}");
+  expect(abap).toContain('nodes TYPE STANDARD TABLE OF ty_s_nodes_nodes WITH EMPTY KEY');
+  expect(abap).toContain('( text = `First child` )');
+  // the Data tab edits the nested rows
+  await page.getByRole('tab', { name: 'Data' }).click();
+  const card = page.locator('#dataPanel .attr', { has: page.locator('.subfields') });
+  await expect(card.locator('input.aname')).toHaveValue('t_nodes');
+  await expect(card.locator('.subfields input').first()).toHaveValue('TEXT');
+  await card.locator('button', { hasText: '+ NODES row' }).first().click();
+  await card.locator('.nested-rows input[type=text]').nth(2).fill('Third child');
+  expect(await abapOf(page)).toContain('( text = `Third child` )');
+  await page.getByRole('tab', { name: 'Checks' }).click();
+  await expect(page.locator('#issuesPanel')).not.toContainText('✕');
+});
+
+test('a list inside a bound list repeats a table field of the row', async ({ designer: page }) => {
+  await page.locator('.ins-item[data-type="Tree"]').click();
+  await page.locator('#toast .toast-action').click();
+  // a list bound to t_nodes, a list in its row bound to NODES
+  await page.locator('.ins-item[data-type="List"]').click();
+  await page.locator('#inspector').getByRole('combobox', { name: 'Bind items to a table' }).selectOption('t_nodes');
+  const listId = (await nodeIds(page, 'List')).at(-1);
+  await page.evaluate((id) => window.designer.commit((d) => {
+    const walk = (n) => { if (n.id === id) { n.aggs.items = [{ id: 'nx1', type: 'CustomListItem', props: {}, events: {}, aggs: { content: [{ id: 'nx2', type: 'List', props: {}, events: {}, aggs: {} }] } }]; } Object.values(n.aggs).flat().forEach(walk); };
+    walk(d.root);
+  }), listId);
+  await page.evaluate(() => window.designer.select('nx2'));
+  const rows = page.locator('#inspector').getByRole('combobox', { name: 'Bind items to a table' });
+  await expect(rows.locator('optgroup')).toHaveAttribute('label', /table fields of the row/);
+  await rows.selectOption('#NODES');
+  const abap = await abapOf(page);
+  expect(abap).toMatch(/n = `items` +v = `\{NODES\}`/);
+  await expect(preview(page).getByText('Second child')).toBeVisible();
 });

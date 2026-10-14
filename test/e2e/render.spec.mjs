@@ -20,8 +20,43 @@ for (const [id, design] of allDesigns()) {
       const n = await frame.locator(`[id$="--${nid}"], [id*="--${nid}-"]`).count();
       if (!n) missing.push(nid);
     }
-    // a template row is cloned rather than shown, the content of a tab that
-    // is not selected is not rendered, nor are a Select's items until it opens
-    expect(missing.length, `not in the page: ${missing.length} of ${ids.length}`).toBeLessThan(ids.length / 3);
+    // what UI5 does not put in the page: the content of a tab that is not
+    // selected, the items of a dropdown until it opens, the pages of a
+    // carousel after the first, a tab container's items (their content is
+    // in the page), a lazily loaded object page section - and what depends on the width of the
+    // canvas: what an overflow toolbar moves into its menu, the links a
+    // breadcrumb folds, a column with a minimum screen width, the content
+    // of a tile that is not loaded
+    const expected = hiddenByUi5(design.root);
+    const where = {};
+    const place = (n, path) => { where[n.id] = `${path}/${n.type}`; for (const [a, l] of Object.entries(n.aggs || {})) l.forEach((ch) => place(ch, `${path}/${n.type}.${a}`)); };
+    place(design.root, '');
+    const unexpected = missing.filter((id) => !expected.has(id)).map((id) => where[id]);
+    expect(unexpected, `not in the page though it should be: ${unexpected.join(', ')}`).toEqual([]);
   });
+}
+
+function hiddenByUi5(root) {
+  const hidden = new Set();
+  const mark = (n) => { hidden.add(n.id); for (const l of Object.values(n.aggs || {})) l.forEach(mark); };
+  const walk = (n) => {
+    for (const [agg, list] of Object.entries(n.aggs || {})) {
+      list.forEach((ch, i) => {
+        if (['IconTabBar', 'Carousel', 'Wizard', 'TabContainer', 'SlideTile'].includes(n.type) && i > 0) mark(ch);
+        else if (n.type === 'MenuButton' || n.type === 'MenuItem') mark(ch);
+        else if (n.type === 'TabContainer') { hidden.add(ch.id); if (i > 0) mark(ch); else walk(ch); } // an item is no element, its content is
+        else if (n.type === 'uxap:ObjectPageLayout' && agg === 'sections' && i > 0) mark(ch); // lazy loading in the kitchen sink
+        else if (ch.type === 'core:HTML') mark(ch); // renders its content, no element of its own
+        else if (n.type === 'table:Column' && agg === 'template') mark(ch); // cloned per row, shown with rows only
+        else if (['Select', 'ComboBox', 'MultiComboBox'].includes(n.type) && agg === 'items') mark(ch);
+        else if (n.type === 'MultiInput' && agg === 'tokens') mark(ch);
+        else if (n.type === 'OverflowToolbar' || n.type === 'Breadcrumbs') mark(ch);
+        else if (n.type === 'Table' && agg === 'columns' && ch.props.minScreenWidth) mark(ch);
+        else if (n.type === 'GenericTile' && n.props.state && n.props.state.v !== 'Loaded') mark(ch);
+        else walk(ch);
+      });
+    }
+  };
+  walk(root);
+  return hidden;
 }

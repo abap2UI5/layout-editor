@@ -140,10 +140,42 @@ sap.ui.define([
     });
   }
 
+  // the metadata of a control class, the shape tools/ui5-metadata.mjs
+  // dumps: properties with their types and enum values, aggregations,
+  // the default aggregation, events
+  function describe(msg) {
+    sap.ui.require(['sap/ui/base/DataType', msg.module], function (DataType, C) {
+      try {
+        var md = C.getMetadata();
+        var props = {};
+        var all = md.getAllProperties();
+        Object.keys(all).forEach(function (n) {
+          var t = DataType.getType(all[n].type);
+          var values = t && t.getEnumValues && t.getEnumValues() ? Object.keys(t.getEnumValues()) : undefined;
+          props[n] = values ? { type: all[n].type, values: values } : { type: all[n].type };
+        });
+        var aggs = {};
+        var allAggs = md.getAllAggregations();
+        Object.keys(allAggs).forEach(function (n) { aggs[n] = { multiple: allAggs[n].multiple, type: allAggs[n].type }; });
+        post({ type: 'described', key: msg.key, meta: {
+          className: md.getName(), props: props, aggs: aggs,
+          defaultAgg: md.getDefaultAggregationName ? md.getDefaultAggregationName() || null : null,
+          events: Object.keys(md.getAllEvents()).sort(),
+        } });
+      } catch (err) {
+        post({ type: 'described', key: msg.key, error: String(err && err.message ? err.message : err) });
+      }
+    }, function (err) {
+      post({ type: 'described', key: msg.key, error: 'UI5 has no ' + msg.module + (err && err.message ? ': ' + err.message : '') });
+    });
+  }
+
   window.addEventListener('message', function (e) {
     var msg = e.data || {};
     if (msg.target !== 'dsg-preview') return;
-    if (msg.type === 'render') {
+    if (msg.type === 'describe') {
+      describe(msg);
+    } else if (msg.type === 'render') {
       mode = msg.mode || mode;
       selected = msg.selected || null;
       selectedLabel = msg.label || '';
@@ -179,26 +211,56 @@ sap.ui.define([
     mark('dsg-hover', domOf(nodeIdOf(e.target)));
   }, true);
 
+  // where on the control the pointer is: the upper quarter means before
+  // it, the lower quarter after it, the middle into it (the designer
+  // decides whether it takes children - else "into" lands next to it)
+  function dropZone(e, el) {
+    if (!el) return 'inside';
+    var r = el.getBoundingClientRect();
+    var y = r.height ? (e.clientY - r.top) / r.height : 0.5;
+    return y < 0.25 ? 'before' : y > 0.75 ? 'after' : 'inside';
+  }
+  var DROP_CLASSES = ['dsg-drop', 'dsg-drop-before', 'dsg-drop-after'];
+  function markDrop(el, zone) {
+    DROP_CLASSES.forEach(function (c) { mark(c, null); });
+    if (el) el.classList.add(zone === 'before' ? 'dsg-drop-before' : zone === 'after' ? 'dsg-drop-after' : 'dsg-drop');
+  }
   document.addEventListener('dragover', function (e) {
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-    mark('dsg-drop', domOf(nodeIdOf(e.target)) || document.getElementById('content'));
+    var el = domOf(nodeIdOf(e.target));
+    markDrop(el || document.getElementById('content'), dropZone(e, el));
   }, true);
   document.addEventListener('dragleave', function (e) {
-    if (!e.relatedTarget) mark('dsg-drop', null);
+    if (!e.relatedTarget) markDrop(null);
   }, true);
   document.addEventListener('drop', function (e) {
     e.preventDefault();
     e.stopPropagation();
-    mark('dsg-drop', null);
+    markDrop(null);
     var data = e.dataTransfer && e.dataTransfer.getData('text/plain');
-    if (data && data.indexOf('dsg:') === 0) post({ type: 'drop', data: data, onId: nodeIdOf(e.target) || 'root' });
+    var id = nodeIdOf(e.target);
+    if (data && data.indexOf('dsg:') === 0) post({ type: 'drop', data: data, onId: id || 'root', zone: dropZone(e, domOf(id)) });
   }, true);
 
   document.addEventListener('keydown', function (e) {
     // the designer's shortcuts work while the preview has the focus
     if (mode !== 'design') return;
-    post({ type: 'key', key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey });
+    post({ type: 'key', key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey });
+  });
+
+  // an error after the view was created - in a renderer, a formatter, an
+  // event - would otherwise end in the console only
+  window.addEventListener('error', function (e) {
+    var text = e.message || String(e.error || 'error');
+    showError('The view failed at runtime: ' + text);
+    post({ type: 'error', message: text, runtime: true });
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    var text = r && r.message ? r.message : String(r);
+    showError('The view failed at runtime: ' + text);
+    post({ type: 'error', message: text, runtime: true });
   });
 
   post({ type: 'ready', version: sap.ui.version });

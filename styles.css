@@ -69,6 +69,8 @@ input, select { border-color: var(--field); border-radius: 4px; }
 input.invalid { border-color: var(--error); background: color-mix(in srgb, var(--error) 6%, var(--panel)); }
 
 /* ---------------------------------------------------------- app bar */
+.extra { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: start; }
+.extra .prop { min-width: 0; }
 .appbar { display: flex; align-items: center; gap: 14px; padding: 6px 14px; min-height: 52px; background: var(--appbar); color: var(--appbar-text); flex-wrap: wrap; box-shadow: 0 0 0.125rem 0 rgba(34,53,72,.15), 0 0.125rem 0.25rem 0 rgba(34,53,72,.15); position: relative; z-index: 5; }
 .brand { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 700; }
 .brand .mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--emphasized); color: #fff; font: 700 13px var(--mono); }
@@ -96,7 +98,9 @@ button.cmd { display: flex; gap: 10px; align-items: center; min-width: 210px; ju
 .menu button:hover { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* ---------------------------------------------------------- workspace */
-.workspace { flex: 1; display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; min-height: 0; }
+.workspace { --drawer-w: 280px; --inspector-w: 320px; flex: 1; display: grid; grid-template-columns: var(--drawer-w) 6px minmax(0, 1fr) 6px var(--inspector-w); min-height: 0; }
+.resizer { cursor: col-resize; background: var(--line); touch-action: none; }
+.resizer:hover, .resizer:active { background: var(--accent); }
 /* the left pane's tabs, after the Fiori icon tab bar (text only) */
 .rail { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .rail-btn { position: relative; border: none; border-radius: 0; background: none; padding: 11px 8px 9px; color: var(--text); border-bottom: 3px solid transparent; font-size: 13px; }
@@ -125,6 +129,10 @@ button.cmd { display: flex; gap: 10px; align-items: center; min-width: 210px; ju
 .ins-item .in { font-weight: 600; font-size: 12.5px; }
 .ins-item .id { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ins-item.pattern .ig { background: var(--accent); color: #fff; border-color: var(--accent); }
+.ins-item.runtime .ig { color: var(--warn); }
+.ins-group.byname { border-top: 1px solid var(--line); padding-top: 8px; }
+.ins-group.byname .add-row { padding: 0 6px; }
+.ins-group.byname .hint { padding: 0 6px; }
 
 /* layers */
 .tree { padding: 2px 0 16px; }
@@ -132,6 +140,7 @@ button.cmd { display: flex; gap: 10px; align-items: center; min-width: 210px; ju
   display: flex; align-items: center; gap: 4px; padding: 3px 8px; cursor: pointer; white-space: nowrap; user-select: none; position: relative; border-radius: 6px; margin: 0 6px;
 }
 .lrow:hover { background: var(--accent-soft); }
+.lrow:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .lrow.sel { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); color: var(--text); }
 .lrow.sel .ltype { font-weight: 700; }
 .lrow .caret { width: 14px; text-align: center; color: var(--muted); font-size: 10px; flex: none; border: none; background: none; padding: 0; }
@@ -161,7 +170,9 @@ button.cmd { display: flex; gap: 10px; align-items: center; min-width: 210px; ju
 .stage-body.view-canvas .code-pane { display: none; }
 .stage-body.view-code { grid-template-columns: 1fr; }
 .stage-body.view-code .canvas-pane { display: none; }
-.canvas-pane { display: flex; justify-content: center; padding: 14px; min-height: 0; min-width: 0; background: var(--panel-2); }
+.canvas-pane { display: flex; justify-content: center; padding: 14px; min-height: 0; min-width: 0; background: var(--panel-2); position: relative; }
+.preview-status { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 3; max-width: calc(100% - 40px); padding: 5px 12px; border-radius: 8px; font-size: 12px; background: var(--panel); color: var(--muted); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-status.error { color: var(--error); border-color: var(--error); }
 .device-frame { width: 100%; height: 100%; max-width: 100%; transition: width .15s; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0.125rem 0 rgba(34,53,72,.15), 0 0.5rem 1rem 0 rgba(34,53,72,.15); }
 .device-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
 .code-pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-left: 1px solid var(--line); background: var(--panel); }
@@ -267,15 +278,21 @@ table.rows td input[type=checkbox] { width: auto; }
   position: fixed; bottom: 46px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none;
   background: #1d2d3e; color: #fff; padding: 8px 14px; border-radius: 8px; transition: all .2s; z-index: 50; max-width: 80vw;
 }
-.toast.show { opacity: 1; transform: translateX(-50%); }
+.toast.show { opacity: 1; transform: translateX(-50%); pointer-events: auto; }
+.toast-action { margin-left: 12px; background: var(--emphasized); border-color: var(--emphasized); color: #fff; font-weight: 700; padding: 3px 10px; }
+table.rows td.nested { vertical-align: top; }
+table.rows .nested-rows { margin: 2px 0 2px 12px; border-left: 2px solid var(--line-strong); padding-left: 6px; }
+.fields .frow.sub { margin-left: 14px; }
+.fields .subfields { margin: 2px 0 6px 14px; border-left: 2px solid var(--line-strong); padding-left: 6px; }
 
 @media (max-width: 1280px) {
-  .workspace { grid-template-columns: 250px minmax(0, 1fr) 290px; }
+  .workspace { --drawer-w: 250px; --inspector-w: 290px; }
   .stage-body.view-split { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr); }
   .stage-body.view-split .code-pane { border-left: none; border-top: 1px solid var(--line); }
 }
 @media (max-width: 900px) {
   .workspace { grid-template-columns: 1fr; grid-auto-rows: minmax(300px, auto); }
+  .resizer { display: none; }
   body { height: auto; }
   .stage { min-height: 640px; }
   button.cmd span { display: none; }

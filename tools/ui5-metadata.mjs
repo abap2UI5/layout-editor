@@ -20,7 +20,7 @@ const version = process.argv[2] || '1.71.80';
 const server = await startServer(0);
 const port = server.address().port;
 const src = process.env.UI5_RESOURCES
-  ? `http://127.0.0.1:${port}/ui5/resources/sap-ui-core.js`
+  ? `http://127.0.0.1:${port}/ui5/local/resources/sap-ui-core.js`
   : `https://sdk.openui5.org/${version}/resources/sap-ui-core.js`;
 
 const browser = await chromium.launch();

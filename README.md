@@ -34,7 +34,10 @@ outline · data · checks         properties
 3. **Add data.** On the *Data* tab, define the attributes of the app:
    strings, numbers, flags, dates, times, and tables with fields and sample
    rows. A list or table bound to a table attribute repeats its template per
-   row. The canvas shows your sample data.
+   row. A field can itself be a table, with fields and rows of its own:
+   that is what a tree's nodes come from, and what a list inside a list
+   repeats. When you insert a list, a table or a tree, one click creates
+   the table attribute and binds it. The canvas shows your sample data.
 4. **Name events.** Give a button's `press` (or any other event) a name.
    It becomes `client->_event( )` in the view and a `WHEN` branch in
    `on_event`.
@@ -77,12 +80,25 @@ From there it is your code:
 Also in the editor:
 
 - **Starters**: a blank page, a form, a table with search, and tabs.
+- **Any UI5 control** by its class name (`sap.m.Wizard`, a library of your
+  own): the field at the end of *Controls*, or Ctrl+K. The canvas asks its
+  UI5 for the control's properties, aggregations and events, and from then
+  on it works like one of the palette's. Nothing has checked it against
+  1.71, and *Checks* says so.
 - **Import XML** brings in an existing UI5 XML view. Controls the palette
   does not know are kept as they are.
 - **Save / Open** stores the design as JSON so you can continue later. The
-  design is also kept in the browser between visits.
-- **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z, **Delete** removes the
-  selection, **Ctrl+D** duplicates it.
+  design is also kept in the browser between visits; what New, Open or
+  Import replaced is under *Recent designs*. **Copy share link** puts the
+  whole design into a URL - open it anywhere, the editor loads it.
+- **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z, **Delete** or **Backspace**
+  removes the selection, **Ctrl+D** duplicates it, **Ctrl+C / Ctrl+X /
+  Ctrl+V** copy, cut and paste it (also into another design or tab),
+  **Alt+↑** selects the parent, **Escape** the view. In the outline the
+  arrow keys walk the tree.
+- A drop on the canvas lands before, into or after the control under the
+  pointer: the upper quarter is before, the lower after. The panels on the
+  left and right can be dragged wider.
 - **Checks** lists what would break the class or the view, and inputs
   whose entry goes nowhere.
 - The canvas can show a phone or tablet width, the Horizon, Quartz or
@@ -95,7 +111,10 @@ Also in the editor:
   verified against **abap2UI5 1.147.0**.
 - ABAP 7.40 or later, or ABAP Cloud. The class uses inline declarations and
   `VALUE #( )`, like every abap2UI5 sample.
-- Every control and property the palette offers exists in **UI5 1.71**.
+- Every control and property the palette offers exists in **UI5 1.71**:
+  121 controls of sap.m, sap.ui.core, sap.ui.layout, sap.ui.unified,
+  sap.ui.table, sap.f and sap.uxap. A control inserted by class name is
+  whatever the canvas's UI5 says it is.
 
 ## What is checked, and how
 
@@ -119,12 +138,16 @@ npm run serve          # http://127.0.0.1:8080/
 npm run verify         # all four checks above
 ```
 
-The preview loads UI5 from the OpenUI5 CDN. Without network access, point
-the server at local OpenUI5 trees (each `@openui5/*` package's `src/`
-copied into one folder) and open the editor with `?ui5=local`:
+The preview loads UI5 from the OpenUI5 CDN. Without access to it, serve
+local OpenUI5 trees and open the editor with `?ui5=local`.
+`npm run ui5:trees` assembles them from the `@openui5/*` npm packages into
+`.ui5/` (CI does the same, cached, so the browser tests never depend on
+the CDN):
 
 ```bash
-UI5_RESOURCES=/path/to/ui5-1.144 UI5_RESOURCES_171=/path/to/ui5-1.71 npm run test:e2e
+npm run ui5:trees          # .ui5/1.144.0 and .ui5/1.71.80
+npm run test:e2e:local     # the browser tests on them
+UI5_RESOURCES=.ui5/1.144.0 npm run serve   # the editor with ?ui5=local
 ```
 
 `npm run ui5:metadata` regenerates `test/ui5-1.71.json` from a real UI5
@@ -137,7 +160,9 @@ runtime. Run it when the palette gains a control.
 | `src/model.js` | The design document and every edit on it |
 | `src/abap.js` | Design → the ABAP class and its abapGit files |
 | `src/xml.js` | Design → XML view (preview, export), and XML view → design (import) |
-| `src/app.js` | The editor UI |
+| `src/app.js` | The editor UI: wires the panels and renders them on every change |
+| `src/ui/store.js` | The state, commit( ) with undo and the browser store, selection |
+| `src/ui/*.js` | One module per panel: insert, layers, inspector, data, code, preview, palette, files, keys, edit (drop and clipboard) |
 | `src/preview/init.js` | The preview frame (a UI5 module) |
 | `tools/` | Dev server, metadata dump, class generation, runtime verification |
 | `test/` | Unit tests, fixtures, the builder model, browser tests |

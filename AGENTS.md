@@ -34,6 +34,10 @@ The product is the generated class. It must:
   `test/ui5-1.71.json`. A new control needs `npm run ui5:metadata` (with a
   1.71 tree, see README) so its metadata is in the file. Never write the
   metadata by hand.
+- A control inserted by class name (`RUNTIME` in `src/catalog.js`) comes
+  from the UI5 runtime of the canvas through `runtimeDef( )`; it is never
+  written into `CONTROLS` and never checked against 1.71. Everything that
+  reads the catalogue goes through `getControl( )`, which knows both.
 - `defaultAgg` is UI5's default aggregation and nothing else, because
   children of the default aggregation are written without a wrapper tag.
   Where a drop should land somewhere else, use `dropAgg`.

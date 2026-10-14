@@ -14,7 +14,7 @@
 // An attribute:
 //   { name, type: string|int|decimal|bool|date|time|table, value, fields: [{ name, type }], rows: [{}] }
 
-import { CONTROLS, getControl, defaultAggFor, accepts, dropAggOf } from './catalog.js';
+import { CONTROLS, NAMESPACES, getControl, defaultAggFor, accepts, dropAggOf } from './catalog.js';
 
 export const DESIGN_VERSION = 1;
 export const SCALAR_TYPES = ['string', 'int', 'decimal', 'bool', 'date', 'time'];
@@ -52,6 +52,61 @@ export function createDesign() {
     attributes: [],
     root,
   };
+}
+
+// A design that comes from a file: ids the canvas can find (n + base36,
+// unique), else new ones - and the shape the editor relies on
+// One step per version of the design format, from the version before it;
+// a design of an older version is brought up step by step
+const MIGRATIONS = {
+  // 2: (d) => { ...; d.version = 2; },
+};
+
+export function normalizeDesign(d) {
+  if (!d || typeof d !== 'object' || !d.root || typeof d.version !== 'number') throw new Error('not a designer file');
+  if (d.version > DESIGN_VERSION) throw new Error(`a design of version ${d.version} - this editor reads up to ${DESIGN_VERSION}`);
+  while (d.version < DESIGN_VERSION) {
+    const step = MIGRATIONS[d.version + 1];
+    if (!step) throw new Error(`no migration from design version ${d.version}`);
+    step(d);
+    d.version += 1;
+  }
+  d.className = String(d.className || 'ZCL_MY_APP');
+  d.description = String(d.description || '');
+  d.attributes = Array.isArray(d.attributes) ? d.attributes : [];
+  d.root.id = 'root';
+  d.root.type = 'mvc:View';
+  const seen = new Set(['root']);
+  walk(d.root, (n) => {
+    n.props = n.props || {};
+    n.events = n.events || {};
+    n.aggs = n.aggs || {};
+    if (n.id === 'root') return true;
+    if (typeof n.id !== 'string' || !/^n[0-9a-z]+$/.test(n.id) || seen.has(n.id)) n.id = newId();
+    seen.add(n.id);
+    return true;
+  });
+  return d;
+}
+
+// The prefix a library gets in this design's view: the catalogue's where
+// it has one, else the one an import gave it, else the library's last
+// name (sap.suite.ui.microchart -> microchart), made unique and remembered
+export function prefixFor(design, lib) {
+  for (const [p, uri] of Object.entries(NAMESPACES)) if (uri === lib) return p;
+  design.namespaces = design.namespaces || {};
+  for (const [p, uri] of Object.entries(design.namespaces)) if (uri === lib) return p;
+  let p = lib.split('.').pop();
+  while (p in NAMESPACES || p in design.namespaces) p += '_';
+  design.namespaces[p] = lib;
+  return p;
+}
+
+// the XML name of a control in this design: `Button` for sap.m, else
+// prefix:Name
+export function typeFor(design, lib, name) {
+  const p = prefixFor(design, lib);
+  return p ? `${p}:${name}` : name;
 }
 
 export function clone(x) {
@@ -121,7 +176,7 @@ export function canHaveChildren(node) {
 }
 
 export function aggAccepts(node, agg, childType) {
-  if (node.type === 'mvc:View') return agg === 'content';
+  if (node.type === 'mvc:View') return agg === 'content' && getControl(childType)?.category !== 'Parts';
   const c = getControl(node.type);
   if (!c) return true;
   const a = c.aggs && c.aggs[agg];
@@ -138,7 +193,7 @@ export function insertNode(design, child, parentId, agg, index) {
   if (!p) throw new Error(`no node ${parentId}`);
   const parent = p.node;
   const target = agg || (parent.type === 'mvc:View' ? 'content' : defaultAggFor(parent.type, child.type));
-  if (!target) throw new Error(`${parent.type} takes no ${child.type}`);
+  if (!target || !aggAccepts(parent, target, child.type)) throw new Error(`${parent.type} takes no ${child.type}${agg ? ` in ${agg}` : ''}`);
   parent.aggs[target] = parent.aggs[target] || [];
   const list = parent.aggs[target];
   list.splice(index == null || index > list.length ? list.length : index, 0, child);
@@ -151,7 +206,7 @@ export function dropTarget(design, onId, childType) {
   const hit = findNode(design.root, onId);
   if (!hit) return null;
   const n = hit.node;
-  if (n.type === 'mvc:View') return { parentId: n.id, agg: 'content', index: null };
+  if (n.type === 'mvc:View') return aggAccepts(n, 'content', childType) ? { parentId: n.id, agg: 'content', index: null } : null;
   const c = getControl(n.type);
   if (c && c.aggs) {
     for (const agg of [dropAggOf(c), ...Object.keys(c.aggs)].filter(Boolean)) {
@@ -166,7 +221,7 @@ export function dropTarget(design, onId, childType) {
   while (cur) {
     const up = findNode(design.root, cur.id);
     const pc = getControl(cur.type);
-    const agg = cur.type === 'mvc:View' ? 'content' : pc && pc.aggs ? Object.keys(pc.aggs).find((a) => aggAccepts(cur, a, childType)) : null;
+    const agg = cur.type === 'mvc:View' ? (aggAccepts(cur, 'content', childType) ? 'content' : null) : pc && pc.aggs ? Object.keys(pc.aggs).find((a) => aggAccepts(cur, a, childType)) : null;
     if (agg) return { parentId: cur.id, agg, index: null };
     cur = up && up.parent;
   }
@@ -218,7 +273,7 @@ export function duplicateNode(design, id) {
   walk(copy, (n) => { n.id = newId(); });
   const list = hit.parent.aggs[hit.agg];
   const c = getControl(hit.parent.type);
-  if (c && c.aggs && c.aggs[hit.agg] && c.aggs[hit.agg].single) return id;
+  if (c && c.aggs && c.aggs[hit.agg] && c.aggs[hit.agg].single) return null;
   list.splice(hit.index + 1, 0, copy);
   return copy.id;
 }
@@ -231,14 +286,32 @@ export function duplicateNode(design, id) {
 export function rowContext(design, id) {
   let hit = findNode(design.root, id);
   while (hit && hit.parent) {
-    const binding = hit.parent.props && hit.parent.props[hit.agg];
+    // the aggregation itself, or the one its templates are for (a grid
+    // table's columns hold the templates of its rows)
+    const pc = getControl(hit.parent.type);
+    const def = pc && pc.aggs && pc.aggs[hit.agg];
+    const boundAgg = def && def.templateFor ? def.templateFor : hit.agg;
+    const binding = hit.parent.props && hit.parent.props[boundAgg];
     if (binding && binding.m === 'b') {
       const attr = design.attributes.find((a) => a.name === binding.v);
       if (attr && attr.type === 'table') return attr;
     }
+    // rows of a table field of the row above (a list inside a list)
+    if (binding && binding.m === 'f') {
+      const outer = rowContext(design, hit.parent.id);
+      const field = outer && outer.fields.find((f) => f.name === binding.v);
+      if (field && field.type === 'table') return field;
+    }
     hit = findNode(design.root, hit.parent.id);
   }
   return null;
+}
+
+// the field a tree repeats its children from: the first table field of
+// the rows - none for a flat tree
+export function childrenField(table) {
+  const f = (table.fields || []).find((x) => x.type === 'table');
+  return f ? f.name : null;
 }
 
 export function bindableAggs(node) {
@@ -250,15 +323,34 @@ export function bindableAggs(node) {
 // Bind a list to a table attribute and give it one template row built from
 // the table's fields - what a designer would otherwise click together cell
 // by cell
-export function bindListToTable(design, nodeId, agg, attrName) {
+// With `replace` false the template that is there stays, only the binding
+// is set - for a list someone has built by hand. `viaField`: `attrName`
+// is a table field of the row the list sits in (a list inside a bound
+// list repeats the rows of that field).
+export function bindListToTable(design, nodeId, agg, attrName, replace = true, viaField = false) {
   const hit = findNode(design.root, nodeId);
-  const attr = design.attributes.find((a) => a.name === attrName);
+  let attr;
+  if (viaField) {
+    const ctx = rowContext(design, nodeId);
+    attr = ctx && ctx.fields.find((x) => x.name === attrName);
+  } else {
+    attr = design.attributes.find((a) => a.name === attrName);
+  }
   if (!hit || !attr || attr.type !== 'table') return;
   const node = hit.node;
-  const fields = attr.fields.length ? attr.fields : [{ name: 'TEXT', type: 'string' }];
+  const all = attr.fields && attr.fields.length ? attr.fields : [{ name: 'TEXT', type: 'string' }];
+  // the scalar fields make the template; a table field is what a tree
+  // descends into
+  const fields = all.filter((x) => x.type !== 'table').length ? all.filter((x) => x.type !== 'table') : all;
   const f = (i) => ({ m: 'f', v: (fields[i] || fields[0]).name });
-  node.props[agg] = { m: 'b', v: attr.name };
-  if (node.type === 'Table') {
+  node.props[agg] = viaField ? { m: 'f', v: attr.name } : { m: 'b', v: attr.name };
+  if (node.type === 'Tree' && childrenField(attr)) node.props[agg].arr = childrenField(attr);
+  if (!replace) return;
+  if (node.type === 'Tree') {
+    const item = createNode('StandardTreeItem');
+    item.props.title = f(0);
+    node.aggs.items = [item];
+  } else if (node.type === 'Table') {
     node.aggs.columns = fields.map((fld) => {
       const col = createNode('Column');
       col.aggs.header = [createNode('Text', { props: { text: label(fld.name) } })];
@@ -293,7 +385,39 @@ export function bindListToTable(design, nodeId, agg, attrName) {
     item.props.key = f(0);
     item.props.text = fields[1] ? f(1) : f(0);
     node.aggs.items = [item];
+  } else if (node.type === 'table:Table') {
+    node.aggs.columns = fields.map((fld) => {
+      const col = createNode('table:Column', { props: { label: label(fld.name) }, aggs: {} });
+      const cell = createNode(fld.type === 'bool' ? 'CheckBox' : 'Text');
+      delete cell.props.text;
+      if (fld.type === 'bool') {
+        cell.props.selected = { m: 'f', v: fld.name };
+        cell.props.editable = { m: 's', v: 'false' };
+      } else {
+        cell.props.text = { m: 'f', v: fld.name };
+      }
+      col.aggs.template = [cell];
+      return col;
+    });
   }
+}
+
+// Is the content of a list's aggregation still what the catalogue starts
+// it with - or what binding it to a table generated? Then binding it anew
+// may replace it without asking
+export function hasOwnTemplate(node, agg) {
+  const items = node.aggs[agg] || [];
+  if (!items.length) return false;
+  const c = getControl(node.type);
+  const init = (c && c.init && c.init.aggs && c.init.aggs[agg]) || [];
+  const same = (n, spec) => n.type === spec.type
+    && Object.entries(spec.props || {}).every(([k, v]) => n.props[k] && n.props[k].m === 's' && n.props[k].v === v)
+    && Object.keys(n.props).every((k) => (spec.props || {})[k] !== undefined || n.props[k].m === 'f');
+  if (items.length === init.length && items.every((n, i) => same(n, init[i]))) return false;
+  // one template whose values are all fields: generated by a binding
+  const generated = (n) => Object.values(n.props).every((v) => v.m === 'f' || (v.m === 's' && v.v === 'false'))
+    && Object.values(n.aggs).flat().every(generated);
+  return !(items.length === 1 && generated(items[0]));
 }
 
 export function unbindList(design, nodeId, agg) {
@@ -374,25 +498,61 @@ export function validate(design) {
     if (names.has(a.name)) issues.push({ level: 'error', text: `Attribute ${a.name} is defined twice` });
     names.add(a.name);
     if (a.type === 'table') {
-      if (!a.fields.length) issues.push({ level: 'error', text: `Table ${a.name} has no fields` });
-      const fn = new Set();
-      for (const f of a.fields) {
-        const fe = checkFieldName(f.name);
-        if (fe) issues.push({ level: 'error', text: `Field ${a.name}-${f.name}: ${fe}` });
-        if (fn.has(f.name)) issues.push({ level: 'error', text: `Field ${a.name}-${f.name} is defined twice` });
-        fn.add(f.name);
+      const checkFields = (fields, where) => {
+        if (!fields.length) issues.push({ level: 'error', text: `Table ${where} has no fields` });
+        const fn = new Set();
+        for (const f of fields) {
+          const fe = checkFieldName(f.name);
+          if (fe) issues.push({ level: 'error', text: `Field ${where}-${f.name}: ${fe}` });
+          if (fn.has(f.name)) issues.push({ level: 'error', text: `Field ${where}-${f.name} is defined twice` });
+          fn.add(f.name);
+          if (f.type === 'table') checkFields(f.fields || [], `${where}-${f.name}`);
+        }
+      };
+      checkFields(a.fields, a.name);
+      for (const t of tableTypes(a)) {
+        if (t.name.length > 30) issues.push({ level: 'error', text: `Table ${a.name}: its row type ${t.name} is longer than 30 characters` });
       }
-      if (typeName(a).length > 30) issues.push({ level: 'error', text: `Table ${a.name}: its row type ${typeName(a)} is longer than 30 characters` });
+    }
+  }
+  const allTypes = design.attributes.filter((a) => a.type === 'table').flatMap((a) => tableTypes(a).map((t) => [t.name, a.name]));
+  const seenTypes = new Map();
+  for (const [t, owner] of allTypes) {
+    if (seenTypes.has(t) && seenTypes.get(t) !== owner) issues.push({ level: 'error', text: `Tables ${seenTypes.get(t)} and ${owner} share the row type ${t} - rename one` });
+    seenTypes.set(t, seenTypes.get(t) || owner);
+  }
+  const attrByName = new Map(design.attributes.map((a) => [a.name, a]));
+  for (const a of design.attributes) {
+    if (!attributeUsage(design, a.name)) issues.push({ level: 'warning', text: `Attribute ${a.name} is public, but nothing binds it - bind it or remove it` });
+    const rowValues = (fields, rows, where) => (rows || []).flatMap((r) => fields.flatMap((f) => (f.type === 'table'
+      ? rowValues(f.fields || [], r[f.name], `${where}-${f.name}`)
+      : [[f.type, r[f.name], `${where}-${f.name}`]])));
+    const values = a.type === 'table' ? rowValues(a.fields, a.rows, a.name) : [[a.type, a.value, a.name]];
+    for (const [type, v, where] of values) {
+      const w = checkValue(type, v);
+      if (w) issues.push({ level: 'warning', text: `${where}: ${w}` });
     }
   }
   walk(design.root, (n, parent, agg) => {
     for (const [p, v] of Object.entries(n.props || {})) {
       if (!v) continue;
       if (v.m === 'b' && !names.has(v.v)) issues.push({ level: 'error', text: `${n.type}.${p} is bound to ${v.v}, which is not an attribute`, node: n.id });
+      else if (v.m === 'b') {
+        const attr = attrByName.get(v.v);
+        const isAgg = bindableAggs(n).includes(p);
+        if (isAgg && attr.type !== 'table') issues.push({ level: 'error', text: `${n.type}.${p} repeats the rows of ${v.v}, which is not a table`, node: n.id });
+        if (!isAgg && attr.type === 'table') issues.push({ level: 'error', text: `${n.type}.${p} is bound to the table ${v.v} - a property takes a single value`, node: n.id });
+        const def = CONTROLS[n.type] && CONTROLS[n.type].props && CONTROLS[n.type].props[p];
+        if (def && !isAgg && !attributeFits(def, attr.type)) issues.push({ level: 'warning', text: `${n.type}.${p} is ${def.type}, ${v.v} is ${attr.type}`, node: n.id });
+      }
       if (v.m === 'f') {
         const ctx = rowContext(design, n.id);
+        const field = ctx && ctx.fields.find((f) => f.name === v.v);
+        const isAgg = bindableAggs(n).includes(p);
         if (!ctx) issues.push({ level: 'error', text: `${n.type}.${p} uses field ${v.v} outside a bound list`, node: n.id });
-        else if (!ctx.fields.some((f) => f.name === v.v)) issues.push({ level: 'error', text: `${n.type}.${p}: ${ctx.name} has no field ${v.v}`, node: n.id });
+        else if (!field) issues.push({ level: 'error', text: `${n.type}.${p}: ${ctx.name} has no field ${v.v}`, node: n.id });
+        else if (isAgg && field.type !== 'table') issues.push({ level: 'error', text: `${n.type}.${p} repeats the rows of field ${v.v}, which is not a table`, node: n.id });
+        else if (!isAgg && field.type === 'table') issues.push({ level: 'error', text: `${n.type}.${p} is bound to the table field ${v.v} - a property takes a single value`, node: n.id });
       }
     }
     for (const [e, name] of Object.entries(n.events || {})) {
@@ -401,8 +561,16 @@ export function validate(design) {
     }
     for (const a of bindableAggs(n)) {
       const b = n.props[a];
-      if (b && b.m === 'b' && (n.aggs[a] || []).length !== 1) {
+      const def = getControl(n.type).aggs[a];
+      if (b && (b.m === 'b' || b.m === 'f') && !def.noTemplate && (n.aggs[a] || []).length !== 1) {
         issues.push({ level: 'warning', text: `${n.type}: a bound ${a} aggregation needs exactly one template item`, node: n.id });
+      }
+      if (n.type === 'Tree' && !(b && (b.m === 'b' || b.m === 'f' || b.m === 'x'))) {
+        issues.push({ level: 'error', text: 'Tree: its items have to be bound to a table - UI5 fails on static tree items', node: n.id });
+      }
+      if (b && b.arr) {
+        const ctx = b.m === 'b' ? attrByName.get(b.v) : null;
+        if (ctx && !(ctx.fields || []).some((f) => f.name === b.arr && f.type === 'table')) issues.push({ level: 'error', text: `${n.type}.${a}: ${b.v} has no table field ${b.arr} to take the children from`, node: n.id });
       }
     }
     const c = CONTROLS[n.type];
@@ -412,16 +580,56 @@ export function validate(design) {
       if (!wired) issues.push({ level: 'info', text: `${n.type}: what the user enters goes nowhere - bind ${c.input} to an attribute (or name an event)`, node: n.id });
     }
     if (parent && !CONTROLS[n.type] && n.type !== 'mvc:View') {
-      issues.push({ level: 'info', text: `${n.type} is not in the palette - kept as imported`, node: n.id });
+      issues.push({ level: 'info', text: `${n.type} is not in the palette - not checked against UI5 1.71`, node: n.id });
     }
     return true;
   });
   return issues;
 }
 
-export function typeName(attr) {
+// A sample value the class cannot carry as it is: more than two decimals
+// (the type is p LENGTH 16 DECIMALS 2), a time without seconds, a date or
+// time in another shape than the data panel writes
+export function checkValue(type, v) {
+  if (v === '' || v == null) return null;
+  const t = String(v).trim();
+  if (type === 'decimal') {
+    if (!/^-?\d+(\.\d+)?$/.test(t)) return `"${t}" is not a number`;
+    if ((t.split('.')[1] || '').length > 2) return `"${t}" has more than 2 decimals - the class rounds it`;
+  }
+  if (type === 'int' && !/^-?\d+$/.test(t)) return `"${t}" is not a whole number`;
+  if (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(t)) return `"${t}" is not a date (yyyy-mm-dd)`;
+  if (type === 'time' && !/^\d{2}:\d{2}:\d{2}$/.test(t)) return `"${t}" is not a time (hh:mm:ss)`;
+  return null;
+}
+
+// Does an attribute of `attrType` fit a property of `def`? A boolean takes
+// a flag, a number a number, text takes anything that prints
+export function attributeFits(def, attrType) {
+  if (attrType === 'table') return false;
+  if (def.type === 'boolean') return attrType === 'bool';
+  if (def.type === 'int') return attrType === 'int';
+  if (def.type === 'float') return attrType === 'int' || attrType === 'decimal';
+  return attrType !== 'bool';
+}
+
+// the row type of a table attribute (t_rows -> ty_s_rows), and of a table
+// field inside it (field NODES of t_rows -> ty_s_rows_nodes)
+export function typeName(attr, path = []) {
   const base = attr.name.startsWith('t_') ? attr.name.slice(2) : attr.name;
-  return `ty_s_${base}`;
+  return [`ty_s_${base}`, ...path.map((f) => f.toLowerCase())].join('_');
+}
+
+// Every table type a table attribute needs, innermost first: [{ name,
+// fields, path }] - a field of type table has fields of its own
+export function tableTypes(attr) {
+  const out = [];
+  const walkFields = (fields, path) => {
+    for (const f of fields) if (f.type === 'table') walkFields(f.fields || [], [...path, f.name]);
+    out.push({ name: typeName(attr, path), fields, path });
+  };
+  walkFields(attr.fields || [], []);
+  return out;
 }
 
 // The model the preview binds: what abap2UI5 would send, keys upper case
@@ -430,11 +638,7 @@ export function previewModel(design) {
   for (const a of design.attributes) {
     const key = a.name.toUpperCase();
     if (a.type === 'table') {
-      out[key] = (a.rows || []).map((r) => {
-        const row = {};
-        for (const f of a.fields) row[f.name] = jsValue(f.type, r[f.name]);
-        return row;
-      });
+      out[key] = jsRows(a.fields, a.rows);
     } else {
       out[key] = jsValue(a.type, a.value);
     }
@@ -442,9 +646,20 @@ export function previewModel(design) {
   return out;
 }
 
+function jsRows(fields, rows) {
+  return (rows || []).map((r) => {
+    const row = {};
+    for (const f of fields) row[f.name] = f.type === 'table' ? jsRows(f.fields || [], r[f.name]) : jsValue(f.type, r[f.name]);
+    return row;
+  });
+}
+
+// what abap2UI5 sends for the value model_init seeds: the class rounds a
+// decimal to 2 places and pads a time to seconds, so does the canvas
 function jsValue(type, v) {
   if (type === 'bool') return v === true || v === 'true' || v === 'X';
   if (type === 'int') return v === '' || v == null ? 0 : parseInt(v, 10) || 0;
-  if (type === 'decimal') return v === '' || v == null ? 0 : Number(v) || 0;
+  if (type === 'decimal') return v === '' || v == null ? 0 : Math.round((Number(v) || 0) * 100) / 100;
+  if (type === 'time' && /^\d{2}:\d{2}$/.test(String(v))) return `${v}:00`;
   return v == null ? '' : String(v);
 }

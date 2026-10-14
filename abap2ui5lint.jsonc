@@ -10,7 +10,11 @@
     "chain-house-layout": { "severity": "warning" },
     // the kitchen sink writes a raw expression on purpose - it is the test
     // of the designer's "Expr" mode, which takes whatever the user types
-    "hardcoded-binding-path": { "exclude": ["/.verify/abap/zcl_dsg_kitchen_sink."] }
+    "hardcoded-binding-path": { "exclude": ["/.verify/abap/zcl_dsg_kitchen_sink"] },
+    // a list inside a bound list repeats a table field of the row
+    // (items = `{NODES}`): the template's fields resolve against that row,
+    // which the runtime check proves - the linter sees no context there
+    "relative-binding-without-context": { "exclude": ["/.verify/abap/zcl_dsg_kitchen_sink"] }
   },
   "failOn": "warning"
 }

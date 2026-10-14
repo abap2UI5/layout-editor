@@ -32,7 +32,16 @@ function evalExpr(src) {
       let out = '';
       while (s[j] !== '|') {
         if (s[j] === '\\') { const e = s[j + 1]; out += e === 'n' ? '\n' : e === 'r' ? '\r' : e === 't' ? '\t' : e; j += 2; continue; }
-        if (s[j] === '{') throw new Error(`embedded expression in template: ${s}`);
+        if (s[j] === '{') {
+          // an embedded expression: the path of a binding
+          const close = s.indexOf('}', j);
+          const inner = s.slice(j + 1, close).trim();
+          const b = /^client->_bind\( val = (\w+) path = abap_true \)$/.exec(inner);
+          if (!b) throw new Error(`embedded expression in template: ${inner}`);
+          out += `/${b[1].toUpperCase()}`;
+          j = close + 1;
+          continue;
+        }
         out += s[j++];
       }
       parts.push(out);

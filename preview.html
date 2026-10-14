@@ -10,6 +10,8 @@
     .dsg-hover { outline: 1px dashed #0064d9 !important; outline-offset: -1px; }
     .dsg-sel { outline: 2px solid #0064d9 !important; outline-offset: -2px; }
     .dsg-drop { outline: 2px dashed #0064d9 !important; outline-offset: -2px; background-color: rgba(0, 100, 217, 0.06) !important; }
+    .dsg-drop-before { box-shadow: 0 -3px 0 0 #0064d9 !important; }
+    .dsg-drop-after { box-shadow: 0 3px 0 0 #0064d9 !important; }
     #dsg-error { display: none; position: fixed; inset: auto 12px 12px 12px; padding: 10px 12px; background: #fff4f4; color: #8f1d1d;
       border: 1px solid #e4a3a3; border-radius: 6px; font: 13px/1.4 system-ui, sans-serif; white-space: pre-wrap; z-index: 99999; }
     #dsg-tools { position: fixed; z-index: 99998; display: none; align-items: center; gap: 1px; padding: 2px; border-radius: 7px;
@@ -41,6 +43,18 @@
 </head>
 <body class="sapUiBody">
   <div id="dsg-loading">Loading UI5…</div>
+  <script>
+    // UI5 that has not booted after a while: say so, instead of a spinner
+    // for ever - the CDN may be out of reach (see ?ui5=local in the README)
+    setTimeout(function () {
+      var el = document.getElementById('dsg-loading');
+      if (!el || !el.parentNode) return;
+      el.innerHTML = '<div style="max-width:28rem;text-align:center;line-height:1.5"><b>UI5 is not loading.</b><br>' +
+        'The canvas loads OpenUI5 from sdk.openui5.org. Without access to it, serve a local tree (README: <code>?ui5=local</code>), ' +
+        'or check the version in the toolbar.</div>';
+      window.parent.postMessage({ source: 'dsg-preview', type: 'error', message: 'UI5 did not load', boot: true }, '*');
+    }, 25000);
+  </script>
   <div id="content"></div>
   <div id="dsg-error"></div>
 </body>

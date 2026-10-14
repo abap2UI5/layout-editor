@@ -2,3 +2,4 @@ node_modules/
 .verify/
 test-results/
 playwright-report/
+.ui5/
