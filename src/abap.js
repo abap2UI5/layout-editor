@@ -221,12 +221,16 @@ function seedTable(attr) {
   // columns line up; a field no row sets is left out
   const used = attr.fields.filter((f) => (attr.rows || []).some((r) => abapValue(f.type, r[f.name]) !== null));
   const rows = (attr.rows || []).map((r) => used.map((f) => [f.name.toLowerCase(), abapValue(f.type, r[f.name]) ?? INITIAL[f.type]]));
-  const nonEmpty = rows.filter((r) => r.length);
+  // every sample row is a row of the model the preview shows, so every row
+  // is written - a row that sets nothing as an initial line ( )
+  const nonEmpty = rows;
   if (!nonEmpty.length) return [];
   const sameShape = nonEmpty.every((r) => r.map(([n]) => n).join() === nonEmpty[0].map(([n]) => n).join());
   const cellText = (n, v) => `${n} = ${v}`;
   let rendered;
-  if (sameShape && nonEmpty.length > 1) {
+  if (!nonEmpty[0].length) {
+    rendered = nonEmpty.map(() => '( )');
+  } else if (sameShape && nonEmpty.length > 1) {
     const cols = nonEmpty[0].length;
     const widths = [];
     for (let i = 0; i < cols; i++) widths[i] = Math.max(...nonEmpty.map((r) => cellText(...r[i]).length));

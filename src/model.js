@@ -121,7 +121,7 @@ export function canHaveChildren(node) {
 }
 
 export function aggAccepts(node, agg, childType) {
-  if (node.type === 'mvc:View') return agg === 'content';
+  if (node.type === 'mvc:View') return agg === 'content' && getControl(childType)?.category !== 'Parts';
   const c = getControl(node.type);
   if (!c) return true;
   const a = c.aggs && c.aggs[agg];
@@ -138,7 +138,7 @@ export function insertNode(design, child, parentId, agg, index) {
   if (!p) throw new Error(`no node ${parentId}`);
   const parent = p.node;
   const target = agg || (parent.type === 'mvc:View' ? 'content' : defaultAggFor(parent.type, child.type));
-  if (!target) throw new Error(`${parent.type} takes no ${child.type}`);
+  if (!target || !aggAccepts(parent, target, child.type)) throw new Error(`${parent.type} takes no ${child.type}${agg ? ` in ${agg}` : ''}`);
   parent.aggs[target] = parent.aggs[target] || [];
   const list = parent.aggs[target];
   list.splice(index == null || index > list.length ? list.length : index, 0, child);
@@ -151,7 +151,7 @@ export function dropTarget(design, onId, childType) {
   const hit = findNode(design.root, onId);
   if (!hit) return null;
   const n = hit.node;
-  if (n.type === 'mvc:View') return { parentId: n.id, agg: 'content', index: null };
+  if (n.type === 'mvc:View') return aggAccepts(n, 'content', childType) ? { parentId: n.id, agg: 'content', index: null } : null;
   const c = getControl(n.type);
   if (c && c.aggs) {
     for (const agg of [dropAggOf(c), ...Object.keys(c.aggs)].filter(Boolean)) {
@@ -166,7 +166,7 @@ export function dropTarget(design, onId, childType) {
   while (cur) {
     const up = findNode(design.root, cur.id);
     const pc = getControl(cur.type);
-    const agg = cur.type === 'mvc:View' ? 'content' : pc && pc.aggs ? Object.keys(pc.aggs).find((a) => aggAccepts(cur, a, childType)) : null;
+    const agg = cur.type === 'mvc:View' ? (aggAccepts(cur, 'content', childType) ? 'content' : null) : pc && pc.aggs ? Object.keys(pc.aggs).find((a) => aggAccepts(cur, a, childType)) : null;
     if (agg) return { parentId: cur.id, agg, index: null };
     cur = up && up.parent;
   }
@@ -218,7 +218,7 @@ export function duplicateNode(design, id) {
   walk(copy, (n) => { n.id = newId(); });
   const list = hit.parent.aggs[hit.agg];
   const c = getControl(hit.parent.type);
-  if (c && c.aggs && c.aggs[hit.agg] && c.aggs[hit.agg].single) return id;
+  if (c && c.aggs && c.aggs[hit.agg] && c.aggs[hit.agg].single) return null;
   list.splice(hit.index + 1, 0, copy);
   return copy.id;
 }
@@ -383,12 +383,28 @@ export function validate(design) {
         fn.add(f.name);
       }
       if (typeName(a).length > 30) issues.push({ level: 'error', text: `Table ${a.name}: its row type ${typeName(a)} is longer than 30 characters` });
+      const twin = design.attributes.find((b) => b !== a && b.type === 'table' && typeName(b) === typeName(a));
+      if (twin && design.attributes.indexOf(twin) < design.attributes.indexOf(a)) {
+        issues.push({ level: 'error', text: `Tables ${twin.name} and ${a.name} share the row type ${typeName(a)} - rename one` });
+      }
     }
+  }
+  const attrByName = new Map(design.attributes.map((a) => [a.name, a]));
+  for (const a of design.attributes) {
+    if (!attributeUsage(design, a.name)) issues.push({ level: 'warning', text: `Attribute ${a.name} is public, but nothing binds it - bind it or remove it` });
   }
   walk(design.root, (n, parent, agg) => {
     for (const [p, v] of Object.entries(n.props || {})) {
       if (!v) continue;
       if (v.m === 'b' && !names.has(v.v)) issues.push({ level: 'error', text: `${n.type}.${p} is bound to ${v.v}, which is not an attribute`, node: n.id });
+      else if (v.m === 'b') {
+        const attr = attrByName.get(v.v);
+        const isAgg = bindableAggs(n).includes(p);
+        if (isAgg && attr.type !== 'table') issues.push({ level: 'error', text: `${n.type}.${p} repeats the rows of ${v.v}, which is not a table`, node: n.id });
+        if (!isAgg && attr.type === 'table') issues.push({ level: 'error', text: `${n.type}.${p} is bound to the table ${v.v} - a property takes a single value`, node: n.id });
+        const def = CONTROLS[n.type] && CONTROLS[n.type].props && CONTROLS[n.type].props[p];
+        if (def && !isAgg && !attributeFits(def, attr.type)) issues.push({ level: 'warning', text: `${n.type}.${p} is ${def.type}, ${v.v} is ${attr.type}`, node: n.id });
+      }
       if (v.m === 'f') {
         const ctx = rowContext(design, n.id);
         if (!ctx) issues.push({ level: 'error', text: `${n.type}.${p} uses field ${v.v} outside a bound list`, node: n.id });
@@ -417,6 +433,16 @@ export function validate(design) {
     return true;
   });
   return issues;
+}
+
+// Does an attribute of `attrType` fit a property of `def`? A boolean takes
+// a flag, a number a number, text takes anything that prints
+export function attributeFits(def, attrType) {
+  if (attrType === 'table') return false;
+  if (def.type === 'boolean') return attrType === 'bool';
+  if (def.type === 'int') return attrType === 'int';
+  if (def.type === 'float') return attrType === 'int' || attrType === 'decimal';
+  return attrType !== 'bool';
 }
 
 export function typeName(attr) {

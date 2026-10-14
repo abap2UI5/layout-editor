@@ -12,7 +12,7 @@ import { CONTROLS, CATEGORIES, DESCRIPTIONS, getControl, splitType, NAMESPACES }
 import {
   createNode, clone, walk, findNode, aggNames, aggAccepts, canHaveChildren, insertNode, dropTarget, removeNode,
   moveNode, shiftNode, duplicateNode, rowContext, bindableAggs, bindListToTable, unbindList, attributeUsage, renameAttribute,
-  validate, previewModel, checkAttributeName, checkFieldName, checkEventName, checkClassName, SCALAR_TYPES, ATTRIBUTE_TYPES, DESIGN_VERSION,
+  validate, previewModel, attributeFits, checkAttributeName, checkFieldName, checkEventName, checkClassName, SCALAR_TYPES, ATTRIBUTE_TYPES, DESIGN_VERSION,
 } from './model.js';
 import { toXml, fromXml } from './xml.js';
 import { generateClass, generateClassMap, abapGitFiles, fileName } from './abap.js';
@@ -124,6 +124,8 @@ function replaceDesign(d) {
 function select(id, opts = {}) {
   if (!findNode(state.design.root, id)) id = 'root';
   state.selected = id;
+  // typing after a change of selection is a new undo step
+  state.lastMergeKey = null;
   // a selected node is never hidden in a collapsed branch
   for (const a of ancestors(id)) state.collapsed.delete(a.id);
   renderLayers();
@@ -673,7 +675,7 @@ function propRow(node, p, def, ctx) {
       const mm = e.target.value;
       if (mm === 's') delete n.props[p];
       else if (mm === 'b') {
-        const fits = d.attributes.filter((a) => a.type !== 'table');
+        const fits = d.attributes.filter((a) => attributeFits(def, a.type));
         n.props[p] = { m: 'b', v: fits[0] ? fits[0].name : '' };
       } else if (mm === 'f') n.props[p] = { m: 'f', v: ctx && ctx.fields[0] ? ctx.fields[0].name : '' };
       else n.props[p] = { m: 'x', v: value && value.m === 's' ? value.v : '' };
@@ -701,7 +703,7 @@ function propRow(node, p, def, ctx) {
       });
     }
   } else if (m === 'b') {
-    const attrs = d.attributes.filter((a) => a.type !== 'table');
+    const attrs = d.attributes.filter((a) => attributeFits(def, a.type));
     editor = h('div', { class: 'val' },
       h('select', {
         'aria-label': `${p}: attribute`,
@@ -1015,7 +1017,7 @@ function onToolbarAction(action, id) {
     if (hit && hit.parent) select(hit.parent.id);
   } else if (action === 'up') commit((d) => shiftNode(d, id, -1));
   else if (action === 'down') commit((d) => shiftNode(d, id, 1));
-  else if (action === 'dup') commit((d) => duplicateNode(d, id));
+  else if (action === 'dup') commit((d) => duplicateNode(d, id) || toast('It cannot be duplicated: its slot takes one control'));
   else if (action === 'del') commit((d) => removeNode(d, id));
 }
 
@@ -1306,7 +1308,8 @@ function wire() {
     if (v && !/^\d+\.\d+\.\d+$/.test(v)) { ver.classList.add('invalid'); toast('A version like 1.71.80, or empty for the latest'); return; }
     ver.classList.remove('invalid');
     state.prefs.ui5 = v;
-    if (v && /^1\.(\d+)\./.test(v) && Number(RegExp.$1) < 102 && state.prefs.theme === 'sap_horizon') { state.prefs.theme = 'sap_fiori_3'; theme.value = 'sap_fiori_3'; }
+    const minor = /^1\.(\d+)\./.exec(v);
+    if (minor && Number(minor[1]) < 102 && state.prefs.theme === 'sap_horizon') { state.prefs.theme = 'sap_fiori_3'; theme.value = 'sap_fiori_3'; }
     savePrefs();
     loadPreview();
   };

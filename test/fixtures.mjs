@@ -42,6 +42,8 @@ export function kitchenSink() {
         { NAME: 'Gamma', QTY: '', PRICE: '', DONE: false, DUE: '', AT: '' },
       ],
     },
+    // sample rows that set nothing are rows of the model all the same
+    { name: 't_blank', type: 'table', fields: [{ name: 'NOTE', type: 'string' }], rows: [{ NOTE: '' }, {}] },
   ];
   const page = d.root.aggs.content[0];
   page.aggs.content = [];
@@ -81,6 +83,9 @@ export function kitchenSink() {
   const list = createNode('List');
   insertNode(d, list, page.id);
   bindListToTable(d, list.id, 'items', 't_rows');
+  const blank = createNode('List');
+  insertNode(d, blank, page.id);
+  bindListToTable(d, blank.id, 'items', 't_blank');
   const select = createNode('Select');
   insertNode(d, select, page.id);
   bindListToTable(d, select.id, 'items', 't_rows');

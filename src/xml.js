@@ -20,6 +20,15 @@ export function escapeBindingLiteral(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}');
 }
 
+// A value the view writes: a static text that is not empty, a binding that
+// names something. An empty binding would bind the whole model ({/}) or
+// fail to parse ({}) - the class leaves it out, so does the view
+export function isSetValue(value) {
+  if (!value) return false;
+  if (value.m === 's') return value.v !== '' && value.v != null;
+  return !!value.v;
+}
+
 export function valueToXml(value, opts) {
   if (!value) return null;
   switch (value.m) {
@@ -58,8 +67,9 @@ export function toXml(design, options = {}) {
     const attrs = [];
     if (preview) attrs.push(`id="${node.id}"`);
     for (const [name, value] of Object.entries(node.props || {})) {
+      if (!isSetValue(value)) continue;
       const v = valueToXml(value);
-      if (v === null || (value.m === 's' && value.v === '')) continue;
+      if (v === null) continue;
       attrs.push(`${name}="${escapeXml(v)}"`);
     }
     for (const [ev, name] of Object.entries(node.events || {})) {
