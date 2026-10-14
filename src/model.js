@@ -266,7 +266,12 @@ export function duplicateNode(design, id) {
 export function rowContext(design, id) {
   let hit = findNode(design.root, id);
   while (hit && hit.parent) {
-    const binding = hit.parent.props && hit.parent.props[hit.agg];
+    // the aggregation itself, or the one its templates are for (a grid
+    // table's columns hold the templates of its rows)
+    const pc = getControl(hit.parent.type);
+    const def = pc && pc.aggs && pc.aggs[hit.agg];
+    const boundAgg = def && def.templateFor ? def.templateFor : hit.agg;
+    const binding = hit.parent.props && hit.parent.props[boundAgg];
     if (binding && binding.m === 'b') {
       const attr = design.attributes.find((a) => a.name === binding.v);
       if (attr && attr.type === 'table') return attr;
@@ -331,6 +336,20 @@ export function bindListToTable(design, nodeId, agg, attrName, replace = true) {
     item.props.key = f(0);
     item.props.text = fields[1] ? f(1) : f(0);
     node.aggs.items = [item];
+  } else if (node.type === 'table:Table') {
+    node.aggs.columns = fields.map((fld) => {
+      const col = createNode('table:Column', { props: { label: label(fld.name) }, aggs: {} });
+      const cell = createNode(fld.type === 'bool' ? 'CheckBox' : 'Text');
+      delete cell.props.text;
+      if (fld.type === 'bool') {
+        cell.props.selected = { m: 'f', v: fld.name };
+        cell.props.editable = { m: 's', v: 'false' };
+      } else {
+        cell.props.text = { m: 'f', v: fld.name };
+      }
+      col.aggs.template = [cell];
+      return col;
+    });
   }
 }
 
@@ -478,7 +497,8 @@ export function validate(design) {
     }
     for (const a of bindableAggs(n)) {
       const b = n.props[a];
-      if (b && b.m === 'b' && (n.aggs[a] || []).length !== 1) {
+      const def = getControl(n.type).aggs[a];
+      if (b && b.m === 'b' && !def.noTemplate && (n.aggs[a] || []).length !== 1) {
         issues.push({ level: 'warning', text: `${n.type}: a bound ${a} aggregation needs exactly one template item`, node: n.id });
       }
     }

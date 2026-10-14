@@ -22,7 +22,8 @@ for (const [id, design] of allDesigns()) {
     }
     // what UI5 does not put in the page: the content of a tab that is not
     // selected, the items of a dropdown until it opens, the pages of a
-    // carousel after the first - and what depends on the width of the
+    // carousel after the first, a tab container's items (their content is
+    // in the page), a lazily loaded object page section - and what depends on the width of the
     // canvas: what an overflow toolbar moves into its menu, the links a
     // breadcrumb folds, a column with a minimum screen width, the content
     // of a tile that is not loaded
@@ -41,7 +42,12 @@ function hiddenByUi5(root) {
   const walk = (n) => {
     for (const [agg, list] of Object.entries(n.aggs || {})) {
       list.forEach((ch, i) => {
-        if ((n.type === 'IconTabBar' && i > 0) || (n.type === 'Carousel' && i > 0)) mark(ch);
+        if (['IconTabBar', 'Carousel', 'Wizard', 'TabContainer', 'SlideTile'].includes(n.type) && i > 0) mark(ch);
+        else if (n.type === 'MenuButton' || n.type === 'MenuItem') mark(ch);
+        else if (n.type === 'TabContainer') { hidden.add(ch.id); if (i > 0) mark(ch); else walk(ch); } // an item is no element, its content is
+        else if (n.type === 'uxap:ObjectPageLayout' && agg === 'sections' && i > 0) mark(ch); // lazy loading in the kitchen sink
+        else if (ch.type === 'core:HTML') mark(ch); // renders its content, no element of its own
+        else if (n.type === 'table:Column' && agg === 'template') mark(ch); // cloned per row, shown with rows only
         else if (['Select', 'ComboBox', 'MultiComboBox'].includes(n.type) && agg === 'items') mark(ch);
         else if (n.type === 'MultiInput' && agg === 'tokens') mark(ch);
         else if (n.type === 'OverflowToolbar' || n.type === 'Breadcrumbs') mark(ch);

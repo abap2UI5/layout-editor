@@ -10,7 +10,7 @@
     "chain-house-layout": { "severity": "warning" },
     // the kitchen sink writes a raw expression on purpose - it is the test
     // of the designer's "Expr" mode, which takes whatever the user types
-    "hardcoded-binding-path": { "exclude": ["/.verify/abap/zcl_dsg_kitchen_sink."] }
+    "hardcoded-binding-path": { "exclude": ["/.verify/abap/zcl_dsg_kitchen_sink"] }
   },
   "failOn": "warning"
 }

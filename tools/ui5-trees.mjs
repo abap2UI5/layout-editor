@@ -7,7 +7,7 @@
 //   UI5_RESOURCES=.ui5/1.71.80 npm run ui5:metadata
 //
 // A tree is the src/ of each package copied into one folder: sap.ui.core,
-// sap.m, sap.ui.layout, sap.ui.unified and the theme libraries the canvas
+// sap.m, sap.ui.layout, sap.ui.unified, sap.f, sap.uxap, sap.ui.table and the theme libraries the canvas
 // offers. Nothing is downloaded twice: a tree that is there is kept.
 import { cp, mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const LIBS = ['sap.ui.core', 'sap.m', 'sap.ui.layout', 'sap.ui.unified', 'themelib_sap_fiori_3', 'themelib_sap_belize'];
+const LIBS = ['sap.ui.core', 'sap.m', 'sap.ui.layout', 'sap.ui.unified', 'sap.f', 'sap.uxap', 'sap.ui.table', 'themelib_sap_fiori_3', 'themelib_sap_belize'];
 
 for (const version of process.argv.slice(2)) {
   const tree = join(ROOT, '.ui5', version);

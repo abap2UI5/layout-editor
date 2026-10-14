@@ -21,12 +21,28 @@ const HOME = {
   IconTabFilter: 'IconTabBar', IconTabSeparator: 'IconTabBar', 'core:Item': 'Select', RadioButton: 'RadioButtonGroup',
   SegmentedButtonItem: 'SegmentedButton', StandardListItem: 'List', CustomListItem: 'List', Column: 'Table', ColumnListItem: 'Table',
   ObjectListItem: 'List', DisplayListItem: 'List', InputListItem: 'List', ObjectAttribute: 'ObjectHeader', Token: 'MultiInput',
-  TileContent: 'GenericTile', NumericContent: 'TileContent',
+  TileContent: 'GenericTile', NumericContent: 'TileContent', ImageContent: 'TileContent', NewsContent: 'TileContent', FeedContent: 'TileContent',
+  FeedListItem: 'List', NotificationListItem: 'List', ActionListItem: 'List', GroupHeaderListItem: 'List',
+  WizardStep: 'Wizard', TabContainerItem: 'TabContainer', MenuItem: 'Menu', Menu: 'MenuButton',
+  'l:BlockLayoutRow': 'l:BlockLayout', 'l:BlockLayoutCell': 'l:BlockLayoutRow', 'table:Column': 'table:Table',
+  'f:DynamicPageTitle': 'f:DynamicPage', 'f:DynamicPageHeader': 'f:DynamicPage', 'cards:Header': 'f:Card', 'core:Title': 'form:SimpleForm',
+  'uxap:ObjectPageDynamicHeaderTitle': 'uxap:ObjectPageLayout', 'uxap:ObjectPageSection': 'uxap:ObjectPageLayout', 'uxap:ObjectPageSubSection': 'uxap:ObjectPageSection',
 };
 
-export function kitchenSink() {
+// the category a control's outermost home is in: a part goes with the
+// control it lives in
+function homeCategory(type) {
+  let t = type;
+  while (HOME[t]) t = HOME[t];
+  return CONTROLS[t].category;
+}
+
+// `half`: 1 for the layout and display controls, 2 for input and lists -
+// one class with every control is more than the transpiled runtime of the
+// verification takes in one statement; nothing: all of them
+export function kitchenSink(half) {
   const d = createDesign();
-  d.className = 'ZCL_DSG_KITCHEN_SINK';
+  d.className = half ? `ZCL_DSG_KITCHEN_SINK_${half}` : 'ZCL_DSG_KITCHEN_SINK';
   d.description = 'every control of the designer palette';
   d.attributes = [
     { name: 'text', type: 'string', value: 'Hello `world` {not a binding}' },
@@ -54,19 +70,29 @@ export function kitchenSink() {
   const parents = {};
   let ev = 0;
   for (const [type, c] of Object.entries(CONTROLS)) {
+    if (half && (['Layout', 'Display'].includes(homeCategory(type)) ? 1 : 2) !== half) continue;
     const node = createNode(type);
     for (const [p, def] of Object.entries(c.props || {})) node.props[p] = { m: 's', v: sample(def) };
     for (const e of c.events || []) node.events[e] = `EV_${++ev}`;
     const home = HOME[type];
     if (home) {
-      const place = (t) => {
-        if (parents[t]) return parents[t];
-        const p = createNode(t);
-        insertNode(d, p, HOME[t] ? place(HOME[t]).id : box.id);
+      // one parent per kind, its slots empty so the part fits - a second
+      // one when the slot of the first is taken (a tile content holds one)
+      const place = (t, fresh) => {
+        if (parents[t] && !fresh) return parents[t];
+        const p = createNode(t, { aggs: {} });
+        if (!HOME[t]) insertNode(d, p, box.id);
+        else {
+          try { insertNode(d, p, place(HOME[t]).id); } catch { insertNode(d, p, place(HOME[t], true).id); }
+        }
         parents[t] = p;
         return p;
       };
-      insertNode(d, node, place(home).id);
+      try {
+        insertNode(d, node, place(home).id);
+      } catch {
+        insertNode(d, node, place(home, true).id);
+      }
     } else {
       insertNode(d, node, box.id);
     }
@@ -106,6 +132,6 @@ export function kitchenSink() {
 }
 
 export function allDesigns() {
-  return [...STARTERS.map((s) => [s.id, s.make()]), ['kitchen-sink', kitchenSink()]];
+  return [...STARTERS.map((s) => [s.id, s.make()]), ['kitchen-sink-1', kitchenSink(1)], ['kitchen-sink-2', kitchenSink(2)]];
 }
 

@@ -40,15 +40,15 @@ test('a binding that names no attribute is reported, a table where a scalar is e
 });
 
 test('handlers, ids and core:require are dropped and counted, unknown controls listed', () => {
-  const d = fromXml(VIEW(`<Page id="p" core:require="{x:'y'}"><Button id="b" press=".onGo" text="Go"/><Input change="onChange" class="sapUiSmallMargin"/><Wizard><steps><Text text="in"/></steps></Wizard></Page>`), base());
-  const [button, input, wizard] = first(d).aggs.content;
+  const d = fromXml(VIEW(`<Page id="p" core:require="{x:'y'}"><Button id="b" press=".onGo" text="Go"/><Input change="onChange" class="sapUiSmallMargin"/><Shell><content><Text text="in"/></content></Shell></Page>`), base());
+  const [button, input, shell] = first(d).aggs.content;
   assert.deepEqual(Object.keys(button.props), ['text']);
   assert.deepEqual(input.props.class, { m: 's', v: 'sapUiSmallMargin' }, 'an unknown property is kept');
-  assert.equal(wizard.aggs.steps[0].type, 'Text');
+  assert.equal(shell.aggs.content[0].type, 'Text');
   const r = importReport();
   assert.deepEqual(r.handlers, ['Button.press', 'Input.change']);
   assert.equal(r.ids, 2);
-  assert.deepEqual(r.unknown, ['Wizard']);
+  assert.deepEqual(r.unknown, ['Shell']);
   assert.ok(toXml(d).includes('class="sapUiSmallMargin"'));
 });
 
