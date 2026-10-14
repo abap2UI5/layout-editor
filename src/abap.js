@@ -260,6 +260,17 @@ function seedTable(attr) {
 }
 
 export function generateClass(design) {
+  return buildClass(design).source;
+}
+
+// The class source with, per line, the design node it belongs to (null for
+// every line outside the view chain) - what the code view links to the
+// canvas with
+export function generateClassMap(design) {
+  return buildClass(design);
+}
+
+function buildClass(design) {
   const cls = design.className.toLowerCase();
   const events = collectEvents(design);
   const tables = design.attributes.filter((a) => a.type === 'table');
@@ -326,7 +337,9 @@ export function generateClass(design) {
   L.push('');
   L.push('  METHOD view_display.');
   L.push('');
-  L.push(...viewChain(design, 4));
+  const chain = viewChain(design, 4);
+  const chainStart = L.length;
+  L.push(...chain);
   L.push('');
   L.push('    client->view_display( view->stringify( ) ).');
   L.push('');
@@ -354,18 +367,10 @@ export function generateClass(design) {
   }
   L.push('');
   L.push('ENDCLASS.');
-  return L.map((l) => l.replace(/\s+$/, '')).join('\n') + '\n';
-}
-
-// The class source with, per line, the design node it belongs to (null for
-// every line outside the view chain) - what the code view links to the
-// canvas with
-export function generateClassMap(design) {
-  const source = generateClass(design);
-  const lines = source.split('\n');
-  const chain = viewChain(design, 4);
-  const start = lines.indexOf(chain[0]);
-  const nodeIds = lines.map((_, i) => (i >= start && i < start + chain.length ? chain.nodeIds[i - start] : null));
+  const source = L.map((l) => l.replace(/\s+$/, '')).join('\n') + '\n';
+  // one entry per line of the source, the final newline's empty line too
+  const nodeIds = L.map((_, i) => (i >= chainStart && i < chainStart + chain.length ? chain.nodeIds[i - chainStart] : null));
+  nodeIds.push(null);
   return { source, nodeIds };
 }
 

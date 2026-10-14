@@ -143,7 +143,9 @@ runtime. Run it when the palette gains a control.
 | `src/model.js` | The design document and every edit on it |
 | `src/abap.js` | Design → the ABAP class and its abapGit files |
 | `src/xml.js` | Design → XML view (preview, export), and XML view → design (import) |
-| `src/app.js` | The editor UI |
+| `src/app.js` | The editor UI: wires the panels and renders them on every change |
+| `src/ui/store.js` | The state, commit( ) with undo and the browser store, selection |
+| `src/ui/*.js` | One module per panel: insert, layers, inspector, data, code, preview, palette, files, keys, edit (drop and clipboard) |
 | `src/preview/init.js` | The preview frame (a UI5 module) |
 | `tools/` | Dev server, metadata dump, class generation, runtime verification |
 | `test/` | Unit tests, fixtures, the builder model, browser tests |
