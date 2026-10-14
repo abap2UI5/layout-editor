@@ -113,31 +113,78 @@ sap.ui.define([
   window.addEventListener('scroll', function () { if (tools) placeTools(); }, true);
   window.addEventListener('resize', function () { if (tools) placeTools(); });
 
+  // Every render ends - in a view on the canvas, or in an error the
+  // designer shows - and releases the next one. Whatever throws on the way
+  // (the view's creation, a model, the placing: a renderer that fails on a
+  // value) is reported, never swallowed: a render that got stuck used to
+  // leave the canvas blank and every later edit unseen.
+  var RENDER_TIMEOUT = 20000;
+  var renderSeq = 0;
   function render(msg) {
     if (rendering) { pending = msg; return; }
     if (msg.xml === lastXml && view) {
-      view.getModel().setData(msg.model);
-      highlight(false);
+      try {
+        view.getModel().setData(msg.model);
+        highlight(false);
+        showError('');
+        post({ type: 'rendered' }); // the view on the canvas is the design's again
+      } catch (err) {
+        fail('The model does not apply', err);
+      }
       return;
     }
     rendering = true;
     viewSeq += 1;
-    XMLView.create({ id: 'dsg' + (viewSeq % 2), definition: msg.xml, controller: new PreviewController() }).then(function (v) {
-      if (view) view.destroy();
-      view = v;
-      lastXml = msg.xml;
-      v.setModel(new JSONModel(msg.model));
-      v.placeAt('content');
-      showError('');
-      post({ type: 'rendered' });
-      setTimeout(function () { highlight(false); }, 50);
-    }, function (err) {
-      showError('The view does not render: ' + (err && err.message ? err.message : err));
-      post({ type: 'error', message: String(err && err.message ? err.message : err) });
-    }).then(function () {
+    var seq = ++renderSeq;
+    var done = false;
+    function finish() {
+      if (done) return;
+      done = true;
       rendering = false;
       if (pending) { var next = pending; pending = null; render(next); }
-    });
+    }
+    function fail(what, err) {
+      var text = what + ': ' + (err && err.message ? err.message : err);
+      showError(text);
+      post({ type: 'error', message: text });
+    }
+    // UI5 that never answers (a control module the CDN does not deliver)
+    // would otherwise hold the canvas for ever
+    setTimeout(function () {
+      if (seq === renderSeq && !done) {
+        fail('The view is still loading after ' + (RENDER_TIMEOUT / 1000) + ' seconds', 'a control may not be loading - check the network, or reload the canvas');
+        finish();
+      }
+    }, RENDER_TIMEOUT);
+    var promise;
+    try {
+      promise = XMLView.create({ id: 'dsg' + (viewSeq % 2), definition: msg.xml, controller: new PreviewController() });
+    } catch (err) {
+      fail('The view does not render', err);
+      finish();
+      return;
+    }
+    promise.then(function (v) {
+      if (done) { v.destroy(); return; } // timed out meanwhile: the next render owns the canvas
+      try {
+        v.setModel(new JSONModel(msg.model));
+        if (view) view.destroy();
+        view = v;
+        lastXml = msg.xml;
+        v.placeAt('content');
+        showError('');
+        post({ type: 'rendered' });
+        setTimeout(function () { highlight(false); }, 50);
+      } catch (err) {
+        // the old view is gone or half replaced: say so, the next edit
+        // renders anew
+        view = null;
+        lastXml = null;
+        fail('The view does not render', err);
+      }
+    }, function (err) {
+      fail('The view does not render', err);
+    }).then(finish, function (err) { fail('The view does not render', err); finish(); });
   }
 
   // the metadata of a control class, the shape tools/ui5-metadata.mjs
@@ -247,6 +294,23 @@ sap.ui.define([
     // the designer's shortcuts work while the preview has the focus
     if (mode !== 'design') return;
     post({ type: 'key', key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey });
+  });
+
+  // what UI5 logs as an error (an invalid value for a property, a binding
+  // it cannot parse, a renderer that gave up) reaches the designer too -
+  // the canvas may look fine or empty and nobody knows why
+  sap.ui.require(['sap/base/Log'], function (Log) {
+    var seen = {};
+    Log.addLogListener({
+      onLogEntry: function (entry) {
+        if (entry.level > Log.Level.ERROR) return;
+        var text = String(entry.message || '');
+        if (/Parameters: The following parameters|could not be loaded from|sap-ui-version\.json/.test(text)) return; // local trees, not the view
+        if (seen[text]) return;
+        seen[text] = true;
+        post({ type: 'ui5log', message: text.slice(0, 300) });
+      },
+    });
   });
 
   // an error after the view was created - in a renderer, a formatter, an

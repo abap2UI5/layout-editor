@@ -301,3 +301,18 @@ test('a list inside a bound list repeats a table field of the row', async ({ des
   expect(abap).toMatch(/n = `items` +v = `\{NODES\}`/);
   await expect(preview(page).getByText('Second child')).toBeVisible();
 });
+
+test('a view UI5 cannot render says why on the canvas, and the next edit renders again', async ({ designer: page }) => {
+  const before = await page.evaluate(() => Number(document.body.dataset.renders || 0));
+  await page.evaluate(() => window.designer.commit((d) => {
+    d.root.aggs.content[0].aggs.content.push({ id: 'nbroken1', type: 'NoSuchControl', props: {}, events: {}, aggs: {} });
+  }));
+  await expect(page.locator('#previewStatus')).toContainText('does not render');
+  await expect(page.locator('#previewStatus')).toContainText('NoSuchControl');
+  await expect(page.locator('#previewStatus')).toHaveClass(/error/);
+  // the way back: undo, and the canvas renders again - no render stays stuck
+  await page.locator('#btnUndo').click();
+  await expect.poll(() => page.evaluate(() => Number(document.body.dataset.renders || 0))).toBeGreaterThan(before + 1);
+  await expect(page.locator('#previewStatus')).toBeHidden();
+  await expect(preview(page).getByText('Customer data')).toBeVisible();
+});

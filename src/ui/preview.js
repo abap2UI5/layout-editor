@@ -4,7 +4,7 @@ import { previewModel, findNode, shiftNode, duplicateNode, removeNode, walk, typ
 import { toXml, namespaceUri } from '../xml.js';
 import { getControl, registerControl, runtimeDef, parseClassName, splitType } from '../catalog.js';
 import { state, select, commit, labelOfSelection, emitChange } from './store.js';
-import { $, toast } from './dom.js';
+import { $, h, toast } from './dom.js';
 import { handleDrop } from './edit.js';
 import { onKey } from './keys.js';
 
@@ -24,10 +24,13 @@ export function loadPreview() {
   $('#preview').src = previewUrl();
 }
 
-// the line over the canvas: what UI5 is doing, or what went wrong
-function previewStatus(text, level) {
+// the line over the canvas: what UI5 is doing, or what went wrong -
+// `reload` adds the way out of a canvas that is stuck
+function previewStatus(text, level, reload) {
   const el = $('#previewStatus');
-  el.textContent = text || '';
+  el.replaceChildren(text || '');
+  if (text && reload) el.append(h('button', { class: 'link', title: 'Reload the canvas', onclick: () => loadPreview() }, 'Reload canvas'));
+  el.title = text || '';
   el.className = `preview-status${text ? '' : ' hidden'}${level ? ` ${level}` : ''}`;
 }
 
@@ -116,8 +119,11 @@ window.addEventListener('message', (e) => {
     onKey({ key: msg.key, ctrlKey: msg.ctrl, metaKey: false, shiftKey: msg.shift, altKey: msg.alt, preventDefault() {}, target: document.body });
   } else if (msg.type === 'error') {
     document.body.dataset.previewError = msg.message;
-    previewStatus(msg.boot ? 'UI5 did not load - see the canvas' : `The view ${msg.runtime ? 'failed at runtime' : 'does not render'}: ${msg.message}`, 'error');
+    previewStatus(msg.boot ? 'UI5 did not load - see the canvas' : msg.runtime ? `The view failed at runtime: ${msg.message}` : msg.message, 'error', true);
     count();
+  } else if (msg.type === 'ui5log') {
+    // UI5's own error: the view may show, but not as meant
+    if (!document.body.dataset.previewError) previewStatus(`UI5 reports: ${msg.message}`, 'warn', true);
   } else if (msg.type === 'rendered') {
     delete document.body.dataset.previewError;
     previewStatus('');
