@@ -7,6 +7,7 @@ import { abapGitFiles } from '../abap.js';
 import { zip } from '../zip.js';
 import { state, commit, replaceDesign, showPanel, recentDesigns, designToLink } from './store.js';
 import { $, h, toast, download, dialog } from './dom.js';
+import { addControlByName } from './edit.js';
 
 export function newDialog() {
   dialog('Start from a template', h('div', {},
@@ -40,6 +41,18 @@ export async function shareLink() {
   } catch (err) {
     toast(`No link: ${err.message}`);
   }
+}
+
+// a class name typed in, inserted at the selection
+export function insertByNameDialog() {
+  const inp = h('input', { placeholder: 'sap.m.Wizard', spellcheck: 'false', 'aria-label': 'Class name' });
+  dialog('Insert a UI5 control by class name', h('div', {},
+    h('p', { class: 'hint', text: 'The canvas asks its UI5 for the control; properties, aggregations and events come from there. Not checked against 1.71.' }),
+    inp), [
+    { text: 'Cancel', action: () => true },
+    { text: 'Insert', primary: true, action: () => { addControlByName(inp.value.trim()); return true; } },
+  ]);
+  inp.focus();
 }
 
 export function importDialog() {

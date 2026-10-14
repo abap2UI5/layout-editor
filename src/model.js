@@ -14,7 +14,7 @@
 // An attribute:
 //   { name, type: string|int|decimal|bool|date|time|table, value, fields: [{ name, type }], rows: [{}] }
 
-import { CONTROLS, getControl, defaultAggFor, accepts, dropAggOf } from './catalog.js';
+import { CONTROLS, NAMESPACES, getControl, defaultAggFor, accepts, dropAggOf } from './catalog.js';
 
 export const DESIGN_VERSION = 1;
 export const SCALAR_TYPES = ['string', 'int', 'decimal', 'bool', 'date', 'time'];
@@ -87,6 +87,26 @@ export function normalizeDesign(d) {
     return true;
   });
   return d;
+}
+
+// The prefix a library gets in this design's view: the catalogue's where
+// it has one, else the one an import gave it, else the library's last
+// name (sap.suite.ui.microchart -> microchart), made unique and remembered
+export function prefixFor(design, lib) {
+  for (const [p, uri] of Object.entries(NAMESPACES)) if (uri === lib) return p;
+  design.namespaces = design.namespaces || {};
+  for (const [p, uri] of Object.entries(design.namespaces)) if (uri === lib) return p;
+  let p = lib.split('.').pop();
+  while (p in NAMESPACES || p in design.namespaces) p += '_';
+  design.namespaces[p] = lib;
+  return p;
+}
+
+// the XML name of a control in this design: `Button` for sap.m, else
+// prefix:Name
+export function typeFor(design, lib, name) {
+  const p = prefixFor(design, lib);
+  return p ? `${p}:${name}` : name;
 }
 
 export function clone(x) {
@@ -509,7 +529,7 @@ export function validate(design) {
       if (!wired) issues.push({ level: 'info', text: `${n.type}: what the user enters goes nowhere - bind ${c.input} to an attribute (or name an event)`, node: n.id });
     }
     if (parent && !CONTROLS[n.type] && n.type !== 'mvc:View') {
-      issues.push({ level: 'info', text: `${n.type} is not in the palette - kept as imported`, node: n.id });
+      issues.push({ level: 'info', text: `${n.type} is not in the palette - not checked against UI5 1.71`, node: n.id });
     }
     return true;
   });

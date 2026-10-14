@@ -4,6 +4,8 @@ import { createNode, clone, walk, findNode, newId, aggAccepts, insertNode, dropT
 import { PATTERNS } from '../patterns.js';
 import { state, commit, ancestors } from './store.js';
 import { toast, displayType } from './dom.js';
+import { describeControl } from './preview.js';
+import { renderInsert } from './insert.js';
 
 export function addControl(type, onId = state.selected) {
   commit((d) => {
@@ -43,6 +45,18 @@ export function insertPattern(id, onId, place) {
     }
     return first;
   });
+}
+
+// Any UI5 control by its class name: the canvas describes it, then it is
+// inserted like one of the palette's
+export async function addControlByName(className, onId = state.selected) {
+  try {
+    const type = await describeControl(className);
+    addControl(type, onId);
+    renderInsert();
+  } catch (err) {
+    toast(err.message);
+  }
 }
 
 // the place next to a node: before it or after it in its parent's list

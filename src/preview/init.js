@@ -140,10 +140,42 @@ sap.ui.define([
     });
   }
 
+  // the metadata of a control class, the shape tools/ui5-metadata.mjs
+  // dumps: properties with their types and enum values, aggregations,
+  // the default aggregation, events
+  function describe(msg) {
+    sap.ui.require(['sap/ui/base/DataType', msg.module], function (DataType, C) {
+      try {
+        var md = C.getMetadata();
+        var props = {};
+        var all = md.getAllProperties();
+        Object.keys(all).forEach(function (n) {
+          var t = DataType.getType(all[n].type);
+          var values = t && t.getEnumValues && t.getEnumValues() ? Object.keys(t.getEnumValues()) : undefined;
+          props[n] = values ? { type: all[n].type, values: values } : { type: all[n].type };
+        });
+        var aggs = {};
+        var allAggs = md.getAllAggregations();
+        Object.keys(allAggs).forEach(function (n) { aggs[n] = { multiple: allAggs[n].multiple, type: allAggs[n].type }; });
+        post({ type: 'described', key: msg.key, meta: {
+          className: md.getName(), props: props, aggs: aggs,
+          defaultAgg: md.getDefaultAggregationName ? md.getDefaultAggregationName() || null : null,
+          events: Object.keys(md.getAllEvents()).sort(),
+        } });
+      } catch (err) {
+        post({ type: 'described', key: msg.key, error: String(err && err.message ? err.message : err) });
+      }
+    }, function (err) {
+      post({ type: 'described', key: msg.key, error: 'UI5 has no ' + msg.module + (err && err.message ? ': ' + err.message : '') });
+    });
+  }
+
   window.addEventListener('message', function (e) {
     var msg = e.data || {};
     if (msg.target !== 'dsg-preview') return;
-    if (msg.type === 'render') {
+    if (msg.type === 'describe') {
+      describe(msg);
+    } else if (msg.type === 'render') {
       mode = msg.mode || mode;
       selected = msg.selected || null;
       selectedLabel = msg.label || '';

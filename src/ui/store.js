@@ -17,6 +17,12 @@ export function on(event, fn) {
 function emit(event, arg) {
   for (const fn of listeners[event]) fn(arg || {});
 }
+// a re-render without an edit: what the panels show of the design changed
+// (a control the runtime described), the design did not
+export function emitChange() {
+  state.rev += 1;
+  emit('change', {});
+}
 
 const STORE_KEY = 'abap2ui5-designer:design';
 

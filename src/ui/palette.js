@@ -7,7 +7,7 @@ import { state, select, commit, undo, redo } from './store.js';
 import { $, h, displayType, nodeLabel } from './dom.js';
 import { addControl, insertPattern, copySelection, pasteSelection } from './edit.js';
 import { setView, copyText } from './code.js';
-import { exportZip, newDialog, importDialog, recentDialog, shareLink, saveDesign, openFile } from './files.js';
+import { exportZip, newDialog, importDialog, recentDialog, shareLink, insertByNameDialog, saveDesign, openFile } from './files.js';
 
 
 function commands() {
@@ -28,6 +28,7 @@ function commands() {
   action('Save design', saveDesign);
   action('Open design', () => openFile('.json,.xml'));
   action('Recent designs', recentDialog);
+  action('Insert any UI5 control by class name', insertByNameDialog, 'e.g. sap.m.Wizard');
   action('Copy share link', shareLink, 'the design in a URL');
   action('Show layout only', () => setView('canvas'));
   action('Show code only', () => setView('code'));

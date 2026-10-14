@@ -241,3 +241,22 @@ test('a shared link carries the design, Recent brings the replaced one back', as
   await expect(tab.locator('#className')).toHaveValue('ZCL_BEFORE');
   await tab.close();
 });
+
+test('any UI5 control by class name: the canvas describes it, the properties know its types', async ({ designer: page }) => {
+  await page.locator('#insertByName').fill('sap.m.Avatar');
+  await page.locator('#insertByName').press('Enter');
+  await expect(selectedType(page)).toHaveText('Avatar');
+  await expect(page.locator('#inspector .insp-desc')).toContainText('sap.m.Avatar - from the UI5 runtime');
+  // an enum from the runtime is a dropdown
+  await expect(prop(page, 'displaySize').locator('.val select')).toBeVisible();
+  await prop(page, 'displaySize').locator('.val select').selectOption('L');
+  await prop(page, 'initials').locator('.val input').fill('AB');
+  const abap = await abapOf(page);
+  expect(abap).toContain(')->tag( `Avatar`');
+  expect(abap).toContain('v = `AB`');
+  await expect(preview(page).locator('.sapFAvatar, .sapMAvatar').first()).toBeVisible();
+  // it stays in the palette for the next insert, and Checks says it is unchecked
+  await expect(page.locator('.ins-item.runtime[data-type="Avatar"]')).toBeVisible();
+  await page.getByRole('tab', { name: 'Checks' }).click();
+  await expect(page.locator('#issuesPanel')).toContainText('not checked against UI5 1.71');
+});

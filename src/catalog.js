@@ -578,8 +578,55 @@ export const CONTROLS = {
 
 export const CATEGORIES = ['Layout', 'Display', 'Input', 'Lists', 'Parts'];
 
+// Controls the palette does not have, described by the UI5 runtime of the
+// canvas at the user's request (any class name: sap.m.Wizard, a library
+// of their own). They work like the palette's - properties with types,
+// aggregations, events - but nothing has checked them against 1.71.
+export const RUNTIME = {};
+
+export function registerControl(type, def) {
+  RUNTIME[type] = def;
+}
+
 export function getControl(type) {
-  return CONTROLS[type] || null;
+  return CONTROLS[type] || RUNTIME[type] || null;
+}
+
+// the UI5 metadata of a control (as tools/ui5-metadata.mjs and the preview
+// dump it) as a catalogue entry
+const RUNTIME_SKIP_AGGS = ['tooltip', 'customData', 'layoutData', 'dependents', 'dragDropConfig'];
+const RUNTIME_SKIP_EVENTS = ['modelContextChange', 'validateFieldGroup', 'formatError', 'parseError', 'validationError', 'validationSuccess'];
+export function runtimeDef(meta) {
+  const props = {};
+  for (const [n, p] of Object.entries(meta.props || {})) {
+    const t = p.type;
+    if (p.values) props[n] = { type: 'enum', values: p.values };
+    else if (t === 'string') props[n] = { type: 'string' };
+    else if (t === 'boolean') props[n] = { type: 'boolean' };
+    else if (t === 'int') props[n] = { type: 'int' };
+    else if (t === 'float') props[n] = { type: 'float' };
+    else if (t === 'sap.ui.core.CSSSize') props[n] = { type: 'cssSize' };
+    else if (t === 'sap.ui.core.URI') props[n] = { type: /icon/i.test(n) ? 'icon' : 'uri' };
+    else if (t === 'object' || t === 'any' || t === 'function') continue;
+    else props[n] = { type: 'string', loose: true, hint: t };
+  }
+  const aggs = {};
+  for (const [n, a] of Object.entries(meta.aggs || {})) {
+    if (RUNTIME_SKIP_AGGS.includes(n)) continue;
+    aggs[n] = a.multiple ? {} : { single: true };
+  }
+  const def = { category: 'Runtime', runtime: true, className: meta.className, props, events: (meta.events || []).filter((e) => !RUNTIME_SKIP_EVENTS.includes(e)) };
+  if (Object.keys(aggs).length) def.aggs = aggs;
+  if (meta.defaultAgg && aggs[meta.defaultAgg]) def.defaultAgg = meta.defaultAgg;
+  return def;
+}
+
+// `sap.suite.ui.microchart.RadialMicroChart` -> { lib, name, module }
+export function parseClassName(className) {
+  const full = String(className || '').trim().replace(/\//g, '.');
+  const i = full.lastIndexOf('.');
+  if (i < 1 || !/^[A-Za-z_][\w.]*$/.test(full)) return null;
+  return { lib: full.slice(0, i), name: full.slice(i + 1), module: full.replace(/\./g, '/') };
 }
 
 // `form:SimpleForm` -> { ns: 'form', name: 'SimpleForm' }

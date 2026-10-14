@@ -197,3 +197,45 @@ test('a design of an older version is migrated, a newer one refused', () => {
   d.version = 0;
   assert.throws(() => normalizeDesign(d), /no migration/);
 });
+
+test('a control the UI5 runtime describes becomes a catalogue entry', async () => {
+  const { runtimeDef, registerControl, getControl, parseClassName, RUNTIME } = await import('../src/catalog.js');
+  const { prefixFor, typeFor } = await import('../src/model.js');
+  assert.deepEqual(parseClassName('sap.suite.ui.microchart.RadialMicroChart'), { lib: 'sap.suite.ui.microchart', name: 'RadialMicroChart', module: 'sap/suite/ui/microchart/RadialMicroChart' });
+  assert.deepEqual(parseClassName('sap/m/Wizard'), { lib: 'sap.m', name: 'Wizard', module: 'sap/m/Wizard' });
+  assert.equal(parseClassName('Wizard'), null);
+  const d = createDesign();
+  assert.equal(typeFor(d, 'sap.m', 'Wizard'), 'Wizard');
+  assert.equal(typeFor(d, 'sap.ui.layout', 'Grid'), 'l:Grid');
+  assert.equal(typeFor(d, 'sap.suite.ui.microchart', 'RadialMicroChart'), 'microchart:RadialMicroChart');
+  assert.equal(prefixFor(d, 'sap.suite.ui.microchart'), 'microchart', 'remembered, not renamed');
+  assert.equal(prefixFor(d, 'my.own.form'), 'form_', 'form is taken by the catalogue');
+  assert.deepEqual(d.namespaces, { microchart: 'sap.suite.ui.microchart', form_: 'my.own.form' });
+  const def = runtimeDef({
+    className: 'sap.suite.ui.microchart.RadialMicroChart',
+    props: { percentage: { type: 'float' }, valueColor: { type: 'sap.m.ValueColor', values: ['Neutral', 'Good'] }, size: { type: 'sap.m.Size', values: ['XS', 'S'] }, width: { type: 'sap.ui.core.CSSSize' }, iconSrc: { type: 'sap.ui.core.URI' }, stuff: { type: 'object' }, odd: { type: 'int[]' } },
+    aggs: { tooltip: { multiple: false }, customData: { multiple: true }, content: { multiple: true }, header: { multiple: false } },
+    defaultAgg: 'content',
+    events: ['press', 'modelContextChange'],
+  });
+  assert.deepEqual(def.props.percentage, { type: 'float' });
+  assert.deepEqual(def.props.valueColor, { type: 'enum', values: ['Neutral', 'Good'] });
+  assert.deepEqual(def.props.width, { type: 'cssSize' });
+  assert.deepEqual(def.props.iconSrc, { type: 'icon' });
+  assert.equal(def.props.stuff, undefined);
+  assert.equal(def.props.odd.loose, true);
+  assert.deepEqual(def.aggs, { content: {}, header: { single: true } });
+  assert.equal(def.defaultAgg, 'content');
+  assert.deepEqual(def.events, ['press']);
+  registerControl('microchart:RadialMicroChart', def);
+  assert.equal(getControl('microchart:RadialMicroChart'), def);
+  const node = createNode('microchart:RadialMicroChart');
+  insertNode(d, node, page(d).id);
+  insertNode(d, createNode('Text'), node.id);
+  assert.deepEqual(Object.keys(node.aggs), ['content']);
+  assert.ok(toXml(d).includes('xmlns:microchart="sap.suite.ui.microchart"'));
+  assert.ok(toXml(d).includes('<microchart:RadialMicroChart>'));
+  assert.ok(generateClass(d).includes('n = `RadialMicroChart` ns = `microchart`'));
+  assert.ok(validate(d).some((i) => i.level === 'info' && i.text.includes('not checked against UI5 1.71')));
+  delete RUNTIME['microchart:RadialMicroChart'];
+});

@@ -19,7 +19,7 @@ import { renderInspector } from './ui/inspector.js';
 import { renderData, renderIssues } from './ui/data.js';
 import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code.js';
 import { loadPreview, postPreview, sendPreview } from './ui/preview.js';
-import { handleDrop, copySelection, pasteSelection } from './ui/edit.js';
+import { handleDrop, copySelection, pasteSelection, addControlByName } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
 import { newDialog, importDialog, recentDialog, shareLink, openFile, saveDesign, exportZip } from './ui/files.js';
 import { onKey } from './ui/keys.js';
@@ -203,4 +203,4 @@ if (location.hash.startsWith('#d=')) {
 }
 
 // for the browser tests and the curious: the state and the generators
-window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection };
+window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };

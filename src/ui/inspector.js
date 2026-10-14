@@ -50,7 +50,7 @@ export function renderInspector() {
   });
   box.append(h('div', { class: 'insp-head' },
     h('div', { class: 'insp-title' }, h('b', { text: displayType(node.type) }), link ? h('a', { href: link, target: '_blank', rel: 'noopener', text: 'UI5 API ↗' }) : null),
-    h('div', { class: 'insp-desc', text: DESCRIPTIONS[node.type] || (c ? '' : 'Imported control - kept as it is') }),
+    h('div', { class: 'insp-desc', text: DESCRIPTIONS[node.type] || (c && c.runtime ? `${c.className} - from the UI5 runtime, not checked against 1.71` : c ? '' : 'Imported control - kept as it is') }),
     h('div', { class: 'insp-tools' }, filter,
       h('label', {}, h('input', { type: 'checkbox', checked: state.inspector.onlySet, onchange: (e) => { state.inspector.onlySet = e.target.checked; renderInspector(); } }), 'set only'))));
 

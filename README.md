@@ -77,6 +77,11 @@ From there it is your code:
 Also in the editor:
 
 - **Starters**: a blank page, a form, a table with search, and tabs.
+- **Any UI5 control** by its class name (`sap.m.Wizard`, a library of your
+  own): the field at the end of *Controls*, or Ctrl+K. The canvas asks its
+  UI5 for the control's properties, aggregations and events, and from then
+  on it works like one of the palette's. Nothing has checked it against
+  1.71, and *Checks* says so.
 - **Import XML** brings in an existing UI5 XML view. Controls the palette
   does not know are kept as they are.
 - **Save / Open** stores the design as JSON so you can continue later. The
@@ -103,7 +108,10 @@ Also in the editor:
   verified against **abap2UI5 1.147.0**.
 - ABAP 7.40 or later, or ABAP Cloud. The class uses inline declarations and
   `VALUE #( )`, like every abap2UI5 sample.
-- Every control and property the palette offers exists in **UI5 1.71**.
+- Every control and property the palette offers exists in **UI5 1.71**:
+  121 controls of sap.m, sap.ui.core, sap.ui.layout, sap.ui.unified,
+  sap.ui.table, sap.f and sap.uxap. A control inserted by class name is
+  whatever the canvas's UI5 says it is.
 
 ## What is checked, and how
 

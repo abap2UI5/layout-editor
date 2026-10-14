@@ -1,8 +1,9 @@
 // The canvas: the preview frame (preview.html, src/preview/init.js) gets
 // the view and the model, reports what is clicked, dropped and typed.
-import { previewModel, findNode, shiftNode, duplicateNode, removeNode } from '../model.js';
-import { toXml } from '../xml.js';
-import { state, select, commit, labelOfSelection } from './store.js';
+import { previewModel, findNode, shiftNode, duplicateNode, removeNode, walk, typeFor } from '../model.js';
+import { toXml, namespaceUri } from '../xml.js';
+import { getControl, registerControl, runtimeDef, parseClassName, splitType } from '../catalog.js';
+import { state, select, commit, labelOfSelection, emitChange } from './store.js';
 import { $, toast } from './dom.js';
 import { handleDrop } from './edit.js';
 import { onKey } from './keys.js';
@@ -54,6 +55,40 @@ function onToolbarAction(action, id) {
   else if (action === 'del') commit((d) => removeNode(d, id));
 }
 
+// Ask the UI5 runtime of the canvas what a control class is: its
+// properties, aggregations and events - and keep it as a catalogue entry,
+// so the control works like one of the palette's
+const describing = new Map();
+let describeSeq = 0;
+export function describeControl(className) {
+  const parsed = parseClassName(className);
+  if (!parsed) return Promise.reject(new Error(`${className} is not a class name like sap.m.Wizard`));
+  const type = typeFor(state.design, parsed.lib, parsed.name);
+  if (getControl(type)) return Promise.resolve(type);
+  if (!state.previewReady) return Promise.reject(new Error('the canvas is still loading UI5'));
+  return new Promise((resolve, reject) => {
+    const key = `d${++describeSeq}`;
+    describing.set(key, { type, resolve, reject });
+    postPreview({ type: 'describe', key, module: parsed.module });
+    setTimeout(() => { if (describing.delete(key)) reject(new Error(`UI5 did not answer for ${className}`)); }, 15000);
+  });
+}
+
+// every control of the design the catalogue does not know, described
+// anew - a design opened from a file or the browser store lost them
+function describeUnknown() {
+  const todo = new Set();
+  walk(state.design.root, (n) => {
+    if (n.id !== 'root' && !getControl(n.type)) {
+      const { ns, name } = splitType(n.type);
+      const lib = namespaceUri(state.design, ns);
+      if (lib) todo.add(`${lib}.${name}`);
+    }
+    return true;
+  });
+  for (const c of todo) describeControl(c).then(() => emitChange()).catch(() => {});
+}
+
 window.addEventListener('message', (e) => {
   const msg = e.data || {};
   if (msg.source !== 'dsg-preview' || e.source !== $('#preview').contentWindow) return;
@@ -63,6 +98,14 @@ window.addEventListener('message', (e) => {
     previewStatus('');
     $('#ui5version').placeholder = `UI5 ${msg.version}`;
     sendPreview(true);
+    describeUnknown();
+  } else if (msg.type === 'described') {
+    const d = describing.get(msg.key);
+    if (!d) return;
+    describing.delete(msg.key);
+    if (msg.error) { d.reject(new Error(msg.error)); return; }
+    registerControl(d.type, runtimeDef(msg.meta));
+    d.resolve(d.type);
   } else if (msg.type === 'select') {
     select(msg.id);
   } else if (msg.type === 'action') {
