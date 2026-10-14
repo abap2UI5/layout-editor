@@ -1,0 +1,5556 @@
+{
+ "version": "1.71.80",
+ "controls": {
+  "Page": {
+   "className": "sap.m.Page",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "title": {
+     "type": "string"
+    },
+    "titleLevel": {
+     "type": "sap.ui.core.TitleLevel",
+     "values": [
+      "Auto",
+      "H1",
+      "H2",
+      "H3",
+      "H4",
+      "H5",
+      "H6"
+     ]
+    },
+    "showNavButton": {
+     "type": "boolean"
+    },
+    "showHeader": {
+     "type": "boolean"
+    },
+    "showSubHeader": {
+     "type": "boolean"
+    },
+    "navButtonText": {
+     "type": "string"
+    },
+    "navButtonTooltip": {
+     "type": "string"
+    },
+    "enableScrolling": {
+     "type": "boolean"
+    },
+    "icon": {
+     "type": "sap.ui.core.URI"
+    },
+    "backgroundDesign": {
+     "type": "sap.m.PageBackgroundDesign",
+     "values": [
+      "Standard",
+      "List",
+      "Solid",
+      "Transparent"
+     ]
+    },
+    "navButtonType": {
+     "type": "sap.m.ButtonType",
+     "values": [
+      "Default",
+      "Back",
+      "Accept",
+      "Reject",
+      "Transparent",
+      "Ghost",
+      "Up",
+      "Unstyled",
+      "Emphasized"
+     ]
+    },
+    "showFooter": {
+     "type": "boolean"
+    },
+    "contentOnlyBusy": {
+     "type": "boolean"
+    },
+    "floatingFooter": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "content": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    },
+    "customHeader": {
+     "multiple": false,
+     "type": "sap.m.IBar"
+    },
+    "footer": {
+     "multiple": false,
+     "type": "sap.m.IBar"
+    },
+    "subHeader": {
+     "multiple": false,
+     "type": "sap.m.IBar"
+    },
+    "headerContent": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    },
+    "landmarkInfo": {
+     "multiple": false,
+     "type": "sap.m.PageAccessibleLandmarkInfo"
+    }
+   },
+   "defaultAgg": "content",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "navButtonPress",
+    "navButtonTap",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "VBox": {
+   "className": "sap.m.VBox",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "displayInline": {
+     "type": "boolean"
+    },
+    "direction": {
+     "type": "sap.m.FlexDirection",
+     "values": [
+      "Row",
+      "Column",
+      "RowReverse",
+      "ColumnReverse",
+      "Inherit"
+     ]
+    },
+    "fitContainer": {
+     "type": "boolean"
+    },
+    "renderType": {
+     "type": "sap.m.FlexRendertype",
+     "values": [
+      "Div",
+      "List",
+      "Bare"
+     ]
+    },
+    "justifyContent": {
+     "type": "sap.m.FlexJustifyContent",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "SpaceBetween",
+      "SpaceAround",
+      "Inherit"
+     ]
+    },
+    "alignItems": {
+     "type": "sap.m.FlexAlignItems",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "Baseline",
+      "Stretch",
+      "Inherit"
+     ]
+    },
+    "wrap": {
+     "type": "sap.m.FlexWrap",
+     "values": [
+      "NoWrap",
+      "Wrap",
+      "WrapReverse"
+     ]
+    },
+    "alignContent": {
+     "type": "sap.m.FlexAlignContent",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "SpaceBetween",
+      "SpaceAround",
+      "Stretch",
+      "Inherit"
+     ]
+    },
+    "backgroundDesign": {
+     "type": "sap.m.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "items",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "HBox": {
+   "className": "sap.m.HBox",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "displayInline": {
+     "type": "boolean"
+    },
+    "direction": {
+     "type": "sap.m.FlexDirection",
+     "values": [
+      "Row",
+      "Column",
+      "RowReverse",
+      "ColumnReverse",
+      "Inherit"
+     ]
+    },
+    "fitContainer": {
+     "type": "boolean"
+    },
+    "renderType": {
+     "type": "sap.m.FlexRendertype",
+     "values": [
+      "Div",
+      "List",
+      "Bare"
+     ]
+    },
+    "justifyContent": {
+     "type": "sap.m.FlexJustifyContent",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "SpaceBetween",
+      "SpaceAround",
+      "Inherit"
+     ]
+    },
+    "alignItems": {
+     "type": "sap.m.FlexAlignItems",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "Baseline",
+      "Stretch",
+      "Inherit"
+     ]
+    },
+    "wrap": {
+     "type": "sap.m.FlexWrap",
+     "values": [
+      "NoWrap",
+      "Wrap",
+      "WrapReverse"
+     ]
+    },
+    "alignContent": {
+     "type": "sap.m.FlexAlignContent",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "SpaceBetween",
+      "SpaceAround",
+      "Stretch",
+      "Inherit"
+     ]
+    },
+    "backgroundDesign": {
+     "type": "sap.m.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "items",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "FlexBox": {
+   "className": "sap.m.FlexBox",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "displayInline": {
+     "type": "boolean"
+    },
+    "direction": {
+     "type": "sap.m.FlexDirection",
+     "values": [
+      "Row",
+      "Column",
+      "RowReverse",
+      "ColumnReverse",
+      "Inherit"
+     ]
+    },
+    "fitContainer": {
+     "type": "boolean"
+    },
+    "renderType": {
+     "type": "sap.m.FlexRendertype",
+     "values": [
+      "Div",
+      "List",
+      "Bare"
+     ]
+    },
+    "justifyContent": {
+     "type": "sap.m.FlexJustifyContent",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "SpaceBetween",
+      "SpaceAround",
+      "Inherit"
+     ]
+    },
+    "alignItems": {
+     "type": "sap.m.FlexAlignItems",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "Baseline",
+      "Stretch",
+      "Inherit"
+     ]
+    },
+    "wrap": {
+     "type": "sap.m.FlexWrap",
+     "values": [
+      "NoWrap",
+      "Wrap",
+      "WrapReverse"
+     ]
+    },
+    "alignContent": {
+     "type": "sap.m.FlexAlignContent",
+     "values": [
+      "Start",
+      "End",
+      "Center",
+      "SpaceBetween",
+      "SpaceAround",
+      "Stretch",
+      "Inherit"
+     ]
+    },
+    "backgroundDesign": {
+     "type": "sap.m.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "items",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Panel": {
+   "className": "sap.m.Panel",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "headerText": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "expandable": {
+     "type": "boolean"
+    },
+    "expanded": {
+     "type": "boolean"
+    },
+    "expandAnimation": {
+     "type": "boolean"
+    },
+    "backgroundDesign": {
+     "type": "sap.m.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    },
+    "accessibleRole": {
+     "type": "sap.m.PanelAccessibleRole",
+     "values": [
+      "Complementary",
+      "Form",
+      "Region"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "content": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    },
+    "headerToolbar": {
+     "multiple": false,
+     "type": "sap.m.Toolbar"
+    },
+    "infoToolbar": {
+     "multiple": false,
+     "type": "sap.m.Toolbar"
+    }
+   },
+   "defaultAgg": "content",
+   "events": [
+    "expand",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "form:SimpleForm": {
+   "className": "sap.ui.layout.form.SimpleForm",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "maxContainerCols": {
+     "type": "int"
+    },
+    "minWidth": {
+     "type": "int"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "labelMinWidth": {
+     "type": "int"
+    },
+    "layout": {
+     "type": "sap.ui.layout.form.SimpleFormLayout",
+     "values": [
+      "ResponsiveLayout",
+      "GridLayout",
+      "ResponsiveGridLayout",
+      "ColumnLayout"
+     ]
+    },
+    "labelSpanXL": {
+     "type": "int"
+    },
+    "labelSpanL": {
+     "type": "int"
+    },
+    "labelSpanM": {
+     "type": "int"
+    },
+    "labelSpanS": {
+     "type": "int"
+    },
+    "adjustLabelSpan": {
+     "type": "boolean"
+    },
+    "emptySpanXL": {
+     "type": "int"
+    },
+    "emptySpanL": {
+     "type": "int"
+    },
+    "emptySpanM": {
+     "type": "int"
+    },
+    "emptySpanS": {
+     "type": "int"
+    },
+    "columnsXL": {
+     "type": "int"
+    },
+    "columnsL": {
+     "type": "int"
+    },
+    "columnsM": {
+     "type": "int"
+    },
+    "singleContainerFullSize": {
+     "type": "boolean"
+    },
+    "breakpointXL": {
+     "type": "int"
+    },
+    "breakpointL": {
+     "type": "int"
+    },
+    "breakpointM": {
+     "type": "int"
+    },
+    "backgroundDesign": {
+     "type": "sap.ui.layout.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "content": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "title": {
+     "multiple": false,
+     "type": "sap.ui.core.Title"
+    },
+    "toolbar": {
+     "multiple": false,
+     "type": "sap.ui.core.Toolbar"
+    }
+   },
+   "defaultAgg": "content",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "IconTabBar": {
+   "className": "sap.m.IconTabBar",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "showSelection": {
+     "type": "boolean"
+    },
+    "expandable": {
+     "type": "boolean"
+    },
+    "expanded": {
+     "type": "boolean"
+    },
+    "selectedKey": {
+     "type": "string"
+    },
+    "upperCase": {
+     "type": "boolean"
+    },
+    "stretchContentHeight": {
+     "type": "boolean"
+    },
+    "applyContentPadding": {
+     "type": "boolean"
+    },
+    "backgroundDesign": {
+     "type": "sap.m.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    },
+    "headerMode": {
+     "type": "sap.m.IconTabHeaderMode",
+     "values": [
+      "Standard",
+      "Inline"
+     ]
+    },
+    "showOverflowSelectList": {
+     "type": "boolean"
+    },
+    "headerBackgroundDesign": {
+     "type": "sap.m.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    },
+    "enableTabReordering": {
+     "type": "boolean"
+    },
+    "tabDensityMode": {
+     "type": "sap.m.IconTabDensityMode",
+     "values": [
+      "Inherit",
+      "Compact",
+      "Cozy"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.m.IconTab"
+    },
+    "content": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "expand",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "select",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "IconTabFilter": {
+   "className": "sap.m.IconTabFilter",
+   "props": {
+    "text": {
+     "type": "string"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "key": {
+     "type": "string"
+    },
+    "count": {
+     "type": "string"
+    },
+    "showAll": {
+     "type": "boolean"
+    },
+    "icon": {
+     "type": "sap.ui.core.URI"
+    },
+    "iconColor": {
+     "type": "sap.ui.core.IconColor",
+     "values": [
+      "Default",
+      "Positive",
+      "Negative",
+      "Critical",
+      "Neutral",
+      "Contrast"
+     ]
+    },
+    "iconDensityAware": {
+     "type": "boolean"
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "design": {
+     "type": "sap.m.IconTabFilterDesign",
+     "values": [
+      "Horizontal",
+      "Vertical"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "content": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "content",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "IconTabSeparator": {
+   "className": "sap.m.IconTabSeparator",
+   "props": {
+    "icon": {
+     "type": "sap.ui.core.URI"
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "iconDensityAware": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Toolbar": {
+   "className": "sap.m.Toolbar",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "active": {
+     "type": "boolean"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "design": {
+     "type": "sap.m.ToolbarDesign",
+     "values": [
+      "Auto",
+      "Transparent",
+      "Info",
+      "Solid"
+     ]
+    },
+    "style": {
+     "type": "sap.m.ToolbarStyle",
+     "values": [
+      "Standard",
+      "Clear"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "content": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "content",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "OverflowToolbar": {
+   "className": "sap.m.OverflowToolbar",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "active": {
+     "type": "boolean"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "design": {
+     "type": "sap.m.ToolbarDesign",
+     "values": [
+      "Auto",
+      "Transparent",
+      "Info",
+      "Solid"
+     ]
+    },
+    "style": {
+     "type": "sap.m.ToolbarStyle",
+     "values": [
+      "Standard",
+      "Clear"
+     ]
+    },
+    "asyncMode": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "content": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "content",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "ToolbarSpacer": {
+   "className": "sap.m.ToolbarSpacer",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Bar": {
+   "className": "sap.m.Bar",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "enableFlexBox": {
+     "type": "boolean"
+    },
+    "translucent": {
+     "type": "boolean"
+    },
+    "design": {
+     "type": "sap.m.BarDesign",
+     "values": [
+      "Auto",
+      "Header",
+      "SubHeader",
+      "Footer"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "contentLeft": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    },
+    "contentMiddle": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    },
+    "contentRight": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Title": {
+   "className": "sap.m.Title",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "text": {
+     "type": "string"
+    },
+    "level": {
+     "type": "sap.ui.core.TitleLevel",
+     "values": [
+      "Auto",
+      "H1",
+      "H2",
+      "H3",
+      "H4",
+      "H5",
+      "H6"
+     ]
+    },
+    "titleStyle": {
+     "type": "sap.ui.core.TitleLevel",
+     "values": [
+      "Auto",
+      "H1",
+      "H2",
+      "H3",
+      "H4",
+      "H5",
+      "H6"
+     ]
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "wrapping": {
+     "type": "boolean"
+    },
+    "wrappingType": {
+     "type": "sap.m.WrappingType",
+     "values": [
+      "Normal",
+      "Hyphenated"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Text": {
+   "className": "sap.m.Text",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "text": {
+     "type": "string"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "wrapping": {
+     "type": "boolean"
+    },
+    "wrappingType": {
+     "type": "sap.m.WrappingType",
+     "values": [
+      "Normal",
+      "Hyphenated"
+     ]
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "maxLines": {
+     "type": "int"
+    },
+    "renderWhitespace": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Label": {
+   "className": "sap.m.Label",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "design": {
+     "type": "sap.m.LabelDesign",
+     "values": [
+      "Bold",
+      "Standard"
+     ]
+    },
+    "text": {
+     "type": "string"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "required": {
+     "type": "boolean"
+    },
+    "displayOnly": {
+     "type": "boolean"
+    },
+    "wrapping": {
+     "type": "boolean"
+    },
+    "wrappingType": {
+     "type": "sap.m.WrappingType",
+     "values": [
+      "Normal",
+      "Hyphenated"
+     ]
+    },
+    "vAlign": {
+     "type": "sap.ui.core.VerticalAlign",
+     "values": [
+      "Bottom",
+      "Middle",
+      "Top",
+      "Inherit"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "ObjectStatus": {
+   "className": "sap.m.ObjectStatus",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "title": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "active": {
+     "type": "boolean"
+    },
+    "state": {
+     "type": "string"
+    },
+    "inverted": {
+     "type": "boolean"
+    },
+    "icon": {
+     "type": "sap.ui.core.URI"
+    },
+    "iconDensityAware": {
+     "type": "boolean"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "ObjectNumber": {
+   "className": "sap.m.ObjectNumber",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "number": {
+     "type": "string"
+    },
+    "numberUnit": {
+     "type": "string"
+    },
+    "emphasized": {
+     "type": "boolean"
+    },
+    "state": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "unit": {
+     "type": "string"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "ObjectIdentifier": {
+   "className": "sap.m.ObjectIdentifier",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "title": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "badgeNotes": {
+     "type": "boolean"
+    },
+    "badgePeople": {
+     "type": "boolean"
+    },
+    "badgeAttachments": {
+     "type": "boolean"
+    },
+    "titleActive": {
+     "type": "boolean"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "titlePress",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "MessageStrip": {
+   "className": "sap.m.MessageStrip",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "text": {
+     "type": "string"
+    },
+    "type": {
+     "type": "sap.ui.core.MessageType",
+     "values": [
+      "Information",
+      "Warning",
+      "Error",
+      "None",
+      "Success"
+     ]
+    },
+    "customIcon": {
+     "type": "sap.ui.core.URI"
+    },
+    "showIcon": {
+     "type": "boolean"
+    },
+    "showCloseButton": {
+     "type": "boolean"
+    },
+    "enableFormattedText": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "link": {
+     "multiple": false,
+     "type": "sap.m.Link"
+    }
+   },
+   "defaultAgg": "link",
+   "events": [
+    "close",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "ProgressIndicator": {
+   "className": "sap.m.ProgressIndicator",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "state": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "displayValue": {
+     "type": "string"
+    },
+    "percentValue": {
+     "type": "float"
+    },
+    "showValue": {
+     "type": "boolean"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "displayOnly": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Image": {
+   "className": "sap.m.Image",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "src": {
+     "type": "sap.ui.core.URI"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "decorative": {
+     "type": "boolean"
+    },
+    "alt": {
+     "type": "string"
+    },
+    "useMap": {
+     "type": "string"
+    },
+    "densityAware": {
+     "type": "boolean"
+    },
+    "activeSrc": {
+     "type": "sap.ui.core.URI"
+    },
+    "mode": {
+     "type": "sap.m.ImageMode",
+     "values": [
+      "Image",
+      "Background"
+     ]
+    },
+    "backgroundSize": {
+     "type": "string"
+    },
+    "backgroundPosition": {
+     "type": "string"
+    },
+    "backgroundRepeat": {
+     "type": "string"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "detailBox": {
+     "multiple": false,
+     "type": "sap.m.LightBox"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "error",
+    "formatError",
+    "load",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "tap",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "core:Icon": {
+   "className": "sap.ui.core.Icon",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "src": {
+     "type": "sap.ui.core.URI"
+    },
+    "size": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "color": {
+     "type": "string"
+    },
+    "hoverColor": {
+     "type": "string"
+    },
+    "activeColor": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "backgroundColor": {
+     "type": "string"
+    },
+    "hoverBackgroundColor": {
+     "type": "string"
+    },
+    "activeBackgroundColor": {
+     "type": "string"
+    },
+    "decorative": {
+     "type": "boolean"
+    },
+    "useIconTooltip": {
+     "type": "boolean"
+    },
+    "alt": {
+     "type": "string"
+    },
+    "noTabStop": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Link": {
+   "className": "sap.m.Link",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "text": {
+     "type": "string"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "target": {
+     "type": "string"
+    },
+    "rel": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "href": {
+     "type": "sap.ui.core.URI"
+    },
+    "validateUrl": {
+     "type": "boolean"
+    },
+    "wrapping": {
+     "type": "boolean"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "subtle": {
+     "type": "boolean"
+    },
+    "emphasized": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Button": {
+   "className": "sap.m.Button",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "text": {
+     "type": "string"
+    },
+    "type": {
+     "type": "sap.m.ButtonType",
+     "values": [
+      "Default",
+      "Back",
+      "Accept",
+      "Reject",
+      "Transparent",
+      "Ghost",
+      "Up",
+      "Unstyled",
+      "Emphasized"
+     ]
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "icon": {
+     "type": "sap.ui.core.URI"
+    },
+    "iconFirst": {
+     "type": "boolean"
+    },
+    "activeIcon": {
+     "type": "sap.ui.core.URI"
+    },
+    "iconDensityAware": {
+     "type": "boolean"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "tap",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Input": {
+   "className": "sap.m.Input",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "value": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "name": {
+     "type": "string"
+    },
+    "placeholder": {
+     "type": "string"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "valueStateText": {
+     "type": "string"
+    },
+    "showValueStateMessage": {
+     "type": "boolean"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "required": {
+     "type": "boolean"
+    },
+    "type": {
+     "type": "sap.m.InputType",
+     "values": [
+      "Text",
+      "Date",
+      "Datetime",
+      "DatetimeLocale",
+      "Email",
+      "Month",
+      "Number",
+      "Tel",
+      "Time",
+      "Url",
+      "Week",
+      "Password"
+     ]
+    },
+    "maxLength": {
+     "type": "int"
+    },
+    "dateFormat": {
+     "type": "string"
+    },
+    "showValueHelp": {
+     "type": "boolean"
+    },
+    "showSuggestion": {
+     "type": "boolean"
+    },
+    "valueHelpOnly": {
+     "type": "boolean"
+    },
+    "filterSuggests": {
+     "type": "boolean"
+    },
+    "maxSuggestionWidth": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "startSuggestion": {
+     "type": "int"
+    },
+    "showTableSuggestionValueHelp": {
+     "type": "boolean"
+    },
+    "description": {
+     "type": "string"
+    },
+    "fieldWidth": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "valueLiveUpdate": {
+     "type": "boolean"
+    },
+    "selectedKey": {
+     "type": "string"
+    },
+    "textFormatMode": {
+     "type": "sap.m.InputTextFormatMode",
+     "values": [
+      "Value",
+      "Key",
+      "ValueKey",
+      "KeyValue"
+     ]
+    },
+    "textFormatter": {
+     "type": "any"
+    },
+    "suggestionRowValidator": {
+     "type": "any"
+    },
+    "enableSuggestionsHighlighting": {
+     "type": "boolean"
+    },
+    "autocomplete": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "suggestionItems": {
+     "multiple": true,
+     "type": "sap.ui.core.Item"
+    },
+    "suggestionColumns": {
+     "multiple": true,
+     "type": "sap.m.Column"
+    },
+    "suggestionRows": {
+     "multiple": true,
+     "type": "sap.m.ColumnListItem"
+    }
+   },
+   "defaultAgg": "suggestionItems",
+   "events": [
+    "change",
+    "formatError",
+    "liveChange",
+    "modelContextChange",
+    "parseError",
+    "submit",
+    "suggest",
+    "suggestionItemSelected",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess",
+    "valueHelpRequest"
+   ]
+  },
+  "TextArea": {
+   "className": "sap.m.TextArea",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "value": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "name": {
+     "type": "string"
+    },
+    "placeholder": {
+     "type": "string"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "valueStateText": {
+     "type": "string"
+    },
+    "showValueStateMessage": {
+     "type": "boolean"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "required": {
+     "type": "boolean"
+    },
+    "rows": {
+     "type": "int"
+    },
+    "cols": {
+     "type": "int"
+    },
+    "height": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "maxLength": {
+     "type": "int"
+    },
+    "showExceededText": {
+     "type": "boolean"
+    },
+    "wrapping": {
+     "type": "sap.ui.core.Wrapping",
+     "values": [
+      "None",
+      "Soft",
+      "Hard",
+      "Off"
+     ]
+    },
+    "valueLiveUpdate": {
+     "type": "boolean"
+    },
+    "growing": {
+     "type": "boolean"
+    },
+    "growingMaxLines": {
+     "type": "int"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "change",
+    "formatError",
+    "liveChange",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "SearchField": {
+   "className": "sap.m.SearchField",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "value": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "maxLength": {
+     "type": "int"
+    },
+    "placeholder": {
+     "type": "string"
+    },
+    "showMagnifier": {
+     "type": "boolean"
+    },
+    "showRefreshButton": {
+     "type": "boolean"
+    },
+    "refreshButtonTooltip": {
+     "type": "string"
+    },
+    "showSearchButton": {
+     "type": "boolean"
+    },
+    "enableSuggestions": {
+     "type": "boolean"
+    },
+    "selectOnFocus": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "suggestionItems": {
+     "multiple": true,
+     "type": "sap.m.SuggestionItem"
+    }
+   },
+   "defaultAgg": "suggestionItems",
+   "events": [
+    "formatError",
+    "liveChange",
+    "modelContextChange",
+    "parseError",
+    "search",
+    "suggest",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "CheckBox": {
+   "className": "sap.m.CheckBox",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "selected": {
+     "type": "boolean"
+    },
+    "partiallySelected": {
+     "type": "boolean"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "name": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "useEntireWidth": {
+     "type": "boolean"
+    },
+    "activeHandling": {
+     "type": "boolean"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "displayOnly": {
+     "type": "boolean"
+    },
+    "wrapping": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "select",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Switch": {
+   "className": "sap.m.Switch",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "state": {
+     "type": "boolean"
+    },
+    "customTextOn": {
+     "type": "string"
+    },
+    "customTextOff": {
+     "type": "string"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "name": {
+     "type": "string"
+    },
+    "type": {
+     "type": "sap.m.SwitchType",
+     "values": [
+      "Default",
+      "AcceptReject"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "change",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Select": {
+   "className": "sap.m.Select",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "name": {
+     "type": "string"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "maxWidth": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "selectedKey": {
+     "type": "string"
+    },
+    "selectedItemId": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "sap.ui.core.URI"
+    },
+    "type": {
+     "type": "sap.m.SelectType",
+     "values": [
+      "Default",
+      "IconOnly"
+     ]
+    },
+    "autoAdjustWidth": {
+     "type": "boolean"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "valueStateText": {
+     "type": "string"
+    },
+    "showSecondaryValues": {
+     "type": "boolean"
+    },
+    "forceSelection": {
+     "type": "boolean"
+    },
+    "wrapItemsText": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.ui.core.Item"
+    }
+   },
+   "defaultAgg": "items",
+   "events": [
+    "change",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "ComboBox": {
+   "className": "sap.m.ComboBox",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "value": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "name": {
+     "type": "string"
+    },
+    "placeholder": {
+     "type": "string"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "valueStateText": {
+     "type": "string"
+    },
+    "showValueStateMessage": {
+     "type": "boolean"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "required": {
+     "type": "boolean"
+    },
+    "maxWidth": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "showButton": {
+     "type": "boolean"
+    },
+    "showSecondaryValues": {
+     "type": "boolean"
+    },
+    "selectedKey": {
+     "type": "string"
+    },
+    "selectedItemId": {
+     "type": "string"
+    },
+    "filterSecondaryValues": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.ui.core.Item"
+    }
+   },
+   "defaultAgg": "items",
+   "events": [
+    "change",
+    "formatError",
+    "loadItems",
+    "modelContextChange",
+    "parseError",
+    "selectionChange",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "core:Item": {
+   "className": "sap.ui.core.Item",
+   "props": {
+    "text": {
+     "type": "string"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "key": {
+     "type": "string"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "DatePicker": {
+   "className": "sap.m.DatePicker",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "value": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "name": {
+     "type": "string"
+    },
+    "placeholder": {
+     "type": "string"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "valueStateText": {
+     "type": "string"
+    },
+    "showValueStateMessage": {
+     "type": "boolean"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "required": {
+     "type": "boolean"
+    },
+    "displayFormat": {
+     "type": "string"
+    },
+    "valueFormat": {
+     "type": "string"
+    },
+    "dateValue": {
+     "type": "object"
+    },
+    "initialFocusedDateValue": {
+     "type": "object"
+    },
+    "displayFormatType": {
+     "type": "string"
+    },
+    "secondaryCalendarType": {
+     "type": "sap.ui.core.CalendarType",
+     "values": [
+      "Gregorian",
+      "Islamic",
+      "Japanese",
+      "Persian",
+      "Buddhist"
+     ]
+    },
+    "minDate": {
+     "type": "object"
+    },
+    "maxDate": {
+     "type": "object"
+    },
+    "showFooter": {
+     "type": "boolean"
+    },
+    "calendarWeekNumbering": {
+     "type": "sap.ui.core.date.CalendarWeekNumbering",
+     "values": [
+      "Default",
+      "ISO_8601",
+      "MiddleEastern",
+      "WesternTraditional"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "specialDates": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "change",
+    "formatError",
+    "modelContextChange",
+    "navigate",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "TimePicker": {
+   "className": "sap.m.TimePicker",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "value": {
+     "type": "string"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "name": {
+     "type": "string"
+    },
+    "placeholder": {
+     "type": "string"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "valueStateText": {
+     "type": "string"
+    },
+    "showValueStateMessage": {
+     "type": "boolean"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "required": {
+     "type": "boolean"
+    },
+    "displayFormat": {
+     "type": "string"
+    },
+    "valueFormat": {
+     "type": "string"
+    },
+    "dateValue": {
+     "type": "object"
+    },
+    "initialFocusedDateValue": {
+     "type": "object"
+    },
+    "localeId": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "minutesStep": {
+     "type": "int"
+    },
+    "secondsStep": {
+     "type": "int"
+    },
+    "placeholderSymbol": {
+     "type": "string"
+    },
+    "mask": {
+     "type": "string"
+    },
+    "maskMode": {
+     "type": "sap.m.TimePickerMaskMode",
+     "values": [
+      "On",
+      "Off"
+     ]
+    },
+    "support2400": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "rules": {
+     "multiple": true,
+     "type": "sap.m.MaskInputRule"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "change",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "StepInput": {
+   "className": "sap.m.StepInput",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "min": {
+     "type": "float"
+    },
+    "max": {
+     "type": "float"
+    },
+    "step": {
+     "type": "float"
+    },
+    "stepMode": {
+     "type": "sap.m.StepInputStepModeType",
+     "values": [
+      "AdditionAndSubtraction",
+      "Multiple"
+     ]
+    },
+    "largerStep": {
+     "type": "float"
+    },
+    "value": {
+     "type": "float"
+    },
+    "name": {
+     "type": "string"
+    },
+    "placeholder": {
+     "type": "string"
+    },
+    "required": {
+     "type": "boolean"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "valueStateText": {
+     "type": "string"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "displayValuePrecision": {
+     "type": "int"
+    },
+    "description": {
+     "type": "string"
+    },
+    "fieldWidth": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "validationMode": {
+     "type": "sap.m.StepInputValidationMode",
+     "values": [
+      "FocusOut",
+      "LiveChange"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "change",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Slider": {
+   "className": "sap.m.Slider",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "name": {
+     "type": "string"
+    },
+    "min": {
+     "type": "float"
+    },
+    "max": {
+     "type": "float"
+    },
+    "step": {
+     "type": "float"
+    },
+    "progress": {
+     "type": "boolean"
+    },
+    "value": {
+     "type": "float"
+    },
+    "showHandleTooltip": {
+     "type": "boolean"
+    },
+    "showAdvancedTooltip": {
+     "type": "boolean"
+    },
+    "inputsAsTooltips": {
+     "type": "boolean"
+    },
+    "enableTickmarks": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "scale": {
+     "multiple": false,
+     "type": "sap.m.IScale"
+    },
+    "customTooltips": {
+     "multiple": true,
+     "type": "sap.m.SliderTooltipBase"
+    }
+   },
+   "defaultAgg": "scale",
+   "events": [
+    "change",
+    "formatError",
+    "liveChange",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "RatingIndicator": {
+   "className": "sap.m.RatingIndicator",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "maxValue": {
+     "type": "int"
+    },
+    "value": {
+     "type": "float"
+    },
+    "iconSize": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "iconSelected": {
+     "type": "sap.ui.core.URI"
+    },
+    "iconUnselected": {
+     "type": "sap.ui.core.URI"
+    },
+    "iconHovered": {
+     "type": "sap.ui.core.URI"
+    },
+    "visualMode": {
+     "type": "sap.m.RatingIndicatorVisualMode",
+     "values": [
+      "Full",
+      "Half"
+     ]
+    },
+    "displayOnly": {
+     "type": "boolean"
+    },
+    "editable": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "change",
+    "formatError",
+    "liveChange",
+    "modelContextChange",
+    "parseError",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "RadioButtonGroup": {
+   "className": "sap.m.RadioButtonGroup",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "columns": {
+     "type": "int"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "selectedIndex": {
+     "type": "int"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "buttons": {
+     "multiple": true,
+     "type": "sap.m.RadioButton"
+    }
+   },
+   "defaultAgg": "buttons",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "select",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "RadioButton": {
+   "className": "sap.m.RadioButton",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "selected": {
+     "type": "boolean"
+    },
+    "groupName": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "useEntireWidth": {
+     "type": "boolean"
+    },
+    "activeHandling": {
+     "type": "boolean"
+    },
+    "editable": {
+     "type": "boolean"
+    },
+    "valueState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "textAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "select",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "SegmentedButton": {
+   "className": "sap.m.SegmentedButton",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "selectedKey": {
+     "type": "string"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "buttons": {
+     "multiple": true,
+     "type": "sap.m.Button"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.m.SegmentedButtonItem"
+    }
+   },
+   "defaultAgg": "buttons",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "select",
+    "selectionChange",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "SegmentedButtonItem": {
+   "className": "sap.m.SegmentedButtonItem",
+   "props": {
+    "text": {
+     "type": "string"
+    },
+    "enabled": {
+     "type": "boolean"
+    },
+    "textDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "key": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "List": {
+   "className": "sap.m.List",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "inset": {
+     "type": "boolean"
+    },
+    "headerText": {
+     "type": "string"
+    },
+    "headerDesign": {
+     "type": "sap.m.ListHeaderDesign",
+     "values": [
+      "Standard",
+      "Plain"
+     ]
+    },
+    "footerText": {
+     "type": "string"
+    },
+    "mode": {
+     "type": "sap.m.ListMode",
+     "values": [
+      "None",
+      "SingleSelect",
+      "SingleSelectLeft",
+      "SingleSelectMaster",
+      "MultiSelect",
+      "Delete"
+     ]
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "includeItemInSelection": {
+     "type": "boolean"
+    },
+    "showUnread": {
+     "type": "boolean"
+    },
+    "noDataText": {
+     "type": "string"
+    },
+    "showNoData": {
+     "type": "boolean"
+    },
+    "enableBusyIndicator": {
+     "type": "boolean"
+    },
+    "modeAnimationOn": {
+     "type": "boolean"
+    },
+    "showSeparators": {
+     "type": "sap.m.ListSeparators",
+     "values": [
+      "All",
+      "Inner",
+      "None"
+     ]
+    },
+    "swipeDirection": {
+     "type": "sap.m.SwipeDirection",
+     "values": [
+      "LeftToRight",
+      "RightToLeft",
+      "Both"
+     ]
+    },
+    "growing": {
+     "type": "boolean"
+    },
+    "growingThreshold": {
+     "type": "int"
+    },
+    "growingTriggerText": {
+     "type": "string"
+    },
+    "growingScrollToLoad": {
+     "type": "boolean"
+    },
+    "growingDirection": {
+     "type": "sap.m.ListGrowingDirection",
+     "values": [
+      "Downwards",
+      "Upwards"
+     ]
+    },
+    "rememberSelections": {
+     "type": "boolean"
+    },
+    "keyboardMode": {
+     "type": "sap.m.ListKeyboardMode",
+     "values": [
+      "Navigation",
+      "Edit"
+     ]
+    },
+    "sticky": {
+     "type": "sap.m.Sticky[]"
+    },
+    "backgroundDesign": {
+     "type": "sap.m.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.m.ListItemBase"
+    },
+    "swipeContent": {
+     "multiple": false,
+     "type": "sap.ui.core.Control"
+    },
+    "headerToolbar": {
+     "multiple": false,
+     "type": "sap.m.Toolbar"
+    },
+    "infoToolbar": {
+     "multiple": false,
+     "type": "sap.m.Toolbar"
+    },
+    "contextMenu": {
+     "multiple": false,
+     "type": "sap.ui.core.IContextMenu"
+    }
+   },
+   "defaultAgg": "items",
+   "events": [
+    "beforeOpenContextMenu",
+    "delete",
+    "formatError",
+    "growingFinished",
+    "growingStarted",
+    "itemPress",
+    "modelContextChange",
+    "parseError",
+    "select",
+    "selectionChange",
+    "swipe",
+    "updateFinished",
+    "updateStarted",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "StandardListItem": {
+   "className": "sap.m.StandardListItem",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "type": {
+     "type": "sap.m.ListType",
+     "values": [
+      "Inactive",
+      "Detail",
+      "Navigation",
+      "Active",
+      "DetailAndActive"
+     ]
+    },
+    "unread": {
+     "type": "boolean"
+    },
+    "selected": {
+     "type": "boolean"
+    },
+    "counter": {
+     "type": "int"
+    },
+    "highlight": {
+     "type": "string"
+    },
+    "highlightText": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "description": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "sap.ui.core.URI"
+    },
+    "iconInset": {
+     "type": "boolean"
+    },
+    "iconDensityAware": {
+     "type": "boolean"
+    },
+    "activeIcon": {
+     "type": "sap.ui.core.URI"
+    },
+    "info": {
+     "type": "string"
+    },
+    "infoState": {
+     "type": "sap.ui.core.ValueState",
+     "values": [
+      "Error",
+      "Warning",
+      "Success",
+      "Information",
+      "None"
+     ]
+    },
+    "adaptTitleSize": {
+     "type": "boolean"
+    },
+    "titleTextDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "infoTextDirection": {
+     "type": "sap.ui.core.TextDirection",
+     "values": [
+      "LTR",
+      "RTL",
+      "Inherit"
+     ]
+    },
+    "wrapping": {
+     "type": "boolean"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    }
+   },
+   "defaultAgg": null,
+   "events": [
+    "detailPress",
+    "detailTap",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "tap",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "CustomListItem": {
+   "className": "sap.m.CustomListItem",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "type": {
+     "type": "sap.m.ListType",
+     "values": [
+      "Inactive",
+      "Detail",
+      "Navigation",
+      "Active",
+      "DetailAndActive"
+     ]
+    },
+    "unread": {
+     "type": "boolean"
+    },
+    "selected": {
+     "type": "boolean"
+    },
+    "counter": {
+     "type": "int"
+    },
+    "highlight": {
+     "type": "string"
+    },
+    "highlightText": {
+     "type": "string"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "content": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "content",
+   "events": [
+    "detailPress",
+    "detailTap",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "tap",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Table": {
+   "className": "sap.m.Table",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "inset": {
+     "type": "boolean"
+    },
+    "headerText": {
+     "type": "string"
+    },
+    "headerDesign": {
+     "type": "sap.m.ListHeaderDesign",
+     "values": [
+      "Standard",
+      "Plain"
+     ]
+    },
+    "footerText": {
+     "type": "string"
+    },
+    "mode": {
+     "type": "sap.m.ListMode",
+     "values": [
+      "None",
+      "SingleSelect",
+      "SingleSelectLeft",
+      "SingleSelectMaster",
+      "MultiSelect",
+      "Delete"
+     ]
+    },
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "includeItemInSelection": {
+     "type": "boolean"
+    },
+    "showUnread": {
+     "type": "boolean"
+    },
+    "noDataText": {
+     "type": "string"
+    },
+    "showNoData": {
+     "type": "boolean"
+    },
+    "enableBusyIndicator": {
+     "type": "boolean"
+    },
+    "modeAnimationOn": {
+     "type": "boolean"
+    },
+    "showSeparators": {
+     "type": "sap.m.ListSeparators",
+     "values": [
+      "All",
+      "Inner",
+      "None"
+     ]
+    },
+    "swipeDirection": {
+     "type": "sap.m.SwipeDirection",
+     "values": [
+      "LeftToRight",
+      "RightToLeft",
+      "Both"
+     ]
+    },
+    "growing": {
+     "type": "boolean"
+    },
+    "growingThreshold": {
+     "type": "int"
+    },
+    "growingTriggerText": {
+     "type": "string"
+    },
+    "growingScrollToLoad": {
+     "type": "boolean"
+    },
+    "growingDirection": {
+     "type": "sap.m.ListGrowingDirection",
+     "values": [
+      "Downwards",
+      "Upwards"
+     ]
+    },
+    "rememberSelections": {
+     "type": "boolean"
+    },
+    "keyboardMode": {
+     "type": "sap.m.ListKeyboardMode",
+     "values": [
+      "Navigation",
+      "Edit"
+     ]
+    },
+    "sticky": {
+     "type": "sap.m.Sticky[]"
+    },
+    "backgroundDesign": {
+     "type": "sap.m.BackgroundDesign",
+     "values": [
+      "Solid",
+      "Transparent",
+      "Translucent"
+     ]
+    },
+    "fixedLayout": {
+     "type": "boolean"
+    },
+    "showOverlay": {
+     "type": "boolean"
+    },
+    "alternateRowColors": {
+     "type": "boolean"
+    },
+    "popinLayout": {
+     "type": "sap.m.PopinLayout",
+     "values": [
+      "Block",
+      "GridSmall",
+      "GridLarge"
+     ]
+    },
+    "contextualWidth": {
+     "type": "string"
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "items": {
+     "multiple": true,
+     "type": "sap.m.ListItemBase"
+    },
+    "swipeContent": {
+     "multiple": false,
+     "type": "sap.ui.core.Control"
+    },
+    "headerToolbar": {
+     "multiple": false,
+     "type": "sap.m.Toolbar"
+    },
+    "infoToolbar": {
+     "multiple": false,
+     "type": "sap.m.Toolbar"
+    },
+    "contextMenu": {
+     "multiple": false,
+     "type": "sap.ui.core.IContextMenu"
+    },
+    "columns": {
+     "multiple": true,
+     "type": "sap.m.Column"
+    }
+   },
+   "defaultAgg": "items",
+   "events": [
+    "beforeOpenContextMenu",
+    "delete",
+    "formatError",
+    "growingFinished",
+    "growingStarted",
+    "itemPress",
+    "modelContextChange",
+    "parseError",
+    "paste",
+    "select",
+    "selectionChange",
+    "swipe",
+    "updateFinished",
+    "updateStarted",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "Column": {
+   "className": "sap.m.Column",
+   "props": {
+    "width": {
+     "type": "sap.ui.core.CSSSize"
+    },
+    "hAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "vAlign": {
+     "type": "sap.ui.core.VerticalAlign",
+     "values": [
+      "Bottom",
+      "Middle",
+      "Top",
+      "Inherit"
+     ]
+    },
+    "styleClass": {
+     "type": "string"
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "minScreenWidth": {
+     "type": "string"
+    },
+    "demandPopin": {
+     "type": "boolean"
+    },
+    "popinHAlign": {
+     "type": "sap.ui.core.TextAlign",
+     "values": [
+      "Begin",
+      "End",
+      "Left",
+      "Right",
+      "Center",
+      "Initial"
+     ]
+    },
+    "popinDisplay": {
+     "type": "sap.m.PopinDisplay",
+     "values": [
+      "Block",
+      "Inline",
+      "WithoutHeader"
+     ]
+    },
+    "mergeDuplicates": {
+     "type": "boolean"
+    },
+    "mergeFunctionName": {
+     "type": "string"
+    },
+    "sortIndicator": {
+     "type": "sap.ui.core.SortOrder",
+     "values": [
+      "None",
+      "Ascending",
+      "Descending"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "header": {
+     "multiple": false,
+     "type": "sap.ui.core.Control"
+    },
+    "footer": {
+     "multiple": false,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "header",
+   "events": [
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "validationError",
+    "validationSuccess"
+   ]
+  },
+  "ColumnListItem": {
+   "className": "sap.m.ColumnListItem",
+   "props": {
+    "blocked": {
+     "type": "boolean"
+    },
+    "busy": {
+     "type": "boolean"
+    },
+    "busyIndicatorDelay": {
+     "type": "int"
+    },
+    "busyIndicatorSize": {
+     "type": "sap.ui.core.BusyIndicatorSize",
+     "values": [
+      "Auto",
+      "Small",
+      "Medium",
+      "Large"
+     ]
+    },
+    "visible": {
+     "type": "boolean"
+    },
+    "fieldGroupIds": {
+     "type": "string[]"
+    },
+    "type": {
+     "type": "sap.m.ListType",
+     "values": [
+      "Inactive",
+      "Detail",
+      "Navigation",
+      "Active",
+      "DetailAndActive"
+     ]
+    },
+    "unread": {
+     "type": "boolean"
+    },
+    "selected": {
+     "type": "boolean"
+    },
+    "counter": {
+     "type": "int"
+    },
+    "highlight": {
+     "type": "string"
+    },
+    "highlightText": {
+     "type": "string"
+    },
+    "vAlign": {
+     "type": "sap.ui.core.VerticalAlign",
+     "values": [
+      "Bottom",
+      "Middle",
+      "Top",
+      "Inherit"
+     ]
+    }
+   },
+   "aggs": {
+    "tooltip": {
+     "multiple": false,
+     "type": "sap.ui.core.TooltipBase"
+    },
+    "customData": {
+     "multiple": true,
+     "type": "sap.ui.core.CustomData"
+    },
+    "layoutData": {
+     "multiple": false,
+     "type": "sap.ui.core.LayoutData"
+    },
+    "dependents": {
+     "multiple": true,
+     "type": "sap.ui.core.Element"
+    },
+    "dragDropConfig": {
+     "multiple": true,
+     "type": "sap.ui.core.dnd.DragDropBase"
+    },
+    "cells": {
+     "multiple": true,
+     "type": "sap.ui.core.Control"
+    }
+   },
+   "defaultAgg": "cells",
+   "events": [
+    "detailPress",
+    "detailTap",
+    "formatError",
+    "modelContextChange",
+    "parseError",
+    "press",
+    "tap",
+    "validateFieldGroup",
+    "validationError",
+    "validationSuccess"
+   ]
+  }
+ }
+}

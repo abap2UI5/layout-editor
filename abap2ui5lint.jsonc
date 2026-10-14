@@ -1,0 +1,16 @@
+{
+  // The abap2UI5 linter over the classes the designer generates
+  // (npm run check:abap writes them to .verify/abap first): every control,
+  // property, enum value and icon against UI5 1.71, and the view-builder
+  // house layout - what abap2UI5's own apps are held to.
+  "paths": [".verify/abap"],
+  "ui5": "1.71",
+  "distribution": "openui5",
+  "rules": {
+    "chain-house-layout": { "severity": "warning" },
+    // the kitchen sink writes a raw expression on purpose - it is the test
+    // of the designer's "Expr" mode, which takes whatever the user types
+    "hardcoded-binding-path": { "exclude": ["/.verify/abap/zcl_dsg_kitchen_sink."] }
+  },
+  "failOn": "warning"
+}

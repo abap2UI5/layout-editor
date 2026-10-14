@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>abap2UI5 View Designer</title>
+  <meta name="description" content="Design a UI5 view by drag and drop and get an abap2UI5 app class to pull into your system.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">◧</span>
+      <span class="name">abap2UI5 <b>View Designer</b></span>
+    </div>
+    <label class="field compact">
+      <span>Class</span>
+      <input id="className" spellcheck="false" autocomplete="off" maxlength="30">
+    </label>
+    <label class="field compact grow">
+      <span>Description</span>
+      <input id="description" maxlength="60" autocomplete="off">
+    </label>
+    <div class="actions">
+      <button id="btnNew" title="Start a new design">New</button>
+      <button id="btnOpen" title="Open a saved design (.json)">Open</button>
+      <button id="btnSave" title="Save the design as .json to continue later">Save</button>
+      <button id="btnImport" title="Start from an existing UI5 XML view">Import XML</button>
+      <span class="sep"></span>
+      <button id="btnUndo" class="icon" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+      <button id="btnRedo" class="icon" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+      <span class="sep"></span>
+      <button id="btnCopy" title="Copy the ABAP class to the clipboard">Copy ABAP</button>
+      <button id="btnZip" class="primary" title="Download the class as an abapGit ZIP - pull it with abapGit's offline import">Download abapGit ZIP</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="pane left">
+      <section class="palette">
+        <div class="pane-head">
+          <h2>Controls</h2>
+          <input id="paletteSearch" type="search" placeholder="Search…" aria-label="Search controls">
+        </div>
+        <div id="palette" class="scroll"></div>
+      </section>
+      <section class="outline">
+        <div class="pane-head"><h2>Outline</h2></div>
+        <div id="outline" class="scroll tree" role="tree"></div>
+      </section>
+    </aside>
+
+    <section class="pane center">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="preview" role="tab">Preview</button>
+        <button class="tab" data-tab="abap" role="tab">ABAP class</button>
+        <button class="tab" data-tab="xml" role="tab">XML view</button>
+        <span class="spacer"></span>
+        <div class="toolbar" id="previewTools">
+          <div class="seg" role="group" aria-label="Mode">
+            <button data-mode="design" class="active" title="Click selects, drag drops">Design</button>
+            <button data-mode="interact" title="Use the view as a user would">Interact</button>
+          </div>
+          <select id="device" aria-label="Width">
+            <option value="100%">Desktop</option>
+            <option value="820px">Tablet</option>
+            <option value="390px">Phone</option>
+          </select>
+          <select id="theme" aria-label="Theme">
+            <option value="sap_horizon">Horizon</option>
+            <option value="sap_fiori_3">Quartz Light</option>
+            <option value="sap_fiori_3_dark">Quartz Dark</option>
+            <option value="sap_belize">Belize</option>
+          </select>
+          <input id="ui5version" placeholder="UI5 latest" title="UI5 version of the preview, e.g. 1.71.80 - empty: the latest" size="9" spellcheck="false">
+        </div>
+      </div>
+      <div class="stage" id="stage-preview">
+        <div class="device-frame" id="deviceFrame">
+          <iframe id="preview" title="Preview"></iframe>
+        </div>
+      </div>
+      <div class="stage code hidden" id="stage-abap">
+        <div class="code-tools">
+          <span id="abapInfo"></span>
+          <span class="spacer"></span>
+          <button id="btnDownloadAbap">Download .clas.abap</button>
+          <button id="btnCopy2">Copy</button>
+        </div>
+        <pre id="abapCode" class="codeblock" tabindex="0"></pre>
+      </div>
+      <div class="stage code hidden" id="stage-xml">
+        <div class="code-tools">
+          <span>The view the class builds. Bindings point at the model abap2UI5 sends.</span>
+          <span class="spacer"></span>
+          <button id="btnCopyXml">Copy</button>
+        </div>
+        <pre id="xmlCode" class="codeblock" tabindex="0"></pre>
+      </div>
+    </section>
+
+    <aside class="pane right">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-rtab="props" role="tab">Properties</button>
+        <button class="tab" data-rtab="data" role="tab">Data</button>
+        <button class="tab" data-rtab="issues" role="tab">Problems <span id="issueCount" class="badge hidden"></span></button>
+      </div>
+      <div id="rpane-props" class="scroll rpane"></div>
+      <div id="rpane-data" class="scroll rpane hidden"></div>
+      <div id="rpane-issues" class="scroll rpane hidden"></div>
+    </aside>
+  </main>
+
+  <dialog id="dlg" class="dialog"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <input id="fileInput" type="file" accept=".json,.xml,application/json,text/xml" hidden>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
