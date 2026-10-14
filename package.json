@@ -1,0 +1,26 @@
+{
+  "name": "abap2ui5-view-designer",
+  "private": true,
+  "description": "Design a UI5 view by drag and drop and get an abap2UI5 app class - one ABAP class, ready to pull with abapGit and build on.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "serve": "node tools/serve.mjs 8080",
+    "test": "node --test test/*.test.mjs",
+    "check:abap": "node tools/gen-classes.mjs && abap2ui5lint --config abap2ui5lint.jsonc --no-render",
+    "verify:abap": "node tools/verify-abap.mjs",
+    "test:e2e": "playwright test",
+    "ui5:metadata": "node tools/ui5-metadata.mjs 1.71.80",
+    "verify": "npm test && npm run check:abap && npm run verify:abap && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@abap2ui5/linter": "0.8.5",
+    "@abap2ui5/node-runtime": "1.147.0",
+    "@abaplint/transpiler-cli": "2.14.3",
+    "@playwright/test": "1.56.1",
+    "express": "5.3.0"
+  }
+}

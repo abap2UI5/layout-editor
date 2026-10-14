@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preview</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #content { height: 100%; }
+    .dsg-hover { outline: 1px dashed #0a6ed1 !important; outline-offset: -1px; }
+    .dsg-sel { outline: 2px solid #0a6ed1 !important; outline-offset: -2px; }
+    .dsg-drop { outline: 2px dashed #e9730c !important; outline-offset: -2px; background-color: rgba(233, 115, 12, 0.06) !important; }
+    #dsg-error { display: none; position: fixed; inset: auto 12px 12px 12px; padding: 10px 12px; background: #fff4f4; color: #8f1d1d;
+      border: 1px solid #e4a3a3; border-radius: 6px; font: 13px/1.4 system-ui, sans-serif; white-space: pre-wrap; z-index: 99999; }
+    #dsg-loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font: 14px system-ui, sans-serif; color: #556; }
+  </style>
+  <script>
+    // ?ui5=<version> boots that version from the OpenUI5 CDN, ?ui5=local or
+    // ?ui5=local:<name> a tree tools/serve.mjs serves, nothing the latest
+    (function () {
+      var p = new URLSearchParams(location.search);
+      var v = p.get('ui5') || '';
+      var local = /^local(?::([\w.-]+))?$/.exec(v);
+      var src = local ? '/ui5/' + (local[1] || 'local') + '/resources/sap-ui-core.js'
+        : v ? 'https://sdk.openui5.org/' + encodeURIComponent(v) + '/resources/sap-ui-core.js'
+        : 'https://sdk.openui5.org/resources/sap-ui-core.js';
+      var theme = p.get('theme') || 'sap_horizon';
+      // Horizon exists from 1.102 on; an older release gets Quartz
+      var minor = /^1\.(\d+)\./.exec(v) || (local && local[1] && /^1\.?(\d+)/.exec(local[1]));
+      if (theme === 'sap_horizon' && minor && Number(minor[1]) < 102) theme = 'sap_fiori_3';
+      document.write('<script id="sap-ui-bootstrap" src="' + src + '" data-sap-ui-theme="' + theme.replace(/[^\w]/g, '') +
+        '" data-sap-ui-libs="sap.m" data-sap-ui-compatVersion="edge" data-sap-ui-async="true" data-sap-ui-oninit="module:designer/init"' +
+        ' data-sap-ui-resourceroots=\'{"designer": "./src/preview"}\'><\/script>');
+    })();
+  </script>
+</head>
+<body class="sapUiBody">
+  <div id="dsg-loading">Loading UI5…</div>
+  <div id="content"></div>
+  <div id="dsg-error"></div>
+</body>
+</html>
