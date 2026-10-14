@@ -11,10 +11,10 @@
 import { CONTROLS, CATEGORIES, DESCRIPTIONS, getControl, splitType, NAMESPACES } from './catalog.js';
 import {
   createNode, clone, walk, findNode, aggNames, aggAccepts, canHaveChildren, insertNode, dropTarget, removeNode,
-  moveNode, shiftNode, duplicateNode, rowContext, bindableAggs, bindListToTable, unbindList, attributeUsage, renameAttribute,
+  moveNode, shiftNode, duplicateNode, rowContext, bindableAggs, bindListToTable, hasOwnTemplate, unbindList, attributeUsage, renameAttribute,
   validate, previewModel, attributeFits, checkAttributeName, checkFieldName, checkEventName, checkClassName, SCALAR_TYPES, ATTRIBUTE_TYPES, DESIGN_VERSION,
 } from './model.js';
-import { toXml, fromXml } from './xml.js';
+import { toXml, fromXml, importReport } from './xml.js';
 import { generateClass, generateClassMap, abapGitFiles, fileName } from './abap.js';
 import { zip } from './zip.js';
 import { STARTERS } from './starters.js';
@@ -534,10 +534,14 @@ function renderInspector() {
       h('div', { class: 'add-row' },
         h('select', {
           'aria-label': `Bind ${agg} to a table`,
-          onchange: (e) => commit((dd) => {
-            if (e.target.value) bindListToTable(dd, node.id, agg, e.target.value);
-            else unbindList(dd, node.id, agg);
-          }),
+          onchange: (e) => {
+            const replace = !e.target.value || !hasOwnTemplate(node, agg)
+              || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of ${e.target.value}?\n\nCancel keeps them and only sets the binding.`);
+            commit((dd) => {
+              if (e.target.value) bindListToTable(dd, node.id, agg, e.target.value, replace);
+              else unbindList(dd, node.id, agg);
+            });
+          },
         }, h('option', { value: '', text: tables.length ? '— static items —' : '— no table attribute yet —' }), options(tables.map((t) => t.name), cur)),
         h('button', { onclick: () => newTableFor(node, agg), title: 'Create a table attribute and bind the rows to it' }, '+ Table')),
       h('p', { class: 'hint', text: cur
@@ -547,23 +551,28 @@ function renderInspector() {
 
   // properties, grouped
   const q = state.inspector.filter.trim().toLowerCase();
-  const defs = (c ? Object.entries(c.props || {}) : Object.keys(node.props).map((p) => [p, { type: 'string' }]))
-    .filter(([p]) => !bindableAggs(node).includes(p))
-    .filter(([p]) => !q || p.toLowerCase().includes(q))
-    .filter(([p]) => !state.inspector.onlySet || isSet(node.props[p]));
+  const visible = ([p]) => !bindableAggs(node).includes(p) && (!q || p.toLowerCase().includes(q)) && (!state.inspector.onlySet || isSet(node.props[p]));
+  const defs = (c ? Object.entries(c.props || {}) : []).filter(visible);
   for (const [title, test] of PROP_GROUPS) {
     const rows = defs.filter(([, def]) => test(def));
     if (!rows.length) continue;
     box.append(group(title, h('div', {}, title === 'Content' ? h('p', { class: 'hint', text: KIND_TITLE }) : null, rows.map(([p, def]) => propRow(node, p, def, ctx)))));
   }
-  if (!c) {
-    const inp = h('input', { placeholder: 'add property…', spellcheck: 'false' });
-    box.append(group('More', h('div', { class: 'add-row' }, inp, h('button', {
-      onclick: () => {
-        const n = inp.value.trim();
-        if (/^[a-zA-Z][\w]*$/.test(n)) commit((dd) => { findNode(dd.root, node.id).node.props[n] = { m: 's', v: '' }; });
-      },
-    }, 'Add'))));
+  // what an import brought along that the catalogue does not know: shown
+  // as text, written to the class as it is, and removable
+  const extras = Object.keys(node.props).filter((p) => !(c && c.props && c.props[p])).map((p) => [p, { type: 'string' }]).filter(visible);
+  if (extras.length || !c) {
+    const inp = h('input', { placeholder: 'add property…', spellcheck: 'false', 'aria-label': 'Property name' });
+    box.append(group(c ? 'Imported' : 'Properties', h('div', {},
+      c ? h('p', { class: 'hint', text: 'Not in the palette - written to the class as it is.' }) : null,
+      extras.map(([p, def]) => h('div', { class: 'extra' }, propRow(node, p, def, ctx),
+        h('button', { class: 'icon danger', title: `Remove ${p}`, 'aria-label': `Remove ${p}`, onclick: () => commit((dd) => { delete findNode(dd.root, node.id).node.props[p]; }) }, '✕'))),
+      !q && !state.inspector.onlySet ? h('div', { class: 'add-row' }, inp, h('button', {
+        onclick: () => {
+          const n = inp.value.trim();
+          if (/^[a-zA-Z][\w]*$/.test(n)) commit((dd) => { findNode(dd.root, node.id).node.props[n] = { m: 's', v: '' }; });
+        },
+      }, 'Add')) : null)));
   }
 
   // events
@@ -1144,8 +1153,10 @@ function importDialog() {
       text: 'Import', primary: true,
       action: () => {
         try {
-          importXmlText(ta.value);
-          return true;
+          const text = ta.value;
+          $('#dlg').close(); // the import opens its summary in the same dialog
+          importXmlText(text);
+          return false; // closed above - the summary may be open now
         } catch (err) {
           toast(err.message);
           return false;
@@ -1157,7 +1168,48 @@ function importDialog() {
 
 function importXmlText(text) {
   replaceDesign(fromXml(text, clone(state.design)));
-  toast('View imported');
+  const r = importReport();
+  const lines = [];
+  if (r.handlers.length) lines.push(`${r.handlers.length} event handler(s) dropped - abap2UI5 events are names: ${[...new Set(r.handlers)].slice(0, 6).join(', ')}${r.handlers.length > 6 ? ', …' : ''}`);
+  if (r.ids) lines.push(`${r.ids} id(s) dropped - the class needs none`);
+  if (r.unknown.length) lines.push(`Not in the palette, kept as imported: ${r.unknown.join(', ')}`);
+  if (r.expressions) lines.push(`${r.expressions} binding(s) kept as UI5 expressions (ƒx)`);
+  if (!lines.length && !r.unresolved.length) { toast('View imported'); return; }
+  const body = h('div', {}, lines.map((t) => h('p', { text: t })));
+  const buttons = [{ text: 'OK', primary: !r.unresolved.length, action: () => true }];
+  if (r.unresolved.length) {
+    body.append(h('p', {}, h('b', { text: `${r.unresolved.length} binding(s) name no attribute of the class: ` }), r.unresolved.map((u) => `{/${u.path}}`).join(', ')));
+    buttons.unshift({
+      text: `Create ${r.unresolved.length} attribute(s)`, primary: true,
+      action: () => { createImportedAttributes(r.unresolved); return true; },
+    });
+  }
+  dialog('View imported', body, buttons);
+}
+
+// the attributes an import asked for: a string per {/NAME}, a table with
+// one field per {/NAME} that repeats rows - and the expressions that named
+// them become bindings
+function createImportedAttributes(unresolved) {
+  commit((d) => {
+    for (const u of unresolved) {
+      let name = u.path.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^[^a-z]+/, 'a');
+      if (u.agg && !name.startsWith('t_')) name = `t_${name}`;
+      let i = 1;
+      const base = name;
+      while (d.attributes.some((a) => a.name === name) || checkAttributeName(name)) name = `${base}${++i}`;
+      d.attributes.push(u.agg
+        ? { name, type: 'table', fields: [{ name: 'TEXT', type: 'string' }], rows: [{ TEXT: 'Row 1' }] }
+        : { name, type: 'string', value: '' });
+      const re = new RegExp(`^\\{\\s*/${u.path}\\s*\\}$`);
+      walk(d.root, (n) => {
+        for (const [p, v] of Object.entries(n.props)) if (v.m === 'x' && re.test(v.v)) n.props[p] = { m: 'b', v: name };
+        return true;
+      });
+    }
+  });
+  showPanel('data');
+  toast('Attributes created - edit them on the Data tab');
 }
 
 function openFile(accept) {

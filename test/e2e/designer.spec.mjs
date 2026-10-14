@@ -143,11 +143,42 @@ test('a UI5 XML view imports into an editable design', async ({ designer: page }
     </Page>
   </mvc:View>`);
   await page.locator('#dlg').getByRole('button', { name: 'Import' }).click();
+  // the summary: what was dropped
+  await expect(page.locator('#dlg')).toContainText('1 event handler(s) dropped');
+  await page.locator('#dlg').getByRole('button', { name: 'OK' }).click();
   await expect(preview(page).getByText('Go')).toBeVisible();
   const abap = await abapOf(page);
   expect(abap).toContain(')->tag( `Button`');
   expect(abap).toContain('v = `{/SOME/PATH}`');
   expect(abap).not.toContain('onGo');
+});
+
+test('an imported binding without an attribute can become one', async ({ designer: page }) => {
+  await page.locator('#btnFile').click();
+  await page.locator('#btnImport').click();
+  await page.locator('#dlg textarea').fill(`<mvc:View xmlns="sap.m" xmlns:mvc="sap.ui.core.mvc">
+    <Page title="Imported"><Input value="{/NAME}"/><Input value="{/STREET}"/><List items="{/T_ORDERS}"/></Page>
+  </mvc:View>`);
+  await page.locator('#dlg').getByRole('button', { name: 'Import' }).click();
+  await expect(page.locator('#dlg')).toContainText('{/STREET}, {/T_ORDERS}');
+  await page.locator('#dlg').getByRole('button', { name: /Create 2 attribute/ }).click();
+  const abap = await abapOf(page);
+  expect(abap).toContain('v = client->_bind( name )');
+  expect(abap).toContain('v = client->_bind( street )');
+  expect(abap).toContain('v = client->_bind( t_orders )');
+  expect(abap).toMatch(/DATA t_orders +TYPE STANDARD TABLE OF ty_s_orders/);
+  await expect(page.locator('#panel-data')).toBeVisible();
+});
+
+test('an imported property the palette does not know shows in the properties and can go', async ({ designer: page }) => {
+  await page.evaluate(() => window.designer.commit((d) => { d.root.aggs.content[0].aggs.content[0].props.class = { m: 's', v: 'sapUiSmallMargin' }; }));
+  const formId = (await nodeIds(page, 'form:SimpleForm'))[0];
+  await page.evaluate((id) => window.designer.select(id), formId);
+  const row = prop(page, 'class');
+  await expect(row.locator('.val input')).toHaveValue('sapUiSmallMargin');
+  expect(await abapOf(page)).toContain('n = `class`');
+  await page.locator('#inspector').getByRole('button', { name: 'Remove class' }).click();
+  expect(await abapOf(page)).not.toContain('n = `class`');
 });
 
 test('a new design from a template', async ({ designer: page }) => {
