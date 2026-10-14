@@ -260,3 +260,44 @@ test('any UI5 control by class name: the canvas describes it, the properties kno
   await page.getByRole('tab', { name: 'Checks' }).click();
   await expect(page.locator('#issuesPanel')).toContainText('not checked against UI5 1.71');
 });
+
+test('a tree gets its nodes from a table with a table field, in one click', async ({ designer: page }) => {
+  await page.locator('.ins-item[data-type="Tree"]').click();
+  await expect(selectedType(page)).toHaveText('Tree');
+  await page.locator('#toast .toast-action', { hasText: 'Create nodes table' }).click();
+  await expect(preview(page).getByText('First', { exact: true })).toBeVisible();
+  const abap = await abapOf(page);
+  expect(abap).toContain("parameters:\\{arrayNames:['NODES']\\}");
+  expect(abap).toContain('nodes TYPE STANDARD TABLE OF ty_s_nodes_nodes WITH EMPTY KEY');
+  expect(abap).toContain('( text = `First child` )');
+  // the Data tab edits the nested rows
+  await page.getByRole('tab', { name: 'Data' }).click();
+  const card = page.locator('#dataPanel .attr', { has: page.locator('.subfields') });
+  await expect(card.locator('input.aname')).toHaveValue('t_nodes');
+  await expect(card.locator('.subfields input').first()).toHaveValue('TEXT');
+  await card.locator('button', { hasText: '+ NODES row' }).first().click();
+  await card.locator('.nested-rows input[type=text]').nth(2).fill('Third child');
+  expect(await abapOf(page)).toContain('( text = `Third child` )');
+  await page.getByRole('tab', { name: 'Checks' }).click();
+  await expect(page.locator('#issuesPanel')).not.toContainText('✕');
+});
+
+test('a list inside a bound list repeats a table field of the row', async ({ designer: page }) => {
+  await page.locator('.ins-item[data-type="Tree"]').click();
+  await page.locator('#toast .toast-action').click();
+  // a list bound to t_nodes, a list in its row bound to NODES
+  await page.locator('.ins-item[data-type="List"]').click();
+  await page.locator('#inspector').getByRole('combobox', { name: 'Bind items to a table' }).selectOption('t_nodes');
+  const listId = (await nodeIds(page, 'List')).at(-1);
+  await page.evaluate((id) => window.designer.commit((d) => {
+    const walk = (n) => { if (n.id === id) { n.aggs.items = [{ id: 'nx1', type: 'CustomListItem', props: {}, events: {}, aggs: { content: [{ id: 'nx2', type: 'List', props: {}, events: {}, aggs: {} }] } }]; } Object.values(n.aggs).flat().forEach(walk); };
+    walk(d.root);
+  }), listId);
+  await page.evaluate(() => window.designer.select('nx2'));
+  const rows = page.locator('#inspector').getByRole('combobox', { name: 'Bind items to a table' });
+  await expect(rows.locator('optgroup')).toHaveAttribute('label', /table fields of the row/);
+  await rows.selectOption('#NODES');
+  const abap = await abapOf(page);
+  expect(abap).toMatch(/n = `items` +v = `\{NODES\}`/);
+  await expect(preview(page).getByText('Second child')).toBeVisible();
+});

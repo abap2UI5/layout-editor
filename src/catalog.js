@@ -527,6 +527,18 @@ export const CONTROLS = {
   NotificationListItem: { category: 'Parts', props: { title: str, description: str, datetime: str, priority: en(['None', 'Low', 'Medium', 'High']), authorName: str, authorPicture: uri, unread: bool, showCloseButton: bool, truncate: bool }, events: ['press', 'close'], aggs: { buttons: { allow: ['Button'] } }, dropAgg: 'buttons', init: { props: { title: 'Notification', description: 'Something happened', datetime: 'Just now' } } },
   ActionListItem: { category: 'Parts', props: { text: str, type: en(LIST_TYPE) }, events: ['press'], init: { props: { text: 'Action' } } },
   GroupHeaderListItem: { category: 'Parts', props: { title: str, count: str }, init: { props: { title: 'Group' } } },
+  // the tree repeats the rows of a table attribute; its children come from
+  // a table field of the row (bindListToTable sets both) - static items
+  // are not possible, UI5 fails on them
+  Tree: {
+    category: 'Lists',
+    props: { headerText: str, mode: en(LIST_MODE), noDataText: str, width: size, visible: bool },
+    events: ['itemPress', 'toggleOpenState', 'selectionChange'],
+    aggs: { headerToolbar: { single: true, allow: ['Toolbar', 'OverflowToolbar'] }, items: { allow: ['StandardTreeItem'], bindable: true, mustBind: true } },
+    defaultAgg: 'items',
+    init: { props: { headerText: 'Tree' } },
+  },
+  StandardTreeItem: { category: 'Parts', props: { title: str, icon: icon, type: en(LIST_TYPE), selected: bool }, events: ['press', 'detailPress'], init: { props: { title: 'Node' } } },
   Table: {
     category: 'Lists',
     props: { headerText: str, mode: en(LIST_MODE), noDataText: str, growing: bool, growingThreshold: int, alternateRowColors: bool, inset: bool, width: size, visible: bool },
@@ -783,6 +795,8 @@ export const DESCRIPTIONS = {
   StandardListItem: 'A list line with title, description and icon',
   CustomListItem: 'A list line with any content',
   Table: 'Rows and columns, from a table attribute or static',
+  Tree: 'Nodes and their children, from a table attribute with a table field',
+  StandardTreeItem: 'The template of a tree node',
   Column: 'One column of a table',
   ColumnListItem: 'The row of a table - the template of a bound table',
 };

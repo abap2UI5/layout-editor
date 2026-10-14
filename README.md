@@ -34,7 +34,10 @@ outline · data · checks         properties
 3. **Add data.** On the *Data* tab, define the attributes of the app:
    strings, numbers, flags, dates, times, and tables with fields and sample
    rows. A list or table bound to a table attribute repeats its template per
-   row. The canvas shows your sample data.
+   row. A field can itself be a table, with fields and rows of its own:
+   that is what a tree's nodes come from, and what a list inside a list
+   repeats. When you insert a list, a table or a tree, one click creates
+   the table attribute and binds it. The canvas shows your sample data.
 4. **Name events.** Give a button's `press` (or any other event) a name.
    It becomes `client->_event( )` in the view and a `WHEN` branch in
    `on_event`.

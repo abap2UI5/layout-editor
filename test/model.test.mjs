@@ -239,3 +239,51 @@ test('a control the UI5 runtime describes becomes a catalogue entry', async () =
   assert.ok(validate(d).some((i) => i.level === 'info' && i.text.includes('not checked against UI5 1.71')));
   delete RUNTIME['microchart:RadialMicroChart'];
 });
+
+test('a table field of a table: nested types, nested rows, a list in a list, a tree', async () => {
+  const { tableTypes, childrenField } = await import('../src/model.js');
+  const { builderXml } = await import('./builder.mjs');
+  const { viewChain } = await import('../src/abap.js');
+  const d = createDesign();
+  d.attributes = [{
+    name: 't_tree', type: 'table',
+    fields: [{ name: 'TEXT', type: 'string' }, { name: 'NODES', type: 'table', fields: [{ name: 'TEXT', type: 'string' }, { name: 'DONE', type: 'bool' }] }],
+    rows: [{ TEXT: 'Root', NODES: [{ TEXT: 'Child', DONE: true }] }, { TEXT: 'Leaf' }],
+  }];
+  assert.deepEqual(tableTypes(d.attributes[0]).map((t) => t.name), ['ty_s_tree_nodes', 'ty_s_tree']);
+  assert.equal(childrenField(d.attributes[0]), 'NODES');
+  const src = generateClass(d);
+  assert.match(src, /BEGIN OF ty_s_tree_nodes,\n\s+text TYPE string,\n\s+done TYPE abap_bool,/);
+  assert.match(src, /nodes TYPE STANDARD TABLE OF ty_s_tree_nodes WITH EMPTY KEY,/);
+  assert.match(src, /nodes = VALUE #\(\n\s+\( text = `Child` done = abap_true \) \) \)/);
+  assert.deepEqual(previewModel(d), { T_TREE: [{ TEXT: 'Root', NODES: [{ TEXT: 'Child', DONE: true }] }, { TEXT: 'Leaf', NODES: [] }] });
+  // the tree binds the rows and names the field its children come from
+  const tree = createNode('Tree');
+  insertNode(d, tree, page(d).id);
+  assert.ok(errors(d).some((t) => t.includes('Tree: its items have to be bound')));
+  bindListToTable(d, tree.id, 'items', 't_tree');
+  assert.deepEqual(tree.props.items, { m: 'b', v: 't_tree', arr: 'NODES' });
+  assert.deepEqual(tree.aggs.items[0].props.title, { m: 'f', v: 'TEXT' });
+  assert.ok(toXml(d).includes(`items="{path:'/T_TREE',parameters:{arrayNames:['NODES']}}"`));
+  assert.ok(generateClass(d).includes("v = |\\{path:'{ client->_bind( val = t_tree path = abap_true ) }',parameters:\\{arrayNames:['NODES']\\}\\}|"));
+  // a list inside the row repeats the table field
+  const list = createNode('List');
+  insertNode(d, list, page(d).id);
+  bindListToTable(d, list.id, 'items', 't_tree');
+  const item = createNode('CustomListItem');
+  list.aggs.items = [item];
+  const inner = createNode('List');
+  insertNode(d, inner, item.id);
+  bindListToTable(d, inner.id, 'items', 'NODES', true, true);
+  assert.deepEqual(inner.props.items, { m: 'f', v: 'NODES' });
+  assert.equal(rowContext(d, inner.aggs.items[0].id).name, 'NODES');
+  assert.deepEqual(inner.aggs.items[0].props.title, { m: 'f', v: 'TEXT' });
+  assert.deepEqual(errors(d), []);
+  assert.equal(builderXml(viewChain(d).join('\n')), toXml(d).replace(/>\s+</g, '><'));
+  // a property bound to the table field, a list bound to a scalar field: errors
+  inner.aggs.items[0].props.title = { m: 'f', v: 'DONE' };
+  item.props.type = { m: 'f', v: 'NODES' };
+  assert.ok(errors(d).some((t) => t.includes('table field NODES - a property')));
+  inner.props.items = { m: 'f', v: 'TEXT' };
+  assert.ok(errors(d).some((t) => t.includes('field TEXT, which is not a table')));
+});

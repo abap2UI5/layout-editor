@@ -278,7 +278,12 @@ table.rows td input[type=checkbox] { width: auto; }
   position: fixed; bottom: 46px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none;
   background: #1d2d3e; color: #fff; padding: 8px 14px; border-radius: 8px; transition: all .2s; z-index: 50; max-width: 80vw;
 }
-.toast.show { opacity: 1; transform: translateX(-50%); }
+.toast.show { opacity: 1; transform: translateX(-50%); pointer-events: auto; }
+.toast-action { margin-left: 12px; background: var(--emphasized); border-color: var(--emphasized); color: #fff; font-weight: 700; padding: 3px 10px; }
+table.rows td.nested { vertical-align: top; }
+table.rows .nested-rows { margin: 2px 0 2px 12px; border-left: 2px solid var(--line-strong); padding-left: 6px; }
+.fields .frow.sub { margin-left: 14px; }
+.fields .subfields { margin: 2px 0 6px 14px; border-left: 2px solid var(--line-strong); padding-left: 6px; }
 
 @media (max-width: 1280px) {
   .workspace { --drawer-w: 250px; --inspector-w: 290px; }

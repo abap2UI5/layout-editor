@@ -11,7 +11,7 @@
 // aligned across an attribute block.
 
 import { NAMESPACES, splitType } from './catalog.js';
-import { aggNames, collectEvents, typeName, isDirectAgg } from './model.js';
+import { aggNames, collectEvents, typeName, tableTypes, isDirectAgg } from './model.js';
 import { usedNamespaces, namespaceUri } from './xml.js';
 
 const MAX_LINE = 255;
@@ -86,7 +86,10 @@ function attrExpr(value) {
       const s = String(value.v ?? '');
       return { p: /[{}\\]/.test(s) ? 't' : 'v', pieces: abapStringPieces(s, 120) };
     }
-    case 'b': return { p: 'v', pieces: [`client->_bind( ${value.v} )`] };
+    case 'b':
+      // a tree: the path with the field its children come from
+      if (value.arr) return { p: 'v', pieces: [`|\\{path:'{ client->_bind( val = ${value.v} path = abap_true ) }',parameters:\\{arrayNames:['${value.arr}']\\}\\}|`] };
+      return { p: 'v', pieces: [`client->_bind( ${value.v} )`] };
     case 'f': return { p: 'v', pieces: [abapString(`{${value.v}}`)] };
     case 'x': return { p: 'v', pieces: abapStringPieces(value.v, 120) };
     default: throw new Error(`unknown value mode ${value.m}`);
@@ -215,12 +218,63 @@ function aligned(rows, indent) {
 
 const INITIAL = { string: '``', int: '0', decimal: '0', bool: 'abap_false', date: `'00000000'`, time: `'000000'` };
 
+// the rows of a table (or of a table field) as cells [name, value]; a
+// table field's value is a nested VALUE #( ) - its rows on lines of their
+// own, which seedTable( ) indents under the row
+function seedRows(fields, rowsIn) {
+  const scalar = fields.filter((f) => f.type !== 'table');
+  const nested = fields.filter((f) => f.type === 'table');
+  const used = scalar.filter((f) => (rowsIn || []).some((r) => abapValue(f.type, r[f.name]) !== null));
+  return (rowsIn || []).map((r) => [
+    ...used.map((f) => [f.name.toLowerCase(), abapValue(f.type, r[f.name]) ?? INITIAL[f.type]]),
+    ...nested.filter((f) => (r[f.name] || []).length).map((f) => [f.name.toLowerCase(), { rows: seedRows(f.fields || [], r[f.name]) }]),
+  ]);
+}
+
+// one row with a nested table in it, one field per line: ( a = 1
+// nodes = VALUE #( ( ... ) ( ... ) ) ) over several lines
+function nestedRowLines(cells, indent, tail) {
+  const lines = [];
+  const w = Math.max(...cells.map(([n]) => n.length));
+  cells.forEach(([n, v], j) => {
+    const pre = j === 0 ? '( ' : '  ';
+    const last = j === cells.length - 1;
+    if (typeof v === 'string') {
+      lines.push(`${indent}${pre}${n.padEnd(w)} = ${v}${last ? ` )${tail}` : ''}`);
+    } else {
+      lines.push(`${indent}${pre}${n.padEnd(w)} = VALUE #(`);
+      const inner = indent + '    ';
+      v.rows.forEach((row, i) => {
+        const rowTail = i === v.rows.length - 1 ? ` )${last ? ` )${tail}` : ''}` : '';
+        if (row.every(([, x]) => typeof x === 'string') && inner.length + 2 + row.map(([a, b]) => `${a} = ${b}`).join(' ').length + 2 + rowTail.length <= MAX_LINE) {
+          lines.push(`${inner}( ${row.map(([a, b]) => `${a} = ${b}`).join(' ')} )${rowTail}`);
+        } else if (row.length) {
+          lines.push(...nestedRowLines(row, inner, rowTail.slice(2)));
+        } else {
+          lines.push(`${inner}( )${rowTail}`);
+        }
+      });
+    }
+  });
+  return lines;
+}
+
 function seedTable(attr) {
   // a field that is set in any row is written in every row (its initial
   // value where a row leaves it empty), so all rows share one shape and the
   // columns line up; a field no row sets is left out
-  const used = attr.fields.filter((f) => (attr.rows || []).some((r) => abapValue(f.type, r[f.name]) !== null));
-  const rows = (attr.rows || []).map((r) => used.map((f) => [f.name.toLowerCase(), abapValue(f.type, r[f.name]) ?? INITIAL[f.type]]));
+  const rows = seedRows(attr.fields, attr.rows);
+  const hasNested = rows.some((r) => r.some(([, v]) => typeof v !== 'string'));
+  if (hasNested) {
+    const head = `    ${attr.name} = VALUE #(`;
+    const lines = [head];
+    rows.forEach((r, i) => {
+      const tail = i === rows.length - 1 ? '.' : '';
+      if (r.every(([, v]) => typeof v === 'string')) lines.push(`        ( ${r.map(([n, v]) => `${n} = ${v}`).join(' ')} )${tail ? ' ).' : ''}`);
+      else lines.push(...nestedRowLines(r, '        ', tail ? ' ).' : ''));
+    });
+    return lines;
+  }
   // every sample row is a row of the model the preview shows, so every row
   // is written - a row that sets nothing as an initial line ( )
   const nonEmpty = rows;
@@ -292,10 +346,13 @@ function buildClass(design) {
   L.push('    INTERFACES z2ui5_if_app.');
   if (design.attributes.length) L.push('');
   for (const t of tables) {
-    L.push('    TYPES:');
-    L.push(`      BEGIN OF ${typeName(t)},`);
-    L.push(...aligned(t.fields.map((f) => [f.name.toLowerCase(), `TYPE ${abapType(f.type)},`]), 8));
-    L.push(`      END OF ${typeName(t)}.`);
+    // the row type, with the types of its table fields before it
+    for (const ty of tableTypes(t)) {
+      L.push('    TYPES:');
+      L.push(`      BEGIN OF ${ty.name},`);
+      L.push(...aligned(ty.fields.map((f) => [f.name.toLowerCase(), `TYPE ${f.type === 'table' ? `STANDARD TABLE OF ${typeName(t, [...ty.path, f.name])} WITH EMPTY KEY` : abapType(f.type)},`]), 8));
+      L.push(`      END OF ${ty.name}.`);
+    }
   }
   const dataRows = [
     ...tables.map((t) => [`DATA ${t.name}`, `TYPE STANDARD TABLE OF ${typeName(t)} WITH EMPTY KEY.`]),

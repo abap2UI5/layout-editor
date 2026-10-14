@@ -69,56 +69,90 @@ function attrCard(a, idx) {
   if (a.type !== 'table') {
     card.append(h('div', { class: 'avalue' }, h('span', { class: 'hint', style: 'margin:0', text: 'Value' }), scalarInput(a.type, a.value, (v) => upd((at) => { at.value = v; }, `a${idx}-v`), `a${idx}-v`)));
   } else {
-    const fields = h('div', { class: 'fields' }, h('div', { class: 'hint', style: 'margin:0 0 4px', text: 'Fields' }));
-    a.fields.forEach((f, fi) => {
-      fields.append(h('div', { class: 'frow' },
-        h('input', {
-          value: f.name, spellcheck: 'false', 'aria-label': 'Field name', 'data-focus': `a${idx}-f${fi}`,
-          onchange: (e) => {
-            const v = e.target.value.trim().toUpperCase();
-            const err = checkFieldName(v) || (a.fields.some((x, j) => j !== fi && x.name === v) ? 'Name is taken' : null);
-            if (err) { e.target.classList.add('invalid'); toast(err); return; }
-            commit((dd) => renameField(dd, idx, fi, v));
-          },
+    // `fieldPath`: the names of the table fields down to this list of
+    // fields - the fields of a table field are edited under it
+    const fieldsAt = (at, fieldPath) => fieldPath.reduce((fields, name) => fields.find((f) => f.name === name).fields, at.fields);
+    const fieldsEditor = (fieldList, fieldPath) => {
+      const key = `a${idx}-${fieldPath.join('.')}`;
+      const box = h('div', { class: fieldPath.length ? 'subfields' : 'fields' },
+        fieldPath.length ? null : h('div', { class: 'hint', style: 'margin:0 0 4px', text: 'Fields - a field of type table has fields of its own (the nodes of a tree, a list in a list)' }));
+      fieldList.forEach((f, fi) => {
+        box.append(h('div', { class: 'frow' },
+          h('input', {
+            value: f.name, spellcheck: 'false', 'aria-label': 'Field name', 'data-focus': `${key}-f${fi}`,
+            onchange: (e) => {
+              const v = e.target.value.trim().toUpperCase();
+              const err = checkFieldName(v) || (fieldList.some((x, j) => j !== fi && x.name === v) ? 'Name is taken' : null);
+              if (err) { e.target.classList.add('invalid'); toast(err); return; }
+              commit((dd) => renameField(dd, idx, fieldPath, fi, v));
+            },
+          }),
+          h('select', {
+            'aria-label': 'Field type',
+            onchange: (e) => commit((dd) => {
+              const fld = fieldsAt(dd.attributes[idx], fieldPath)[fi];
+              fld.type = e.target.value;
+              if (fld.type === 'table') { fld.fields = fld.fields && fld.fields.length ? fld.fields : [{ name: 'TEXT', type: 'string' }]; } else delete fld.fields;
+            }),
+          }, options(ATTRIBUTE_TYPES, f.type)),
+          h('button', { class: 'icon danger', 'aria-label': 'Delete field', title: 'Delete field', onclick: () => commit((dd) => { fieldsAt(dd.attributes[idx], fieldPath).splice(fi, 1); }) }, '✕')));
+        if (f.type === 'table') box.append(fieldsEditor(f.fields || [], [...fieldPath, f.name]));
+      });
+      box.append(h('button', {
+        onclick: () => commit((dd) => {
+          const list = fieldsAt(dd.attributes[idx], fieldPath);
+          let i = list.length + 1;
+          while (list.some((f) => f.name === `FIELD${i}`)) i++;
+          list.push({ name: `FIELD${i}`, type: 'string' });
         }),
-        h('select', { 'aria-label': 'Field type', onchange: (e) => commit((dd) => { dd.attributes[idx].fields[fi].type = e.target.value; }) }, options(SCALAR_TYPES, f.type)),
-        h('button', { class: 'icon danger', 'aria-label': 'Delete field', title: 'Delete field', onclick: () => commit((dd) => { dd.attributes[idx].fields.splice(fi, 1); }) }, '✕')));
-    });
-    fields.append(h('button', {
-      onclick: () => commit((dd) => {
-        const at = dd.attributes[idx];
-        let i = at.fields.length + 1;
-        while (at.fields.some((f) => f.name === `FIELD${i}`)) i++;
-        at.fields.push({ name: `FIELD${i}`, type: 'string' });
-      }),
-    }, '+ Field'));
-    card.append(fields);
+      }, '+ Field'));
+      return box;
+    };
+    card.append(fieldsEditor(a.fields, []));
 
-    const table = h('table', { class: 'rows' }, h('tr', {}, a.fields.map((f) => h('th', { text: f.name })), h('th')));
-    (a.rows || []).forEach((r, ri) => {
-      table.append(h('tr', {}, a.fields.map((f) => h('td', {}, scalarInput(f.type, r[f.name], (v) => upd((at) => { at.rows[ri][f.name] = v; }, `a${idx}-r${ri}-${f.name}`), `a${idx}-r${ri}-${f.name}`))),
-        h('td', {}, h('button', { class: 'icon danger', 'aria-label': 'Delete row', title: 'Delete row', onclick: () => commit((dd) => { dd.attributes[idx].rows.splice(ri, 1); }) }, '✕'))));
-    });
+    // the rows, and under a row the rows of its table fields
+    const rowsAt = (at, rowPath) => rowPath.reduce((rows, [name, i]) => (rows[i][name] = rows[i][name] || []), at.rows);
+    const rowsTable = (fieldList, rows, rowPath) => {
+      const key = `a${idx}-${rowPath.map(([n, i]) => `${n}${i}`).join('.')}`;
+      const table = h('table', { class: 'rows' }, h('tr', {}, fieldList.map((f) => h('th', { text: f.name })), h('th')));
+      (rows || []).forEach((r, ri) => {
+        table.append(h('tr', {}, fieldList.map((f) => (f.type === 'table'
+          ? h('td', { class: 'nested' },
+            h('div', { class: 'nested-rows' }, rowsTable(f.fields || [], r[f.name], [...rowPath, [f.name, ri]]),
+              h('button', { style: 'margin-top:4px', onclick: () => commit((dd) => { rowsAt(dd.attributes[idx], [...rowPath, [f.name, ri]]).push({}); }) }, `+ ${f.name} row`)))
+          : h('td', {}, scalarInput(f.type, r[f.name], (v) => upd((at) => { rowsAt(at, rowPath)[ri][f.name] = v; }, `${key}-r${ri}-${f.name}`), `${key}-r${ri}-${f.name}`)))),
+        h('td', {}, h('button', { class: 'icon danger', 'aria-label': 'Delete row', title: 'Delete row', onclick: () => commit((dd) => { rowsAt(dd.attributes[idx], rowPath).splice(ri, 1); }) }, '✕'))));
+      });
+      return table;
+    };
     card.append(h('div', { class: 'hint', style: 'margin:8px 0 0', text: 'Sample rows - they seed model_init and the canvas' }),
-      h('div', { class: 'rows-wrap' }, table),
+      h('div', { class: 'rows-wrap' }, rowsTable(a.fields, a.rows, [])),
       h('button', { style: 'margin-top:6px', onclick: () => commit((dd) => { (dd.attributes[idx].rows = dd.attributes[idx].rows || []).push({}); }) }, '+ Row'));
   }
   return card;
 }
 
-function renameField(d, idx, fi, to) {
+// rename a field - of the table, or of a table field `fieldPath` down -
+// in its rows and in every binding that names it in that context
+function renameField(d, idx, fieldPath, fi, to) {
   const at = d.attributes[idx];
-  const from = at.fields[fi].name;
-  at.fields[fi].name = to;
-  for (const r of at.rows || []) {
-    if (from in r) { r[to] = r[from]; delete r[from]; }
-  }
+  const list = fieldPath.reduce((fields, name) => fields.find((f) => f.name === name).fields, at.fields);
+  const from = list[fi].name;
+  list[fi].name = to;
+  const renameRows = (rows, depth) => {
+    for (const r of rows || []) {
+      if (depth === fieldPath.length) { if (from in r) { r[to] = r[from]; delete r[from]; } } else renameRows(r[fieldPath[depth]], depth + 1);
+    }
+  };
+  renameRows(at.rows, 0);
+  const ctxFields = list;
   walk(d.root, (n) => {
     for (const v of Object.values(n.props || {})) {
       if (v && v.m === 'f' && v.v === from) {
         const ctx = rowContext(d, n.id);
-        if (ctx && ctx.name === at.name) v.v = to;
+        if (ctx && ctx.fields === ctxFields) v.v = to;
       }
+      if (v && v.m === 'b' && v.v === at.name && v.arr === from && !fieldPath.length) v.arr = to;
     }
     return true;
   });

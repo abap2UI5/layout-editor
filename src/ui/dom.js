@@ -29,12 +29,15 @@ export function options(values, selected, labels = {}) {
 
 let toastTimer = null;
 
-export function toast(text) {
+// `action`: { label, run } - a button in the toast, which then stays
+// longer
+export function toast(text, action) {
   const t = $('#toast');
-  t.textContent = text;
+  t.replaceChildren(text);
+  if (action) t.append(h('button', { class: 'toast-action', onclick: () => { t.classList.remove('show'); action.run(); } }, action.label));
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => t.classList.remove('show'), action ? 6000 : 2200);
 }
 
 export function download(name, data, type) {

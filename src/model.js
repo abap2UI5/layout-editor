@@ -296,9 +296,22 @@ export function rowContext(design, id) {
       const attr = design.attributes.find((a) => a.name === binding.v);
       if (attr && attr.type === 'table') return attr;
     }
+    // rows of a table field of the row above (a list inside a list)
+    if (binding && binding.m === 'f') {
+      const outer = rowContext(design, hit.parent.id);
+      const field = outer && outer.fields.find((f) => f.name === binding.v);
+      if (field && field.type === 'table') return field;
+    }
     hit = findNode(design.root, hit.parent.id);
   }
   return null;
+}
+
+// the field a tree repeats its children from: the first table field of
+// the rows - none for a flat tree
+export function childrenField(table) {
+  const f = (table.fields || []).find((x) => x.type === 'table');
+  return f ? f.name : null;
 }
 
 export function bindableAggs(node) {
@@ -311,17 +324,33 @@ export function bindableAggs(node) {
 // the table's fields - what a designer would otherwise click together cell
 // by cell
 // With `replace` false the template that is there stays, only the binding
-// is set - for a list someone has built by hand
-export function bindListToTable(design, nodeId, agg, attrName, replace = true) {
+// is set - for a list someone has built by hand. `viaField`: `attrName`
+// is a table field of the row the list sits in (a list inside a bound
+// list repeats the rows of that field).
+export function bindListToTable(design, nodeId, agg, attrName, replace = true, viaField = false) {
   const hit = findNode(design.root, nodeId);
-  const attr = design.attributes.find((a) => a.name === attrName);
+  let attr;
+  if (viaField) {
+    const ctx = rowContext(design, nodeId);
+    attr = ctx && ctx.fields.find((x) => x.name === attrName);
+  } else {
+    attr = design.attributes.find((a) => a.name === attrName);
+  }
   if (!hit || !attr || attr.type !== 'table') return;
   const node = hit.node;
-  const fields = attr.fields.length ? attr.fields : [{ name: 'TEXT', type: 'string' }];
+  const all = attr.fields && attr.fields.length ? attr.fields : [{ name: 'TEXT', type: 'string' }];
+  // the scalar fields make the template; a table field is what a tree
+  // descends into
+  const fields = all.filter((x) => x.type !== 'table').length ? all.filter((x) => x.type !== 'table') : all;
   const f = (i) => ({ m: 'f', v: (fields[i] || fields[0]).name });
-  node.props[agg] = { m: 'b', v: attr.name };
+  node.props[agg] = viaField ? { m: 'f', v: attr.name } : { m: 'b', v: attr.name };
+  if (node.type === 'Tree' && childrenField(attr)) node.props[agg].arr = childrenField(attr);
   if (!replace) return;
-  if (node.type === 'Table') {
+  if (node.type === 'Tree') {
+    const item = createNode('StandardTreeItem');
+    item.props.title = f(0);
+    node.aggs.items = [item];
+  } else if (node.type === 'Table') {
     node.aggs.columns = fields.map((fld) => {
       const col = createNode('Column');
       col.aggs.header = [createNode('Text', { props: { text: label(fld.name) } })];
@@ -469,25 +498,36 @@ export function validate(design) {
     if (names.has(a.name)) issues.push({ level: 'error', text: `Attribute ${a.name} is defined twice` });
     names.add(a.name);
     if (a.type === 'table') {
-      if (!a.fields.length) issues.push({ level: 'error', text: `Table ${a.name} has no fields` });
-      const fn = new Set();
-      for (const f of a.fields) {
-        const fe = checkFieldName(f.name);
-        if (fe) issues.push({ level: 'error', text: `Field ${a.name}-${f.name}: ${fe}` });
-        if (fn.has(f.name)) issues.push({ level: 'error', text: `Field ${a.name}-${f.name} is defined twice` });
-        fn.add(f.name);
-      }
-      if (typeName(a).length > 30) issues.push({ level: 'error', text: `Table ${a.name}: its row type ${typeName(a)} is longer than 30 characters` });
-      const twin = design.attributes.find((b) => b !== a && b.type === 'table' && typeName(b) === typeName(a));
-      if (twin && design.attributes.indexOf(twin) < design.attributes.indexOf(a)) {
-        issues.push({ level: 'error', text: `Tables ${twin.name} and ${a.name} share the row type ${typeName(a)} - rename one` });
+      const checkFields = (fields, where) => {
+        if (!fields.length) issues.push({ level: 'error', text: `Table ${where} has no fields` });
+        const fn = new Set();
+        for (const f of fields) {
+          const fe = checkFieldName(f.name);
+          if (fe) issues.push({ level: 'error', text: `Field ${where}-${f.name}: ${fe}` });
+          if (fn.has(f.name)) issues.push({ level: 'error', text: `Field ${where}-${f.name} is defined twice` });
+          fn.add(f.name);
+          if (f.type === 'table') checkFields(f.fields || [], `${where}-${f.name}`);
+        }
+      };
+      checkFields(a.fields, a.name);
+      for (const t of tableTypes(a)) {
+        if (t.name.length > 30) issues.push({ level: 'error', text: `Table ${a.name}: its row type ${t.name} is longer than 30 characters` });
       }
     }
+  }
+  const allTypes = design.attributes.filter((a) => a.type === 'table').flatMap((a) => tableTypes(a).map((t) => [t.name, a.name]));
+  const seenTypes = new Map();
+  for (const [t, owner] of allTypes) {
+    if (seenTypes.has(t) && seenTypes.get(t) !== owner) issues.push({ level: 'error', text: `Tables ${seenTypes.get(t)} and ${owner} share the row type ${t} - rename one` });
+    seenTypes.set(t, seenTypes.get(t) || owner);
   }
   const attrByName = new Map(design.attributes.map((a) => [a.name, a]));
   for (const a of design.attributes) {
     if (!attributeUsage(design, a.name)) issues.push({ level: 'warning', text: `Attribute ${a.name} is public, but nothing binds it - bind it or remove it` });
-    const values = a.type === 'table' ? (a.rows || []).flatMap((r) => a.fields.map((f) => [f.type, r[f.name], `${a.name}-${f.name}`])) : [[a.type, a.value, a.name]];
+    const rowValues = (fields, rows, where) => (rows || []).flatMap((r) => fields.flatMap((f) => (f.type === 'table'
+      ? rowValues(f.fields || [], r[f.name], `${where}-${f.name}`)
+      : [[f.type, r[f.name], `${where}-${f.name}`]])));
+    const values = a.type === 'table' ? rowValues(a.fields, a.rows, a.name) : [[a.type, a.value, a.name]];
     for (const [type, v, where] of values) {
       const w = checkValue(type, v);
       if (w) issues.push({ level: 'warning', text: `${where}: ${w}` });
@@ -507,8 +547,12 @@ export function validate(design) {
       }
       if (v.m === 'f') {
         const ctx = rowContext(design, n.id);
+        const field = ctx && ctx.fields.find((f) => f.name === v.v);
+        const isAgg = bindableAggs(n).includes(p);
         if (!ctx) issues.push({ level: 'error', text: `${n.type}.${p} uses field ${v.v} outside a bound list`, node: n.id });
-        else if (!ctx.fields.some((f) => f.name === v.v)) issues.push({ level: 'error', text: `${n.type}.${p}: ${ctx.name} has no field ${v.v}`, node: n.id });
+        else if (!field) issues.push({ level: 'error', text: `${n.type}.${p}: ${ctx.name} has no field ${v.v}`, node: n.id });
+        else if (isAgg && field.type !== 'table') issues.push({ level: 'error', text: `${n.type}.${p} repeats the rows of field ${v.v}, which is not a table`, node: n.id });
+        else if (!isAgg && field.type === 'table') issues.push({ level: 'error', text: `${n.type}.${p} is bound to the table field ${v.v} - a property takes a single value`, node: n.id });
       }
     }
     for (const [e, name] of Object.entries(n.events || {})) {
@@ -518,8 +562,15 @@ export function validate(design) {
     for (const a of bindableAggs(n)) {
       const b = n.props[a];
       const def = getControl(n.type).aggs[a];
-      if (b && b.m === 'b' && !def.noTemplate && (n.aggs[a] || []).length !== 1) {
+      if (b && (b.m === 'b' || b.m === 'f') && !def.noTemplate && (n.aggs[a] || []).length !== 1) {
         issues.push({ level: 'warning', text: `${n.type}: a bound ${a} aggregation needs exactly one template item`, node: n.id });
+      }
+      if (n.type === 'Tree' && !(b && (b.m === 'b' || b.m === 'f' || b.m === 'x'))) {
+        issues.push({ level: 'error', text: 'Tree: its items have to be bound to a table - UI5 fails on static tree items', node: n.id });
+      }
+      if (b && b.arr) {
+        const ctx = b.m === 'b' ? attrByName.get(b.v) : null;
+        if (ctx && !(ctx.fields || []).some((f) => f.name === b.arr && f.type === 'table')) issues.push({ level: 'error', text: `${n.type}.${a}: ${b.v} has no table field ${b.arr} to take the children from`, node: n.id });
       }
     }
     const c = CONTROLS[n.type];
@@ -562,9 +613,23 @@ export function attributeFits(def, attrType) {
   return attrType !== 'bool';
 }
 
-export function typeName(attr) {
+// the row type of a table attribute (t_rows -> ty_s_rows), and of a table
+// field inside it (field NODES of t_rows -> ty_s_rows_nodes)
+export function typeName(attr, path = []) {
   const base = attr.name.startsWith('t_') ? attr.name.slice(2) : attr.name;
-  return `ty_s_${base}`;
+  return [`ty_s_${base}`, ...path.map((f) => f.toLowerCase())].join('_');
+}
+
+// Every table type a table attribute needs, innermost first: [{ name,
+// fields, path }] - a field of type table has fields of its own
+export function tableTypes(attr) {
+  const out = [];
+  const walkFields = (fields, path) => {
+    for (const f of fields) if (f.type === 'table') walkFields(f.fields || [], [...path, f.name]);
+    out.push({ name: typeName(attr, path), fields, path });
+  };
+  walkFields(attr.fields || [], []);
+  return out;
 }
 
 // The model the preview binds: what abap2UI5 would send, keys upper case
@@ -573,16 +638,20 @@ export function previewModel(design) {
   for (const a of design.attributes) {
     const key = a.name.toUpperCase();
     if (a.type === 'table') {
-      out[key] = (a.rows || []).map((r) => {
-        const row = {};
-        for (const f of a.fields) row[f.name] = jsValue(f.type, r[f.name]);
-        return row;
-      });
+      out[key] = jsRows(a.fields, a.rows);
     } else {
       out[key] = jsValue(a.type, a.value);
     }
   }
   return out;
+}
+
+function jsRows(fields, rows) {
+  return (rows || []).map((r) => {
+    const row = {};
+    for (const f of fields) row[f.name] = f.type === 'table' ? jsRows(f.fields || [], r[f.name]) : jsValue(f.type, r[f.name]);
+    return row;
+  });
 }
 
 // what abap2UI5 sends for the value model_init seeds: the class rounds a

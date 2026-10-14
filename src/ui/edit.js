@@ -1,6 +1,6 @@
 // Edits that start from the UI: inserting a control or a building block
 // at the selection or at a drop, moving by drop, and the clipboard.
-import { createNode, clone, walk, findNode, newId, aggAccepts, insertNode, dropTarget, removeNode, moveNode } from '../model.js';
+import { createNode, clone, walk, findNode, newId, aggAccepts, insertNode, dropTarget, removeNode, moveNode, bindableAggs, bindListToTable } from '../model.js';
 import { PATTERNS } from '../patterns.js';
 import { state, commit, ancestors } from './store.js';
 import { toast, displayType } from './dom.js';
@@ -8,14 +8,58 @@ import { describeControl } from './preview.js';
 import { renderInsert } from './insert.js';
 
 export function addControl(type, onId = state.selected) {
+  let id = null;
   commit((d) => {
     const t = dropTarget(d, onId || 'root', type);
     if (!t) {
       toast(`${displayType(type)} does not fit here`);
       return undefined;
     }
-    return insertNode(d, createNode(type), t.parentId, t.agg, t.index);
+    id = insertNode(d, createNode(type), t.parentId, t.agg, t.index);
+    return id;
   });
+  if (id) offerRows(id);
+}
+
+// A control that repeats rows (a list, a table, a tree) just inserted:
+// one click binds it to a new table attribute of the class - a tree to
+// one with a table field for its children
+export function offerRows(id) {
+  const hit = findNode(state.design.root, id);
+  if (!hit) return;
+  const node = hit.node;
+  const agg = bindableAggs(node)[0];
+  if (!agg || node.props[agg]) return;
+  const tree = node.type === 'Tree';
+  toast(`${displayType(node.type)}: ${tree ? 'its nodes come from a table with a table field' : 'its rows can come from a table attribute of the class'}`, {
+    label: tree ? 'Create nodes table' : 'Create table attribute',
+    run: () => commit((d) => {
+      const name = newTableAttribute(d, tree);
+      bindListToTable(d, node.id, agg, name);
+      return node.id;
+    }),
+  });
+}
+
+// a new table attribute with sample rows: t_items, with TITLE and INFO -
+// or, for a tree, t_nodes with TEXT and the table field NODES
+export function newTableAttribute(d, tree = false) {
+  const base = tree ? 't_nodes' : 't_items';
+  let i = 1;
+  let name = base;
+  while (d.attributes.some((a) => a.name === name)) name = `${base}${++i}`;
+  d.attributes.push(tree
+    ? {
+      name, type: 'table',
+      fields: [{ name: 'TEXT', type: 'string' }, { name: 'NODES', type: 'table', fields: [{ name: 'TEXT', type: 'string' }] }],
+      rows: [{ TEXT: 'First', NODES: [{ TEXT: 'First child' }, { TEXT: 'Second child' }] }, { TEXT: 'Second', NODES: [] }],
+    }
+    : {
+      name, type: 'table',
+      fields: [{ name: 'TITLE', type: 'string' }, { name: 'INFO', type: 'string' }],
+      rows: [{ TITLE: 'First', INFO: 'A' }, { TITLE: 'Second', INFO: 'B' }, { TITLE: 'Third', INFO: 'C' }],
+    });
+  return name;
 }
 
 export function insertPattern(id, onId, place) {
@@ -80,14 +124,17 @@ export function handleDrop(data, onId, place, zone) {
     insertPattern(what, onId, place);
   } else if (kind === 'new') {
     if (!place) { addControl(what, onId); return; }
+    let id = null;
     commit((d) => {
       const p = findNode(d.root, place.parentId);
       if (!p || !aggAccepts(p.node, place.agg, what)) {
         toast(`${displayType(what)} does not fit here`);
         return undefined;
       }
-      return insertNode(d, createNode(what), place.parentId, place.agg, place.index);
+      id = insertNode(d, createNode(what), place.parentId, place.agg, place.index);
+      return id;
     });
+    if (id) offerRows(id);
   } else {
     commit((d) => {
       const hit = findNode(d.root, what);

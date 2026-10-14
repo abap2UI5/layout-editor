@@ -33,7 +33,9 @@ export function valueToXml(value, opts) {
   if (!value) return null;
   switch (value.m) {
     case 's': return escapeBindingLiteral(value.v ?? '');
-    case 'b': return `{/${String(value.v).toUpperCase()}}`;
+    case 'b':
+      if (value.arr) return `{path:'/${String(value.v).toUpperCase()}',parameters:{arrayNames:['${value.arr}']}}`;
+      return `{/${String(value.v).toUpperCase()}}`;
     case 'f': return `{${value.v}}`;
     case 'x': return String(value.v ?? '');
     default: return opts && opts.strict ? (() => { throw new Error(`unknown value mode ${value.m}`); })() : null;
@@ -191,6 +193,12 @@ export function fromXml(src, base) {
   // {/NAME} -> b when NAME is an attribute, {FIELD} -> f inside a list
   // bound to a table with that field, else x
   function bindingValue(v, prop, isAgg, rowTable) {
+    // a tree binding: the path and the field the children come from
+    const tree = /^\{\s*path\s*:\s*'\/([A-Za-z0-9_]+)'\s*,\s*parameters\s*:\s*\{\s*arrayNames\s*:\s*\[\s*'([A-Za-z0-9_]+)'\s*\]\s*\}\s*\}$/.exec(v);
+    if (tree && isAgg) {
+      const a = attrs.get(tree[1].toUpperCase());
+      if (a && a.type === 'table') return { m: 'b', v: a.name, arr: tree[2] };
+    }
     const abs = /^\{\s*\/([A-Za-z0-9_]+)\s*\}$/.exec(v);
     if (abs) {
       const a = attrs.get(abs[1].toUpperCase());
@@ -199,7 +207,8 @@ export function fromXml(src, base) {
       return { m: 'x', v };
     }
     const rel = /^\{\s*([A-Za-z0-9_]+)\s*\}$/.exec(v);
-    if (rel && rowTable && rowTable.fields.some((f) => f.name === rel[1])) return { m: 'f', v: rel[1] };
+    const field = rel && rowTable && (rowTable.fields || []).find((f) => f.name === rel[1]);
+    if (field && (isAgg ? field.type === 'table' : field.type !== 'table')) return { m: 'f', v: rel[1] };
     report.expressions += 1;
     return { m: 'x', v };
   }
@@ -249,8 +258,15 @@ export function fromXml(src, base) {
     // the rows a bound aggregation repeats, for the template inside it
     const tableOf = (agg) => {
       const b = node.props[agg];
-      const a = b && b.m === 'b' ? attrs.get(b.v.toUpperCase()) : null;
-      return a && a.type === 'table' ? a : rowTable;
+      if (b && b.m === 'b') {
+        const a = attrs.get(b.v.toUpperCase());
+        if (a && a.type === 'table') return a;
+      }
+      if (b && b.m === 'f' && rowTable) {
+        const f = (rowTable.fields || []).find((x) => x.name === b.v);
+        if (f && f.type === 'table') return f;
+      }
+      return rowTable;
     };
     for (const ch of el.children) {
       const chScope = nsScope(scope, ch);

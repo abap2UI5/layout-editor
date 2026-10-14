@@ -7,6 +7,7 @@ import {
 } from '../model.js';
 import { state, commit } from './store.js';
 import { $, h, options, toast, displayType, rememberFocus, restoreFocus } from './dom.js';
+import { newTableAttribute } from './edit.js';
 
 const KINDS = { s: 'Aa', b: '@', f: '#', x: 'ƒx' };
 
@@ -57,24 +58,36 @@ export function renderInspector() {
   // rows of a list
   for (const agg of bindableAggs(node)) {
     const tables = d.attributes.filter((a) => a.type === 'table');
-    const cur = node.props[agg] && node.props[agg].m === 'b' ? node.props[agg].v : '';
+    // the table fields of the row this list sits in: a list in a list
+    const rowFields = ctx ? (ctx.fields || []).filter((f) => f.type === 'table') : [];
+    const b = node.props[agg];
+    const cur = b && b.m === 'b' ? b.v : b && b.m === 'f' ? `#${b.v}` : '';
+    const tree = node.type === 'Tree';
     box.append(group('Rows', h('div', {},
       h('div', { class: 'add-row' },
         h('select', {
           'aria-label': `Bind ${agg} to a table`,
           onchange: (e) => {
-            const replace = !e.target.value || !hasOwnTemplate(node, agg)
-              || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of ${e.target.value}?\n\nCancel keeps them and only sets the binding.`);
+            const v = e.target.value;
+            const replace = !v || !hasOwnTemplate(node, agg)
+              || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of ${v}?\n\nCancel keeps them and only sets the binding.`);
             commit((dd) => {
-              if (e.target.value) bindListToTable(dd, node.id, agg, e.target.value, replace);
+              if (v.startsWith('#')) bindListToTable(dd, node.id, agg, v.slice(1), replace, true);
+              else if (v) bindListToTable(dd, node.id, agg, v, replace);
               else unbindList(dd, node.id, agg);
             });
           },
-        }, h('option', { value: '', text: tables.length ? '— static items —' : '— no table attribute yet —' }), options(tables.map((t) => t.name), cur)),
-        h('button', { onclick: () => newTableFor(node, agg), title: 'Create a table attribute and bind the rows to it' }, '+ Table')),
+        }, h('option', { value: '', text: tree ? '— not bound yet —' : tables.length ? '— static items —' : '— no table attribute yet —' }),
+        options(tables.map((t) => t.name), cur),
+        rowFields.length ? h('optgroup', { label: `table fields of the row (${ctx.name})` }, options(rowFields.map((f) => `#${f.name}`), cur, Object.fromEntries(rowFields.map((f) => [`#${f.name}`, `# ${f.name}`])))) : null),
+        h('button', { onclick: () => newTableFor(node, agg), title: tree ? 'Create a table attribute with a table field for the children and bind the nodes to it' : 'Create a table attribute and bind the rows to it' }, tree ? '+ Nodes table' : '+ Table')),
       h('p', { class: 'hint', text: cur
-        ? `One line per row of ${cur}. The template inside repeats per row; its properties take the row's fields (#).`
-        : 'Bind to a table attribute and the template repeats per row.' }))));
+        ? tree
+          ? `One node per row of ${cur}; the children come from its table field${b.arr ? ` ${b.arr}` : ''}. The template's properties take the row's fields (#).`
+          : `One line per row of ${cur}. The template inside repeats per row; its properties take the row's fields (#).`
+        : tree
+          ? 'A tree has to be bound: its nodes are the rows of a table attribute, the children the rows of a table field in it.'
+          : 'Bind to a table attribute and the template repeats per row - or to a table field of the row this list sits in.' }))));
   }
 
   // properties, grouped
@@ -175,14 +188,7 @@ function suggestEvent(node, ev) {
 
 function newTableFor(node, agg) {
   commit((d) => {
-    let i = 1;
-    let name = 't_items';
-    while (d.attributes.some((a) => a.name === name)) name = `t_items${++i}`;
-    d.attributes.push({
-      name, type: 'table',
-      fields: [{ name: 'TITLE', type: 'string' }, { name: 'INFO', type: 'string' }],
-      rows: [{ TITLE: 'First', INFO: 'A' }, { TITLE: 'Second', INFO: 'B' }, { TITLE: 'Third', INFO: 'C' }],
-    });
+    const name = newTableAttribute(d, node.type === 'Tree');
     bindListToTable(d, node.id, agg, name);
     return node.id;
   });

@@ -3,7 +3,7 @@
 // property set and every event named, next to a binding of every attribute
 // type.
 import { CONTROLS } from '../src/catalog.js';
-import { createDesign, createNode, insertNode, bindListToTable } from '../src/model.js';
+import { createDesign, createNode, insertNode, bindListToTable, walk } from '../src/model.js';
 import { STARTERS } from '../src/starters.js';
 
 const SAMPLE = {
@@ -23,7 +23,7 @@ const HOME = {
   ObjectListItem: 'List', DisplayListItem: 'List', InputListItem: 'List', ObjectAttribute: 'ObjectHeader', Token: 'MultiInput',
   TileContent: 'GenericTile', NumericContent: 'TileContent', ImageContent: 'TileContent', NewsContent: 'TileContent', FeedContent: 'TileContent',
   FeedListItem: 'List', NotificationListItem: 'List', ActionListItem: 'List', GroupHeaderListItem: 'List',
-  WizardStep: 'Wizard', TabContainerItem: 'TabContainer', MenuItem: 'Menu', Menu: 'MenuButton',
+  WizardStep: 'Wizard', TabContainerItem: 'TabContainer', MenuItem: 'Menu', Menu: 'MenuButton', StandardTreeItem: 'Tree',
   'l:BlockLayoutRow': 'l:BlockLayout', 'l:BlockLayoutCell': 'l:BlockLayoutRow', 'table:Column': 'table:Table',
   'f:DynamicPageTitle': 'f:DynamicPage', 'f:DynamicPageHeader': 'f:DynamicPage', 'cards:Header': 'f:Card', 'core:Title': 'form:SimpleForm',
   'uxap:ObjectPageDynamicHeaderTitle': 'uxap:ObjectPageLayout', 'uxap:ObjectPageSection': 'uxap:ObjectPageLayout', 'uxap:ObjectPageSubSection': 'uxap:ObjectPageSection',
@@ -62,6 +62,12 @@ export function kitchenSink(half) {
     },
     // sample rows that set nothing are rows of the model all the same
     { name: 't_blank', type: 'table', fields: [{ name: 'NOTE', type: 'string' }], rows: [{ NOTE: '' }, {}] },
+    // a table with a table field: the nodes of a tree, a list in a list
+    {
+      name: 't_tree', type: 'table',
+      fields: [{ name: 'TEXT', type: 'string' }, { name: 'NODES', type: 'table', fields: [{ name: 'TEXT', type: 'string' }, { name: 'DONE', type: 'bool' }] }],
+      rows: [{ TEXT: 'Root', NODES: [{ TEXT: 'Child 1', DONE: true }, { TEXT: 'Child 2', DONE: false }] }, { TEXT: 'Leaf', NODES: [] }],
+    },
   ];
   const page = d.root.aggs.content[0];
   page.aggs.content = [];
@@ -97,6 +103,9 @@ export function kitchenSink(half) {
       insertNode(d, node, box.id);
     }
   }
+  // a tree is bound or nothing: the one the kitchen sink placed its tree
+  // item in takes its nodes from t_tree, the item becomes the template
+  walk(d.root, (n) => { if (n.type === 'Tree') bindListToTable(d, n.id, 'items', 't_tree'); return true; });
   // every scalar type bound, and a table bound to a list
   const bound = createNode('form:SimpleForm', { aggs: { content: [] } });
   insertNode(d, bound, page.id);
@@ -120,6 +129,22 @@ export function kitchenSink(half) {
   const blank = createNode('List');
   insertNode(d, blank, page.id);
   bindListToTable(d, blank.id, 'items', 't_blank');
+  // a list in a list: the inner one repeats the table field of the row
+  const outer = createNode('List');
+  insertNode(d, outer, page.id);
+  bindListToTable(d, outer.id, 'items', 't_tree');
+  const item = createNode('CustomListItem');
+  outer.aggs.items = [item];
+  insertNode(d, createNode('Text', { props: {} }), item.id);
+  item.aggs.content[0].props.text = { m: 'f', v: 'TEXT' };
+  const innerList = createNode('List');
+  insertNode(d, innerList, item.id);
+  bindListToTable(d, innerList.id, 'items', 'NODES', true, true);
+  if (!half) {
+    const tree = createNode('Tree');
+    insertNode(d, tree, page.id);
+    bindListToTable(d, tree.id, 'items', 't_tree');
+  }
   const select = createNode('Select');
   insertNode(d, select, page.id);
   bindListToTable(d, select.id, 'items', 't_rows');
