@@ -173,6 +173,8 @@ button.cmd { display: flex; gap: 10px; align-items: center; min-width: 210px; ju
 .canvas-pane { display: flex; justify-content: center; padding: 14px; min-height: 0; min-width: 0; background: var(--panel-2); position: relative; }
 .preview-status { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 3; max-width: calc(100% - 40px); padding: 5px 12px; border-radius: 8px; font-size: 12px; background: var(--panel); color: var(--muted); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .preview-status.error { color: var(--error); border-color: var(--error); }
+.preview-status.warn { color: var(--warn); border-color: var(--warn); }
+.preview-status button.link { margin-left: 10px; font-size: 12px; }
 .device-frame { width: 100%; height: 100%; max-width: 100%; transition: width .15s; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0.125rem 0 rgba(34,53,72,.15), 0 0.5rem 1rem 0 rgba(34,53,72,.15); }
 .device-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
 .code-pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-left: 1px solid var(--line); background: var(--panel); }
