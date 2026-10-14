@@ -12,7 +12,7 @@ import { CONTROLS, CATEGORIES, DESCRIPTIONS, getControl, splitType, NAMESPACES }
 import {
   createNode, clone, walk, findNode, aggNames, aggAccepts, canHaveChildren, insertNode, dropTarget, removeNode,
   moveNode, shiftNode, duplicateNode, rowContext, bindableAggs, bindListToTable, hasOwnTemplate, unbindList, attributeUsage, renameAttribute,
-  validate, previewModel, attributeFits, checkAttributeName, checkFieldName, checkEventName, checkClassName, SCALAR_TYPES, ATTRIBUTE_TYPES, DESIGN_VERSION,
+  validate, previewModel, attributeFits, normalizeDesign, checkAttributeName, checkFieldName, checkEventName, checkClassName, SCALAR_TYPES, ATTRIBUTE_TYPES,
 } from './model.js';
 import { toXml, fromXml, importReport } from './xml.js';
 import { generateClass, generateClassMap, abapGitFiles, fileName } from './abap.js';
@@ -60,8 +60,7 @@ function loadDesign() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
-      const d = JSON.parse(raw);
-      if (d && d.version === DESIGN_VERSION && d.root) return d;
+      return normalizeDesign(JSON.parse(raw));
     }
   } catch { /* start fresh */ }
   return STARTERS.find((s) => s.id === 'form').make();
@@ -1045,7 +1044,7 @@ window.addEventListener('message', (e) => {
   } else if (msg.type === 'drop') {
     handleDrop(msg.data, msg.onId);
   } else if (msg.type === 'key') {
-    onKey({ key: msg.key, ctrlKey: msg.ctrl, metaKey: false, shiftKey: msg.shift, preventDefault() {}, target: document.body });
+    onKey({ key: msg.key, ctrlKey: msg.ctrl, metaKey: false, shiftKey: msg.shift, altKey: msg.alt, preventDefault() {}, target: document.body });
   } else if (msg.type === 'error') {
     document.body.dataset.previewError = msg.message;
     count();
@@ -1224,9 +1223,7 @@ function openFile(accept) {
       if (/\.xml$/i.test(f.name) || /^\s*</.test(text)) {
         importXmlText(text);
       } else {
-        const d = JSON.parse(text);
-        if (!d || !d.root || d.version !== DESIGN_VERSION) throw new Error('not a designer file');
-        replaceDesign(d);
+        replaceDesign(normalizeDesign(JSON.parse(text)));
         toast(`Opened ${f.name}`);
       }
     } catch (err) {
@@ -1270,6 +1267,8 @@ function wireMenu(button, menu) {
 // ------------------------------------------------------------- keyboard
 
 function onKey(e) {
+  // a dialog has the keys: Escape closes it, nothing reaches the design
+  if (document.querySelector('dialog[open]')) return;
   const t = e.target;
   const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   const ctrl = e.ctrlKey || e.metaKey;

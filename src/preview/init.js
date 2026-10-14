@@ -198,7 +198,7 @@ sap.ui.define([
   document.addEventListener('keydown', function (e) {
     // the designer's shortcuts work while the preview has the focus
     if (mode !== 'design') return;
-    post({ type: 'key', key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey });
+    post({ type: 'key', key: e.key, ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey, alt: e.altKey });
   });
 
   post({ type: 'ready', version: sap.ui.version });

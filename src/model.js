@@ -54,6 +54,28 @@ export function createDesign() {
   };
 }
 
+// A design that comes from a file: ids the canvas can find (n + base36,
+// unique), else new ones - and the shape the editor relies on
+export function normalizeDesign(d) {
+  if (!d || typeof d !== 'object' || !d.root || d.version !== DESIGN_VERSION) throw new Error('not a designer file');
+  d.className = String(d.className || 'ZCL_MY_APP');
+  d.description = String(d.description || '');
+  d.attributes = Array.isArray(d.attributes) ? d.attributes : [];
+  d.root.id = 'root';
+  d.root.type = 'mvc:View';
+  const seen = new Set(['root']);
+  walk(d.root, (n) => {
+    n.props = n.props || {};
+    n.events = n.events || {};
+    n.aggs = n.aggs || {};
+    if (n.id === 'root') return true;
+    if (typeof n.id !== 'string' || !/^n[0-9a-z]+$/.test(n.id) || seen.has(n.id)) n.id = newId();
+    seen.add(n.id);
+    return true;
+  });
+  return d;
+}
+
 export function clone(x) {
   return JSON.parse(JSON.stringify(x));
 }
@@ -413,6 +435,11 @@ export function validate(design) {
   const attrByName = new Map(design.attributes.map((a) => [a.name, a]));
   for (const a of design.attributes) {
     if (!attributeUsage(design, a.name)) issues.push({ level: 'warning', text: `Attribute ${a.name} is public, but nothing binds it - bind it or remove it` });
+    const values = a.type === 'table' ? (a.rows || []).flatMap((r) => a.fields.map((f) => [f.type, r[f.name], `${a.name}-${f.name}`])) : [[a.type, a.value, a.name]];
+    for (const [type, v, where] of values) {
+      const w = checkValue(type, v);
+      if (w) issues.push({ level: 'warning', text: `${where}: ${w}` });
+    }
   }
   walk(design.root, (n, parent, agg) => {
     for (const [p, v] of Object.entries(n.props || {})) {
@@ -456,6 +483,22 @@ export function validate(design) {
   return issues;
 }
 
+// A sample value the class cannot carry as it is: more than two decimals
+// (the type is p LENGTH 16 DECIMALS 2), a time without seconds, a date or
+// time in another shape than the data panel writes
+export function checkValue(type, v) {
+  if (v === '' || v == null) return null;
+  const t = String(v).trim();
+  if (type === 'decimal') {
+    if (!/^-?\d+(\.\d+)?$/.test(t)) return `"${t}" is not a number`;
+    if ((t.split('.')[1] || '').length > 2) return `"${t}" has more than 2 decimals - the class rounds it`;
+  }
+  if (type === 'int' && !/^-?\d+$/.test(t)) return `"${t}" is not a whole number`;
+  if (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(t)) return `"${t}" is not a date (yyyy-mm-dd)`;
+  if (type === 'time' && !/^\d{2}:\d{2}:\d{2}$/.test(t)) return `"${t}" is not a time (hh:mm:ss)`;
+  return null;
+}
+
 // Does an attribute of `attrType` fit a property of `def`? A boolean takes
 // a flag, a number a number, text takes anything that prints
 export function attributeFits(def, attrType) {
@@ -489,9 +532,12 @@ export function previewModel(design) {
   return out;
 }
 
+// what abap2UI5 sends for the value model_init seeds: the class rounds a
+// decimal to 2 places and pads a time to seconds, so does the canvas
 function jsValue(type, v) {
   if (type === 'bool') return v === true || v === 'true' || v === 'X';
   if (type === 'int') return v === '' || v == null ? 0 : parseInt(v, 10) || 0;
-  if (type === 'decimal') return v === '' || v == null ? 0 : Number(v) || 0;
+  if (type === 'decimal') return v === '' || v == null ? 0 : Math.round((Number(v) || 0) * 100) / 100;
+  if (type === 'time' && /^\d{2}:\d{2}$/.test(String(v))) return `${v}:00`;
   return v == null ? '' : String(v);
 }

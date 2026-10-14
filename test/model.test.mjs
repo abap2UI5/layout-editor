@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createDesign, createNode, insertNode, removeNode, moveNode, shiftNode, duplicateNode, dropTarget, findNode,
-  rowContext, bindListToTable, unbindList, validate, previewModel, typeName, attributeFits, renameAttribute, attributeUsage, collectEvents,
+  rowContext, bindListToTable, unbindList, validate, previewModel, typeName, attributeFits, renameAttribute, attributeUsage, collectEvents, normalizeDesign,
 } from '../src/model.js';
 import { generateClass } from '../src/abap.js';
 import { toXml } from '../src/xml.js';
@@ -161,4 +161,31 @@ test('the validation names what breaks the class', () => {
   assert.ok(e.some((t) => t.includes('has no fields')));
   assert.ok(e.some((t) => t.includes('not an attribute')));
   assert.ok(e.some((t) => t.includes('Text.press')));
+});
+
+test('B8: a decimal with 3 decimals and a time without seconds are flagged, the canvas shows what the class sends', () => {
+  const d = createDesign();
+  d.attributes = [{ name: 'amount', type: 'decimal', value: '1.234' }, { name: 'at', type: 'time', value: '12:30' }, { name: 'day', type: 'date', value: '1.1.2026' }, { name: 'n', type: 'int', value: '1e3' }];
+  const w = validate(d).filter((i) => i.level === 'warning').map((i) => i.text);
+  assert.ok(w.some((t) => t.includes('amount') && t.includes('rounds')));
+  assert.ok(w.some((t) => t.includes('at:') && t.includes('hh:mm:ss')));
+  assert.ok(w.some((t) => t.includes('day:')));
+  assert.ok(w.some((t) => t.includes('n:')));
+  assert.deepEqual(previewModel(d), { AMOUNT: 1.23, AT: '12:30:00', DAY: '1.1.2026', N: 1 });
+});
+
+test('B10: a design from a file gets ids the canvas can find', () => {
+  const d = createDesign();
+  const text = page(d).aggs.content[0];
+  text.id = 'weird id';
+  page(d).aggs.content.push({ id: text.id === 'weird id' ? page(d).id : 'x', type: 'Button' });
+  normalizeDesign(d);
+  assert.match(text.id, /^n[0-9a-z]+$/);
+  const ids = [];
+  const walkIds = (n) => { ids.push(n.id); Object.values(n.aggs).flat().forEach(walkIds); };
+  walkIds(d.root);
+  assert.equal(new Set(ids).size, ids.length, 'all ids unique');
+  assert.deepEqual(page(d).aggs.content[1].props, {});
+  assert.throws(() => normalizeDesign({ version: 99, root: {} }), /not a designer file/);
+  assert.throws(() => normalizeDesign('x'), /not a designer file/);
 });

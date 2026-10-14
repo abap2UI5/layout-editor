@@ -81,8 +81,9 @@ Also in the editor:
   does not know are kept as they are.
 - **Save / Open** stores the design as JSON so you can continue later. The
   design is also kept in the browser between visits.
-- **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z, **Delete** removes the
-  selection, **Ctrl+D** duplicates it.
+- **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z, **Delete** or **Backspace**
+  removes the selection, **Ctrl+D** duplicates it, **Alt+↑** selects the
+  parent, **Escape** the view.
 - **Checks** lists what would break the class or the view, and inputs
   whose entry goes nowhere.
 - The canvas can show a phone or tablet width, the Horizon, Quartz or
