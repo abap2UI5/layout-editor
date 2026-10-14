@@ -7,11 +7,16 @@
   <style>
     html, body { height: 100%; margin: 0; }
     #content { height: 100%; }
-    .dsg-hover { outline: 1px dashed #0a6ed1 !important; outline-offset: -1px; }
-    .dsg-sel { outline: 2px solid #0a6ed1 !important; outline-offset: -2px; }
-    .dsg-drop { outline: 2px dashed #e9730c !important; outline-offset: -2px; background-color: rgba(233, 115, 12, 0.06) !important; }
+    .dsg-hover { outline: 1px dashed #0064d9 !important; outline-offset: -1px; }
+    .dsg-sel { outline: 2px solid #0064d9 !important; outline-offset: -2px; }
+    .dsg-drop { outline: 2px dashed #0064d9 !important; outline-offset: -2px; background-color: rgba(0, 100, 217, 0.06) !important; }
     #dsg-error { display: none; position: fixed; inset: auto 12px 12px 12px; padding: 10px 12px; background: #fff4f4; color: #8f1d1d;
       border: 1px solid #e4a3a3; border-radius: 6px; font: 13px/1.4 system-ui, sans-serif; white-space: pre-wrap; z-index: 99999; }
+    #dsg-tools { position: fixed; z-index: 99998; display: none; align-items: center; gap: 1px; padding: 2px; border-radius: 7px;
+      background: #0064d9; color: #fff; font: 12px/1 system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+    #dsg-tools span { padding: 0 6px 0 5px; font-weight: 600; white-space: nowrap; }
+    #dsg-tools button { border: 0; background: transparent; color: #fff; width: 24px; height: 22px; border-radius: 5px; cursor: pointer; font: 13px/1 system-ui, sans-serif; }
+    #dsg-tools button:hover { background: rgba(255,255,255,.2); }
     #dsg-loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font: 14px system-ui, sans-serif; color: #556; }
   </style>
   <script>

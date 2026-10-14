@@ -136,3 +136,23 @@ test('the zip is a zip', () => {
     off += 46 + nameLen;
   }
 });
+
+test('every chain line belongs to the node it writes', async () => {
+  const { generateClassMap } = await import('../src/abap.js');
+  const d = kitchenSink();
+  const { source, nodeIds } = generateClassMap(d);
+  const lines = source.split('\n');
+  assert.equal(nodeIds.length, lines.length);
+  const ids = new Set();
+  walk(d.root, (n) => { ids.add(n.id); });
+  lines.forEach((l, i) => {
+    const m = /\)->(tag|ele)\( (?:`(\w+)`|n = `(\w+)` ns = `(\w+)`)/.exec(l);
+    if (!m || nodeIds[i] === 'root') return;
+    assert.ok(ids.has(nodeIds[i]), `line ${i + 1} names a node that exists`);
+    const n = [...ids].includes(nodeIds[i]) && (() => { let hit; walk(d.root, (x) => { if (x.id === nodeIds[i]) hit = x; }); return hit; })();
+    const name = m[2] || m[3];
+    // a control line names its own type, a wrapper line its parent's aggregation
+    assert.ok(n.type.endsWith(name) || Object.keys(n.aggs).includes(name), `line ${i + 1}: ${l.trim()} belongs to ${n.type}`);
+  });
+  assert.ok(nodeIds.filter((x) => x && x !== 'root').length > 100);
+});

@@ -1,5 +1,5 @@
 {
-  "name": "abap2ui5-view-designer",
+  "name": "abap2ui5-layout-editor",
   "private": true,
   "description": "Design a UI5 view by drag and drop and get an abap2UI5 app class - one ABAP class, ready to pull with abapGit and build on.",
   "license": "MIT",
