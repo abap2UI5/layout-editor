@@ -138,9 +138,11 @@ export function abapValue(type, v, release) {
       return Number.isFinite(n) && n !== 0 ? String(n) : null;
     }
     case 'decimal': {
+      // every number the field takes - .5 and 1e3 too - as ABAP writes it
       const t = String(v).trim();
-      if (!/^-?\d+(\.\d+)?$/.test(t) || Number(t) === 0) return null;
-      return `'${t}'`;
+      const n = Number(t);
+      if (t === '' || !Number.isFinite(n) || n === 0) return null;
+      return /^-?\d+(\.\d+)?$/.test(t) ? `'${t}'` : `'${n.toFixed(2)}'`;
     }
     case 'bool': return v === true || v === 'true' || v === 'X' ? 'abap_true' : null;
     case 'date': {

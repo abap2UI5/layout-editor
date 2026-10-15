@@ -356,55 +356,61 @@ export function bindListToTable(design, nodeId, agg, attrName, replace = true, v
   }
   if (!hit || !attr || attr.type !== 'table') return;
   const node = hit.node;
-  const all = attr.fields && attr.fields.length ? attr.fields : [{ name: 'TEXT', type: 'string' }];
   // the scalar fields make the template; a table field is what a tree
-  // descends into
-  const fields = all.filter((x) => x.type !== 'table').length ? all.filter((x) => x.type !== 'table') : all;
-  const f = (i) => ({ m: 'f', v: (fields[i] || fields[0]).name });
+  // descends into, never the text of a cell. A table of table fields only
+  // gets a template with the catalogue's static texts, to bind by hand
+  const fields = (attr.fields || []).filter((x) => x.type !== 'table');
+  const f = (i) => (fields.length ? { m: 'f', v: (fields[i] || fields[0]).name } : undefined);
+  // the columns of a table: one per scalar field, or one of static text
+  const cols = fields.length ? fields : [{ name: 'ITEM', type: 'string', fixed: true }];
   node.props[agg] = viaField ? { m: 'f', v: attr.name } : { m: 'b', v: attr.name };
   if (node.type === 'Tree' && childrenField(attr)) node.props[agg].arr = childrenField(attr);
   if (!replace) return;
   if (node.type === 'Tree') {
     const item = createNode('StandardTreeItem');
-    item.props.title = f(0);
+    if (fields.length) item.props.title = f(0); else item.props.title = { m: 's', v: 'Node' };
     node.aggs.items = [item];
   } else if (node.type === 'Table') {
-    node.aggs.columns = fields.map((fld) => {
+    node.aggs.columns = cols.map((fld) => {
       const col = createNode('Column');
       col.aggs.header = [createNode('Text', { props: { text: label(fld.name) } })];
       return col;
     });
     const row = createNode('ColumnListItem');
-    row.aggs.cells = fields.map((fld) => {
+    row.aggs.cells = cols.map((fld) => {
       const cell = createNode(fld.type === 'bool' ? 'CheckBox' : 'Text');
       delete cell.props.text;
       if (fld.type === 'bool') {
         cell.props.selected = { m: 'f', v: fld.name };
         cell.props.editable = { m: 's', v: 'false' };
       } else {
-        cell.props.text = { m: 'f', v: fld.name };
+        cell.props.text = fld.fixed ? { m: 's', v: 'Item' } : { m: 'f', v: fld.name };
       }
       return cell;
     });
     node.aggs.items = [row];
   } else if (node.type === 'List') {
     const item = createNode('StandardListItem');
-    item.props.title = f(0);
+    item.props.title = fields.length ? f(0) : { m: 's', v: 'Item' };
     if (fields[1]) item.props.description = f(1);
     if (fields[2]) item.props.info = f(2);
     node.aggs.items = [item];
   } else if (node.type === 'Select' || node.type === 'ComboBox') {
     const item = createNode('core:Item');
-    item.props.key = f(0);
-    item.props.text = fields[1] ? f(1) : f(0);
+    if (fields.length) {
+      item.props.key = f(0);
+      item.props.text = fields[1] ? f(1) : f(0);
+    }
     node.aggs.items = [item];
   } else if (node.type === 'SegmentedButton') {
     const item = createNode('SegmentedButtonItem');
-    item.props.key = f(0);
-    item.props.text = fields[1] ? f(1) : f(0);
+    if (fields.length) {
+      item.props.key = f(0);
+      item.props.text = fields[1] ? f(1) : f(0);
+    }
     node.aggs.items = [item];
   } else if (node.type === 'table:Table') {
-    node.aggs.columns = fields.map((fld) => {
+    node.aggs.columns = cols.map((fld) => {
       const col = createNode('table:Column', { props: { label: label(fld.name) }, aggs: {} });
       const cell = createNode(fld.type === 'bool' ? 'CheckBox' : 'Text');
       delete cell.props.text;
@@ -412,7 +418,7 @@ export function bindListToTable(design, nodeId, agg, attrName, replace = true, v
         cell.props.selected = { m: 'f', v: fld.name };
         cell.props.editable = { m: 's', v: 'false' };
       } else {
-        cell.props.text = { m: 'f', v: fld.name };
+        cell.props.text = fld.fixed ? { m: 's', v: 'Item' } : { m: 'f', v: fld.name };
       }
       col.aggs.template = [cell];
       return col;
@@ -640,12 +646,13 @@ export function checkValue(type, v) {
   if (v === '' || v == null) return null;
   const t = String(v).trim();
   if (type === 'decimal') {
-    if (!/^-?\d+(\.\d+)?$/.test(t)) return `"${t}" is not a number`;
-    if ((t.split('.')[1] || '').length > 2) return `"${t}" has more than 2 decimals - the class rounds it`;
+    if (!Number.isFinite(Number(t))) return `"${t}" is not a number`;
+    if (/^-?\d*\.\d{3,}$/.test(t) || (/e/i.test(t) && Number(t) !== Math.round(Number(t) * 100) / 100)) return `"${t}" has more than 2 decimals - the class rounds it`;
   }
   if (type === 'int' && !/^-?\d+$/.test(t)) return `"${t}" is not a whole number`;
   if (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(t)) return `"${t}" is not a date (yyyy-mm-dd)`;
   if (type === 'time' && !/^\d{2}:\d{2}:\d{2}$/.test(t)) return `"${t}" is not a time (hh:mm:ss)`;
+  if (type === 'time' && t === '00:00:00') return 'midnight is ABAP\'s initial time - the app gets no time, as if it were empty';
   return null;
 }
 
@@ -722,8 +729,14 @@ function jsRows(fields, rows) {
 // decimal to 2 places and pads a time to seconds, so does the canvas
 function jsValue(type, v) {
   if (type === 'bool') return v === true || v === 'true' || v === 'X';
-  if (type === 'int') return v === '' || v == null ? 0 : parseInt(v, 10) || 0;
-  if (type === 'decimal') return v === '' || v == null ? 0 : Math.round((Number(v) || 0) * 100) / 100;
-  if (type === 'time' && /^\d{2}:\d{2}$/.test(String(v))) return `${v}:00`;
+  // + 0: a -0 is a 0, as abap2UI5 sends it
+  if (type === 'int') return v === '' || v == null ? 0 : (parseInt(v, 10) || 0) + 0;
+  if (type === 'decimal') return v === '' || v == null ? 0 : Math.round((Number(String(v).trim()) || 0) * 100) / 100 + 0;
+  // midnight is ABAP's initial time, which abap2UI5 sends as no time
+  if (type === 'time') {
+    const t = /^\d{2}:\d{2}$/.test(String(v)) ? `${v}:00` : v == null ? '' : String(v);
+    return t === '00:00:00' ? '' : t;
+  }
+  if (type === 'date' && v === '0000-00-00') return '';
   return v == null ? '' : String(v);
 }

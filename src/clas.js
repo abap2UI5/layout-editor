@@ -617,8 +617,10 @@ function seedValue(type, operand) {
       if (/^abap_true$/i.test(op) || lit === 'X') return true;
       if (/^(abap_false|space)$/i.test(op) || lit === '' || lit === ' ') return false;
       return undefined;
-    case 'date': return lit !== undefined && /^\d{8}$/.test(lit) ? `${lit.slice(0, 4)}-${lit.slice(4, 6)}-${lit.slice(6)}` : undefined;
-    case 'time': return lit !== undefined && /^\d{6}$/.test(lit) ? `${lit.slice(0, 2)}:${lit.slice(2, 4)}:${lit.slice(4)}` : undefined;
+    // the initial date and time are no value: what a row leaves empty, the
+    // class writes as '00000000' to keep its columns, and abap2UI5 sends ''
+    case 'date': return lit !== undefined && /^\d{8}$/.test(lit) ? (lit === '00000000' ? '' : `${lit.slice(0, 4)}-${lit.slice(4, 6)}-${lit.slice(6)}`) : undefined;
+    case 'time': return lit !== undefined && /^\d{6}$/.test(lit) ? (lit === '000000' ? '' : `${lit.slice(0, 2)}:${lit.slice(2, 4)}:${lit.slice(4)}`) : undefined;
     default: return undefined;
   }
 }

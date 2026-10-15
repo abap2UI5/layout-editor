@@ -345,3 +345,30 @@ test('a table field of a table: nested types, nested rows, a list in a list, a t
   inner.props.items = { m: 'f', v: 'TEXT' };
   assert.ok(errors(d).some((t) => t.includes('field TEXT, which is not a table')));
 });
+
+test('the canvas shows what abap2UI5 sends: midnight is no time, .5 and 1e3 are numbers, -0 is 0', async () => {
+  const { generateClass } = await import('../src/abap.js');
+  const d = createDesign();
+  d.attributes = [
+    { name: 'at', type: 'time', value: '00:00:00' }, { name: 'half', type: 'decimal', value: '.5' },
+    { name: 'big', type: 'decimal', value: '1e3' }, { name: 'zero', type: 'int', value: '-0' },
+  ];
+  assert.deepEqual(previewModel(d), { AT: '', HALF: 0.5, BIG: 1000, ZERO: 0 });
+  assert.ok(Object.is(previewModel(d).ZERO, 0));
+  const src = generateClass(d);
+  assert.match(src, /half = '0\.50'\./);
+  assert.match(src, /big = '1000\.00'\./);
+  assert.ok(!/\bat = /.test(src), 'midnight is the initial time');
+  assert.ok(validate(d).some((i) => i.level === 'warning' && /at: midnight/.test(i.text)));
+});
+
+test('a table of table fields only binds to a template of static text, not to a table field', () => {
+  const d = createDesign();
+  d.attributes = [{ name: 't_groups', type: 'table', fields: [{ name: 'KIDS', type: 'table', fields: [{ name: 'TEXT', type: 'string' }] }], rows: [] }];
+  for (const type of ['List', 'Table', 'table:Table', 'Select']) {
+    const l = createNode(type);
+    insertNode(d, l, page(d).id);
+    bindListToTable(d, l.id, type === 'table:Table' ? 'rows' : 'items', 't_groups');
+  }
+  assert.deepEqual(errors(d), []);
+});

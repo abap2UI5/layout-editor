@@ -416,3 +416,9 @@ test('raw attributes: kept on their control, replaced by what the editor sets, g
   form.aggs.content.splice(1, 1);
   assert.ok(!generateClassSource(d).includes('nameInput'));
 });
+
+test('an initial date or time in a seed row is no value, as abap2UI5 sends it', () => {
+  const attrs = [{ name: 't_x', type: 'table', fields: [{ name: 'D', type: 'date' }, { name: 'T', type: 'time' }], rows: [] }];
+  readSeeds(appClass('', "    t_x = VALUE #( ( d = '00000000' t = '000000' ) ( d = '20240229' t = '123000' ) )."), attrs);
+  assert.deepEqual(attrs[0].rows, [{ D: '', T: '' }, { D: '2024-02-29', T: '12:30:00' }]);
+});
