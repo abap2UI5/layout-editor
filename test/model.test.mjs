@@ -147,6 +147,29 @@ test('attributes: usage, rename and the preview model', () => {
   assert.deepEqual(collectEvents(d), ['CHANGED']);
 });
 
+test('an attribute named in an expression is used, and renamed with it', () => {
+  const d = createDesign();
+  d.attributes = [{ name: 'name', type: 'string', value: '' }, { name: 'names', type: 'string', value: '' }];
+  const text = createNode('Text');
+  text.props.text = { m: 'x', v: '{= ${/NAME} || ${/NAMES} }' };
+  insertNode(d, text, page(d).id);
+  assert.equal(attributeUsage(d, 'name'), 1);
+  renameAttribute(d, 'name', 'title');
+  assert.equal(text.props.text.v, '{= ${/TITLE} || ${/NAMES} }');
+});
+
+test('an attribute may not take the name of a method of the class', () => {
+  const d = createDesign();
+  d.attributes = [{ name: 'on_event', type: 'string', value: '' }];
+  assert.ok(errors(d).some((e) => /on_event/.test(e)));
+});
+
+test('a design from a file gets attributes of the shape the panels rely on', () => {
+  const d = normalizeDesign({ version: 1, root: { aggs: { content: [] } }, attributes: [{ name: 't_x', type: 'table' }, null, { name: 'a', type: 'nonsense' }] });
+  assert.deepEqual(d.attributes, [{ name: 't_x', type: 'table', fields: [], rows: [] }, { name: 'a', type: 'string' }]);
+  assert.doesNotThrow(() => validate(d));
+});
+
 test('the validation names what breaks the class', () => {
   const d = createDesign();
   d.className = 'MY_APP';

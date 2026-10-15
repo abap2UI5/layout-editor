@@ -75,7 +75,23 @@ export function normalizeDesign(d) {
   d.description = String(d.description || '');
   // the ABAP release of the class: 7.02, or nothing for 7.40 and later
   if (d.release === '702') d.release = '702'; else delete d.release;
-  d.attributes = Array.isArray(d.attributes) ? d.attributes : [];
+  d.attributes = (Array.isArray(d.attributes) ? d.attributes : []).filter((a) => a && typeof a === 'object');
+  // the shape the panels and the generator rely on: a name and a type, a
+  // table with fields and rows (a table field with fields of its own)
+  const fieldsOf = (list) => (Array.isArray(list) ? list : []).filter((f) => f && typeof f === 'object').map((f) => {
+    f.name = String(f.name || '');
+    if (!ATTRIBUTE_TYPES.includes(f.type)) f.type = 'string';
+    if (f.type === 'table') f.fields = fieldsOf(f.fields);
+    return f;
+  });
+  for (const a of d.attributes) {
+    a.name = String(a.name || '');
+    if (!ATTRIBUTE_TYPES.includes(a.type)) a.type = 'string';
+    if (a.type === 'table') {
+      a.fields = fieldsOf(a.fields);
+      a.rows = Array.isArray(a.rows) ? a.rows.filter((r) => r && typeof r === 'object') : [];
+    }
+  }
   d.root.id = 'root';
   d.root.type = 'mvc:View';
   const seen = new Set(['root']);
@@ -441,25 +457,44 @@ export function collectEvents(design) {
   return out;
 }
 
-// Where an attribute is used, so the data panel can refuse to delete a
-// bound one silently
+// the path of an attribute in a UI5 expression: /NAME, as abap2UI5 sends
+// it - {/NAME}, {= ${/NAME} }, {path:'/NAME'}
+function pathPattern(name) {
+  return new RegExp(`([{'"$:\\s])/${name.replace(/[^\w]/g, '')}(?![\\w/])`, 'gi');
+}
+
+// Where an attribute is used - bound, or named in an expression - so the
+// data panel can refuse to delete a used one silently
 export function attributeUsage(design, name) {
   let count = 0;
+  const re = pathPattern(name);
   walk(design.root, (n) => {
-    for (const v of Object.values(n.props || {})) if (v && v.m === 'b' && v.v === name) count += 1;
+    for (const v of Object.values(n.props || {})) {
+      if (v && v.m === 'b' && v.v === name) count += 1;
+      else if (v && v.m === 'x' && typeof v.v === 'string' && v.v.match(re)) count += 1;
+    }
   });
   return count;
 }
 
+// a renamed attribute: its bindings follow, and so do the expressions
+// that name its path
 export function renameAttribute(design, from, to) {
+  const re = pathPattern(from);
   walk(design.root, (n) => {
-    for (const v of Object.values(n.props || {})) if (v && v.m === 'b' && v.v === from) v.v = to;
+    for (const v of Object.values(n.props || {})) {
+      if (v && v.m === 'b' && v.v === from) v.v = to;
+      else if (v && v.m === 'x' && typeof v.v === 'string') v.v = v.v.replace(re, `$1/${to.toUpperCase()}`);
+    }
   });
 }
 
 // ------------------------------------------------------------- validation
 
-const ABAP_RESERVED = new Set(['client', 'view', 'me', 'result', 'super', 'data', 'type', 'table', 'value', 'line', 'index']);
+// the names the generated class uses itself - its methods included: an
+// attribute on_event would clash with the method of that name
+const ABAP_RESERVED = new Set(['client', 'view', 'me', 'result', 'super', 'data', 'type', 'table', 'value', 'line', 'index',
+  'view_display', 'on_event', 'model_init', 'main', 'z2ui5_if_app']);
 
 export function checkClassName(name) {
   if (!name) return 'Class name is empty';
@@ -544,7 +579,8 @@ export function validate(design) {
         const isAgg = bindableAggs(n).includes(p);
         if (isAgg && attr.type !== 'table') issues.push({ level: 'error', text: `${n.type}.${p} repeats the rows of ${v.v}, which is not a table`, node: n.id });
         if (!isAgg && attr.type === 'table') issues.push({ level: 'error', text: `${n.type}.${p} is bound to the table ${v.v} - a property takes a single value`, node: n.id });
-        const def = CONTROLS[n.type] && CONTROLS[n.type].props && CONTROLS[n.type].props[p];
+        const nc = getControl(n.type);
+        const def = nc && nc.props && nc.props[p];
         if (def && !isAgg && !attributeFits(def, attr.type)) issues.push({ level: 'warning', text: `${n.type}.${p} is ${def.type}, ${v.v} is ${attr.type}`, node: n.id });
       }
       if (v.m === 'f') {
@@ -575,7 +611,7 @@ export function validate(design) {
         if (ctx && !(ctx.fields || []).some((f) => f.name === b.arr && f.type === 'table')) issues.push({ level: 'error', text: `${n.type}.${a}: ${b.v} has no table field ${b.arr} to take the children from`, node: n.id });
       }
     }
-    const c = CONTROLS[n.type];
+    const c = getControl(n.type);
     if (c && c.input && !rowContext(design, n.id)) {
       const v = n.props[c.input];
       const wired = (v && (v.m === 'b' || v.m === 'x')) || Object.values(n.events || {}).some(Boolean);

@@ -853,9 +853,16 @@ export function classSource(design) {
   for (let i = 0; i < lines.length; i++) {
     lines[i] = lines[i].replace(/\bv = `__le_raw_(\d+)__`/g, (m, n) => `${swaps[n].key} = ${swaps[n].abap}`);
   }
-  if (chain.variable && chain.variable !== 'view') lines[0] = lines[0].replace(/^(\s*)DATA\(view\)/, `$1DATA(${chain.variable})`);
+  // the head of the chain is the author's: the variable they named, declared
+  // inline (DATA(page) =) or before (page = on 7.02, or any release)
+  const head = /^\s*(DATA\(\s*\w+\s*\)|\w+)\s*=(?!=)/i.exec(maskSource(orig.slice(chain.start, chain.end)));
+  if (head) lines[0] = lines[0].replace(/^(\s*)(?:DATA\(view\)|view)(?= = )/, `$1${head[1]}`);
+  else if (chain.variable && chain.variable !== 'view') lines[0] = lines[0].replace(/^(\s*)DATA\(view\)/, `$1DATA(${chain.variable})`);
   const chainText = lines.join('\n');
   let out = orig.slice(0, chain.start) + chainText + orig.slice(chain.end);
+  // a class renamed in the editor: its CLASS statements follow, or the file
+  // name and the class inside it would differ - abapGit refuses that
+  out = renameClass(out, design.className);
   let chainLine = orig.slice(0, chain.start).split('\n').length - 1;
   // 2. attributes the editor added, declared at the end of the PUBLIC SECTION
   const known = new Set((declared || []).map((n) => n.toLowerCase()));
@@ -891,6 +898,29 @@ export function classSource(design) {
   const nodeIds = new Array(total).fill(null);
   lines.nodeIds.forEach((id, i) => { nodeIds[chainLine + i] = id; });
   return { source: out, nodeIds, notes };
+}
+
+// `CLASS old DEFINITION` and `CLASS old IMPLEMENTATION` (and a DEFERRED
+// or LOCAL FRIENDS of it) as `CLASS new ...` - only when the name differs,
+// so an unchanged class stays byte for byte the one that came in
+function renameClass(source, className) {
+  const mask = maskSource(source);
+  const defM = /\bCLASS\s+(\S+)\s+DEFINITION\b/i.exec(mask);
+  if (!defM) return source;
+  const from = defM[1].toLowerCase();
+  const to = className.toLowerCase();
+  if (from === to) return source;
+  const re = /\bCLASS(\s+)(\S+)(?=\s+(?:DEFINITION|IMPLEMENTATION)\b)/gi;
+  let out = '';
+  let last = 0;
+  for (const m of mask.matchAll(re)) {
+    if (m[2].toLowerCase() !== from) continue;
+    const at = m.index + 5 + m[1].length;
+    const name = source.slice(at, at + m[2].length);
+    out += source.slice(last, at) + (name === name.toUpperCase() ? to.toUpperCase() : to);
+    last = at + m[2].length;
+  }
+  return out + source.slice(last);
 }
 
 // The design with each kept raw attribute as an expression the generator

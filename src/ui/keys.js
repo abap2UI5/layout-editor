@@ -22,6 +22,6 @@ export function onKey(e) {
   if (ctrl && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); pasteSelection(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel !== 'root') { e.preventDefault(); commit((d) => removeNode(d, sel)); }
   if (ctrl && (e.key === 'd' || e.key === 'D') && sel !== 'root') { e.preventDefault(); commit((d) => duplicateNode(d, sel) || toast('It cannot be duplicated: its slot takes one control')); }
-  if (e.altKey && e.key === 'ArrowUp') { const hit = findNode(state.design.root, sel); if (hit && hit.parent) select(hit.parent.id); }
+  if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); const hit = findNode(state.design.root, sel); if (hit && hit.parent) select(hit.parent.id); }
   if (e.key === 'Escape') select('root');
 }

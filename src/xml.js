@@ -125,6 +125,7 @@ export function parseXml(src) {
     if (src.startsWith('<?', lt) || src.startsWith('<!', lt)) { i = end(src.indexOf('>', lt), 1); continue; }
     if (src[lt + 1] === '/') {
       const gt = src.indexOf('>', lt);
+      if (gt < 0) throw new Error(`XML: unterminated closing tag at ${lt}`);
       const name = src.slice(lt + 2, gt).trim();
       const top = stack.pop();
       if (!top || top.name !== name) throw new Error(`XML: </${name}> does not close <${top ? top.name : '?'}>`);

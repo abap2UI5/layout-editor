@@ -2,9 +2,9 @@
 import { CONTROLS, DESCRIPTIONS } from '../catalog.js';
 import { PATTERNS } from '../patterns.js';
 import { walk, findNode, removeNode, duplicateNode } from '../model.js';
-import { generateClass } from '../abap.js';
+import { generateClassSource } from '../clas.js';
 import { state, select, commit, undo, redo } from './store.js';
-import { $, h, displayType, nodeLabel } from './dom.js';
+import { $, h, toast, displayType, nodeLabel } from './dom.js';
 import { addControl, insertPattern, copySelection, pasteSelection } from './edit.js';
 import { setView, copyText } from './code.js';
 import { exportZip, newDialog, importDialog, recentDialog, shareLink, insertByNameDialog, saveDesign, openFile } from './files.js';
@@ -22,11 +22,11 @@ function commands() {
   const action = (title, run, detail) => list.push({ kind: 'action', title, detail, run });
   action('Show layout and code', () => setView('split'));
   action('Export abapGit ZIP', exportZip);
-  action('Copy ABAP', () => copyText(generateClass(state.design), 'ABAP'));
+  action('Copy ABAP', () => copyText(generateClassSource(state.design), 'ABAP'));
   action('New from template', newDialog);
   action('Import UI5 XML view', importDialog);
   action('Save design', saveDesign);
-  action('Open design', () => openFile('.json,.xml'));
+  action('Open design, view or class', () => openFile('.json,.xml,.abap'));
   action('Recent designs', recentDialog);
   action('Insert any UI5 control by class name', insertByNameDialog, 'e.g. sap.m.Wizard');
   action('Copy share link', shareLink, 'the design in a URL');
@@ -37,7 +37,7 @@ function commands() {
   action('Redo', redo, 'Ctrl+Shift+Z');
   if (sel && sel.parent) {
     action('Delete selection', () => commit((d) => removeNode(d, state.selected)), 'Del');
-    action('Duplicate selection', () => commit((d) => duplicateNode(d, state.selected)), 'Ctrl+D');
+    action('Duplicate selection', () => commit((d) => duplicateNode(d, state.selected) || toast('It cannot be duplicated: its slot takes one control')), 'Ctrl+D');
     action('Copy selection', () => copySelection(false), 'Ctrl+C');
     action('Cut selection', () => copySelection(true), 'Ctrl+X');
     action('Select parent', () => select(sel.parent.id), 'Alt+↑');

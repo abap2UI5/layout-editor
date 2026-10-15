@@ -407,3 +407,50 @@ test('the canvas boots UI5 from a URL of your own', async ({ page }) => {
   await expect(page.locator('body')).toContainText('not loaded from a link');
   await expect(page.locator('#preview')).not.toHaveAttribute('src', /ui5\.example\.com/);
 });
+
+test('a saved design opens again - its JSON is not read as an ABAP class', async ({ designer: page }) => {
+  const json = await page.evaluate(() => {
+    const d = JSON.parse(JSON.stringify(window.designer.state.design));
+    d.className = 'ZCL_REOPENED';
+    return JSON.stringify(d, null, 1);
+  });
+  await page.locator('#btnFile').click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('#btnOpen').click();
+  await (await chooser).setFiles({ name: 'zcl_reopened.design.json', mimeType: 'application/json', buffer: Buffer.from(json) });
+  await expect(page.locator('#className')).toHaveValue('ZCL_REOPENED');
+  await expect(page.locator('#code')).toContainText('CLASS zcl_reopened DEFINITION PUBLIC.');
+});
+
+test('a view that does not parse leaves the import dialog open with its text', async ({ designer: page }) => {
+  await page.locator('#btnFile').click();
+  await page.locator('#btnImport').click();
+  const broken = '<mvc:View xmlns="sap.m" xmlns:mvc="sap.ui.core.mvc"><Page></mvc:View>';
+  await page.locator('#dlg textarea').fill(broken);
+  await page.locator('#dlg').getByRole('button', { name: 'Import' }).click();
+  await expect(page.locator('#toast')).toContainText('XML');
+  await expect(page.locator('#dlg textarea')).toBeVisible();
+  await expect(page.locator('#dlg textarea')).toHaveValue(broken);
+});
+
+test('tabbing into an event names nothing, a click takes the suggestion', async ({ designer: page }) => {
+  const before = await nodeIds(page, 'Button');
+  const pageId = (await nodeIds(page, 'Page'))[0];
+  await page.evaluate((id) => window.designer.handleDrop('dsg:new:Button', id), pageId);
+  const buttonId = (await nodeIds(page, 'Button')).find((id) => !before.includes(id));
+  const events = () => page.evaluate((id) => {
+    let hit = null;
+    const walk = (n) => { if (n.id === id) hit = n.events; for (const l of Object.values(n.aggs || {})) l.forEach(walk); };
+    walk(window.designer.state.design.root);
+    return hit;
+  }, buttonId);
+  expect(await events()).toEqual({});
+  await page.evaluate((id) => window.designer.select(id), buttonId);
+  const ev = page.locator('#inspector input[aria-label="Event press"]');
+  await ev.focus();
+  await expect(ev).toHaveValue('');
+  expect(await events()).toEqual({});
+  await ev.click();
+  await expect(ev).not.toHaveValue('');
+  expect(Object.keys(await events())).toEqual(['press']);
+});

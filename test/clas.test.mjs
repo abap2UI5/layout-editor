@@ -213,6 +213,24 @@ test('a chain in a variable of another name keeps that name', () => {
   assert.equal(generateClassSource(d), src);
 });
 
+test('a 7.02 chain in a variable of another name keeps that name', () => {
+  const src = generateClass(allDesigns702()[0][1])
+    .replace(/DATA view TYPE REF TO/, 'DATA page TYPE REF TO').replace(/^(\s*)view = /m, '$1page = ').replace(/view->stringify/, 'page->stringify');
+  const d = fromClass(src, createDesign());
+  assert.equal(generateClassSource(d), src);
+});
+
+test('a class renamed in the editor is renamed in its source', () => {
+  const src = generateClass(allDesigns()[0][1]);
+  const d = fromClass(src, createDesign());
+  d.className = 'ZCL_RENAMED';
+  const out = generateClassSource(d);
+  assert.match(out, /^CLASS zcl_renamed DEFINITION PUBLIC\./m);
+  assert.match(out, /^CLASS zcl_renamed IMPLEMENTATION\./m);
+  assert.equal(out.split('\n').length, src.split('\n').length);
+  assert.equal(out.replace(/zcl_renamed/g, allDesigns()[0][1].className.toLowerCase()), src);
+});
+
 test('what cannot be read is refused with a reason', () => {
   assert.throws(() => fromClass('CLASS zcl_x DEFINITION PUBLIC.\n  PUBLIC SECTION.\n    INTERFACES z2ui5_if_app.\nENDCLASS.\nCLASS zcl_x IMPLEMENTATION.\nENDCLASS.\n', createDesign()), /Nothing here builds a view/);
   const two = generateClass(allDesigns()[0][1]);
