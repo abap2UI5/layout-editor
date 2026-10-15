@@ -9,7 +9,7 @@
 // folder.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize, resolve } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -41,7 +41,9 @@ export function startServer(port = 0) {
         rel = m[2];
       }
       let file = normalize(join(base, rel));
-      if (!file.startsWith(base)) throw Object.assign(new Error('outside'), { code: 'ENOENT' });
+      // inside the folder, not one whose name merely starts the same
+      // (/repo-backup next to /repo): the separator is part of the test
+      if (file !== base && !file.startsWith(base.endsWith(sep) ? base : base + sep)) throw Object.assign(new Error('outside'), { code: 'ENOENT' });
       if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
       const body = await readFile(file);
       res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });

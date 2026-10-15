@@ -9,10 +9,25 @@ sap.ui.define([
 ], function (XMLView, Controller, JSONModel, MessageToast) {
   'use strict';
 
-  // two view ids in turn: the next view is created while the current one
-  // is still on screen, so a re-render does not flicker - and two views
-  // cannot share an id
+  // view ids in turn: the next view is created while the current one is
+  // still on screen, so a re-render does not flicker - and two views cannot
+  // share an id. An id is busy from its creation until its view is
+  // destroyed: a render that failed or timed out never hands the next one
+  // the id of a view that is still there
   var viewSeq = 0;
+  var busy = {};
+  function nextViewId() {
+    for (var i = 0; i < 10; i++) {
+      var id = 'dsg' + ((viewSeq + i) % 10);
+      if (!busy[id]) { viewSeq = (viewSeq + i + 1) % 10; busy[id] = true; return id; }
+    }
+    return null;
+  }
+  function destroyView(v) {
+    if (!v) return;
+    delete busy[v.getId()];
+    try { v.destroy(); } catch (e) { /* half built - gone either way */ }
+  }
   var view = null;
   var pending = null;
   var rendering = false;
@@ -134,7 +149,6 @@ sap.ui.define([
       return;
     }
     rendering = true;
-    viewSeq += 1;
     var seq = ++renderSeq;
     var done = false;
     function finish() {
@@ -157,18 +171,21 @@ sap.ui.define([
       }
     }, RENDER_TIMEOUT);
     var promise;
+    var id = nextViewId();
+    if (!id) { fail('The view does not render', 'ten views are still loading - reload the canvas'); finish(); return; }
     try {
-      promise = XMLView.create({ id: 'dsg' + (viewSeq % 2), definition: msg.xml, controller: new PreviewController() });
+      promise = XMLView.create({ id: id, definition: msg.xml, controller: new PreviewController() });
     } catch (err) {
+      delete busy[id];
       fail('The view does not render', err);
       finish();
       return;
     }
     promise.then(function (v) {
-      if (done) { v.destroy(); return; } // timed out meanwhile: the next render owns the canvas
+      if (done) { destroyView(v); return; } // timed out meanwhile: the next render owns the canvas
       try {
         v.setModel(new JSONModel(msg.model));
-        if (view) view.destroy();
+        destroyView(view);
         view = v;
         lastXml = msg.xml;
         v.placeAt('content');
@@ -178,11 +195,15 @@ sap.ui.define([
       } catch (err) {
         // the old view is gone or half replaced: say so, the next edit
         // renders anew
-        view = null;
+        // the new view goes; the old one, when it is still the one on
+        // screen, stays the current view
+        destroyView(v);
+        if (view === v || (view && view.bIsDestroyed)) view = null;
         lastXml = null;
         fail('The view does not render', err);
       }
     }, function (err) {
+      delete busy[id];
       fail('The view does not render', err);
     }).then(finish, function (err) { fail('The view does not render', err); finish(); });
   }
@@ -220,6 +241,9 @@ sap.ui.define([
   window.addEventListener('message', function (e) {
     var msg = e.data || {};
     if (msg.target !== 'dsg-preview') return;
+    // only the editor that frames this page: a view's XML can carry script
+    // (core:HTML), which another page must not get to run on this origin
+    if (e.source !== window.parent || (location.origin !== 'null' && e.origin !== location.origin)) return;
     if (msg.type === 'describe') {
       describe(msg);
     } else if (msg.type === 'render') {

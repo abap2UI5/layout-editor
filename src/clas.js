@@ -217,19 +217,22 @@ export function readViewChain(source) {
   let regionEnd = null;
   let variable = null;
   let indent = 0;
+  let stop = statements.length;
   for (let i = first; i < statements.length; i++) {
     const st = statements[i];
     const text = mask.slice(st.start, st.end);
-    if (i > first && /\bstringify\s*\(/i.test(text)) break;
+    if (i > first && /\bstringify\s*\(/i.test(text)) { stop = i; break; }
     const m = /^(\s*)((?:DATA\(\s*(\w+)\s*\)|(\w+))\s*=\s*)?(z2ui5_cl_ui5_view_builder=>factory|[a-z_]\w*)\s*(?=\(|->)/i.exec(text);
     if (!m) {
       if (i === first) return { ok: false, why: 'The chain does not start with a plain assignment.' };
+      stop = i;
       break;
     }
     const target = m[5].toLowerCase();
     const isFactory = target === FACTORY;
     if (!isFactory && !vars.has(target)) {
       if (i === first) return { ok: false, why: 'The chain does not start with the factory.' };
+      stop = i;
       break;
     }
     const declared = (m[3] || m[4] || '').toLowerCase();
@@ -268,6 +271,17 @@ export function readViewChain(source) {
     regionEnd = st.end;
   }
   if (root.children.length !== 1) return { ok: false, why: 'The chain does not build exactly one root element.' };
+  // the view goes on after a statement of another kind (an IF around part
+  // of it): what comes after is not read, and the export, which writes the
+  // view over the statements it read, would leave it calling a variable it
+  // no longer declares - refused, not half imported
+  for (let i = stop; i < statements.length; i++) {
+    const text = mask.slice(statements[i].start, statements[i].end);
+    if (/^\s*ENDMETHOD\b/i.test(text)) break;
+    if (/\bstringify\s*\(/i.test(text)) continue;
+    const used = [...vars.keys()].find((v) => new RegExp(`(^|[^\\w>-])${v}\\s*->`, 'i').test(text));
+    if (used) return { ok: false, why: `The view is built on after other statements (${used}-> after ${source.slice(statements[stop].start, statements[stop].end).trim().split('\n')[0].slice(0, 40)}) - the editor reads a chain without branches.` };
+  }
   return { ok: true, root: root.children[0], start: regionStart, end: regionEnd, indent, variable: variable || 'view' };
 }
 
@@ -486,7 +500,15 @@ function scalarType(abap) {
 function elementsOf(text, keyword) {
   const m = new RegExp(`^\\s*${keyword}\\s*:?\\s*([\\s\\S]*)\\.$`, 'i').exec(text);
   if (!m) return null;
-  return m[1].split(',').map((s) => s.trim()).filter(Boolean);
+  // split at the commas outside the literals: `Walldorf, DE` is one value
+  const body = m[1];
+  const lit = maskSource(body);
+  const out = [];
+  let from = 0;
+  for (let i = 0; i <= body.length; i++) {
+    if (i === body.length || lit[i] === ',') { out.push(body.slice(from, i).trim()); from = i + 1; }
+  }
+  return out.filter(Boolean);
 }
 
 // The attributes of the PUBLIC SECTION, with the structures the TYPES
@@ -536,7 +558,7 @@ export function readPublicSection(source) {
     const data = elementsOf(text, 'DATA');
     if (!data) continue;
     for (const el of data) {
-      const m = /^(\w+) TYPE (.+?)(?: VALUE (.+))?(?: READ-ONLY)?$/i.exec(el);
+      const m = /^(\w+) TYPE (.+?)(?: VALUE (.+?))?(?: READ-ONLY)?$/i.exec(el);
       if (!m) continue;
       const name = m[1].toLowerCase();
       declared.push(name);
@@ -731,7 +753,7 @@ function valueRows(mask, source, from, to, fields, where, notes) {
         else notes.push(`${where}-${fieldName}: not a table field, its value is left out`);
       } else {
         // the operand runs up to the next `name =` at this level or the end
-        const next = /\s\w+\s*=(?!=)/.exec(mask.slice(p, b));
+        const next = /\s\w+\s*=(?![=>])/.exec(mask.slice(p, b));
         end = next ? p + next.index : b;
         if (field && field.type !== 'table') {
           const v = seedValue(field.type, source.slice(p, end));
@@ -766,7 +788,7 @@ export function fromClass(source, base) {
   // a class without inline declarations that declares its builder is
   // the 7.02 form (src/abap.js) - and stays 7.02 when it is generated anew
   const masked = maskSource(src);
-  design.release = /\bDATA\s+view\s+TYPE\s+REF\s+TO\s+z2ui5_cl_ui5_view_builder\b/i.test(masked) && !/\bDATA\s*\(/i.test(masked) ? '702' : '';
+  design.release = /\bDATA\s+\w+\s+TYPE\s+REF\s+TO\s+z2ui5_cl_ui5_view_builder\b/i.test(masked) && !/\bDATA\s*\(/i.test(masked) ? '702' : '';
   const seedNotes = readSeeds(src, design.attributes);
   const dropped = [];
   const raws = [];
@@ -825,14 +847,29 @@ function placeEvents(source, events) {
   const mask = maskSource(source);
   const caseM = /\bCASE\s+client->get_event\(\s*\)\s*\./i.exec(mask);
   if (!caseM) return { source, unplaced: events };
-  const endM = /\bENDCASE\s*\./i.exec(mask.slice(caseM.index));
-  if (!endM) return { source, unplaced: events };
-  const region = source.slice(caseM.index, caseM.index + endM.index);
-  const whenM = /\n([ \t]*)WHEN\s+OTHERS\b/i.exec(region);
-  const whens = [...region.matchAll(/\n([ \t]*)WHEN\b/gi)];
-  const indent = whenM ? whenM[1] : whens.length ? whens[0][1] : ' '.repeat((/\n(\s*)$/.exec(source.slice(0, caseM.index)) || ['', ''])[1].length + 2);
+  // the WHENs and the ENDCASE of this CASE - not those of a CASE nested
+  // in one of its branches
+  const kw = /\b(ENDCASE|CASE|WHEN(\s+OTHERS\b)?)\b/gi;
+  kw.lastIndex = caseM.index + caseM[0].length;
+  let depth = 1;
+  let others = null;
+  let firstWhen = null;
+  let endAt = null;
+  for (let m = kw.exec(mask); m; m = kw.exec(mask)) {
+    const word = m[1].toUpperCase();
+    if (word === 'CASE') depth += 1;
+    else if (word === 'ENDCASE') { depth -= 1; if (!depth) { endAt = m.index; break; } }
+    else if (depth === 1) {
+      if (firstWhen === null) firstWhen = m.index;
+      if (m[2] && others === null) others = m.index;
+    }
+  }
+  if (endAt === null) return { source, unplaced: events };
+  const lineStart = (i) => source.lastIndexOf('\n', i - 1) + 1;
+  const indentAt = (i) => /^[ \t]*/.exec(source.slice(lineStart(i)))[0];
+  const indent = others !== null ? indentAt(others) : firstWhen !== null ? indentAt(firstWhen) : `${indentAt(caseM.index)}  `;
   // the start of the line of WHEN OTHERS / ENDCASE, so its indentation stays its own
-  const at = whenM ? caseM.index + whenM.index + 1 : source.lastIndexOf('\n', caseM.index + endM.index - 1) + 1;
+  const at = lineStart(others !== null ? others : endAt);
   const lines = events.flatMap((ev) => [`${indent}WHEN ${abapString(ev)}.`, `${indent}  client->message_toast_display( ${abapString(`${ev} - implement me in on_event`)} ).`]);
   return { source: source.slice(0, at) + lines.join('\n') + '\n' + source.slice(at), unplaced: [] };
 }
@@ -860,9 +897,6 @@ export function classSource(design) {
   else if (chain.variable && chain.variable !== 'view') lines[0] = lines[0].replace(/^(\s*)DATA\(view\)/, `$1DATA(${chain.variable})`);
   const chainText = lines.join('\n');
   let out = orig.slice(0, chain.start) + chainText + orig.slice(chain.end);
-  // a class renamed in the editor: its CLASS statements follow, or the file
-  // name and the class inside it would differ - abapGit refuses that
-  out = renameClass(out, design.className);
   let chainLine = orig.slice(0, chain.start).split('\n').length - 1;
   // 2. attributes the editor added, declared at the end of the PUBLIC SECTION
   const known = new Set((declared || []).map((n) => n.toLowerCase()));
@@ -880,7 +914,10 @@ export function classSource(design) {
   // 3. events without a WHEN branch
   const handled = new Set();
   const mask = maskSource(orig);
-  for (const m of orig.matchAll(/\bWHEN\s+([`'])([A-Za-z0-9_]+)\1/gi)) if (mask[m.index] === 'W') handled.add(m[2]);
+  // every literal of a WHEN statement: WHEN `SAVE` OR `CANCEL` handles both
+  for (const m of mask.matchAll(/\bWHEN\b[^.]*\./gi)) {
+    for (const lit of orig.slice(m.index, m.index + m[0].length).matchAll(/([`'])([A-Za-z0-9_]+)\1/g)) handled.add(lit[2]);
+  }
   for (const m of orig.matchAll(/check_on_event\(\s*([`'])([A-Za-z0-9_]+)\1\s*\)/gi)) handled.add(m[2]);
   const newEvents = collectEvents(design).filter((e) => !handled.has(e));
   if (newEvents.length) {
@@ -893,6 +930,11 @@ export function classSource(design) {
     }
     out = placed.source;
   }
+  // a class renamed in the editor: its CLASS statements follow, or the file
+  // name and the class inside it would differ - abapGit refuses that. Last,
+  // because insertAt is an offset into the source as it came; a rename
+  // changes no line, so the line map holds
+  out = renameClass(out, design.className);
   if (!out.endsWith('\n')) out += '\n';
   const total = out.split('\n').length;
   const nodeIds = new Array(total).fill(null);

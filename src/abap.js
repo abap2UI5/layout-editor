@@ -54,9 +54,18 @@ function abapStringPieces(s, width, release) {
     if (release !== '702') return templatePieces(str, width);
     return str.split(/(\r\n|[\n\r\t])/).filter(Boolean).flatMap((part) => (CHAR_CONST[part] ? [CHAR_CONST[part]] : abapStringPieces(part, width)));
   }
-  if (str.length <= width) return [abapString(str)];
+  // the width counts as written: a backtick is doubled in the literal
+  const cost = (ch) => (ch === '`' ? 2 : 1);
+  if (str.length <= width / 2 || [...str].reduce((n, ch) => n + cost(ch), 0) <= width) return [abapString(str)];
   const parts = [];
-  for (let i = 0; i < str.length; i += width) parts.push(abapString(str.slice(i, i + width)));
+  let cur = '';
+  let len = 0;
+  for (const ch of str) {
+    if (cur && len + cost(ch) > width) { parts.push(abapString(cur)); cur = ''; len = 0; }
+    cur += ch;
+    len += cost(ch);
+  }
+  if (cur) parts.push(abapString(cur));
   return parts;
 }
 

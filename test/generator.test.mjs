@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { allDesigns, allDesigns702, kitchenSink } from './fixtures.mjs';
 import { generateClass, generateClassXml, abapGitFiles, viewChain, abapString, releaseOf } from '../src/abap.js';
 import { toXml, fromXml, escapeBindingLiteral } from '../src/xml.js';
-import { validate, clone, walk } from '../src/model.js';
+import { validate, clone, walk, createDesign, createNode, insertNode } from '../src/model.js';
 import { zip, crc32 } from '../src/zip.js';
 import { builderXml } from './builder.mjs';
 
@@ -219,4 +219,45 @@ test('every chain line belongs to the node it writes', async () => {
     assert.ok(n.type.endsWith(name) || Object.keys(n.aggs).includes(name), `line ${i + 1}: ${l.trim()} belongs to ${n.type}`);
   });
   assert.ok(nodeIds.filter((x) => x && x !== 'root').length > 100);
+});
+
+test('a text of backticks is cut by its written width: no line passes 255, no character is torn', () => {
+  for (const release of ['', '702']) {
+    for (const v of ['`'.repeat(130), `${'x'.repeat(119)}😀${'y'.repeat(130)}`]) {
+      const d = createDesign();
+      if (release) d.release = release;
+      d.attributes = [{ name: 'txt', type: 'string', value: v }];
+      const t = createNode('Text');
+      t.props.text = { m: 's', v };
+      insertNode(d, t, d.root.aggs.content[0].id);
+      const src = generateClass(d);
+      assert.ok(src.split('\n').every((l) => l.length <= 255), 'no line over 255');
+      assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(src), 'no lone surrogate');
+    }
+  }
+});
+
+test('a line break in a value is a character reference in the view, as abap2UI5 writes it', () => {
+  const d = createDesign();
+  const t = createNode('Text');
+  t.props.text = { m: 's', v: 'a\nb\tc' };
+  insertNode(d, t, d.root.aggs.content[0].id);
+  assert.match(toXml(d), /text="a&#xA;b&#x9;c"/);
+  const back = fromXml(toXml(d), createDesign());
+  assert.equal(back.root.aggs.content[0].aggs.content.at(-1).props.text.v, 'a\nb\tc');
+});
+
+test('a view of two root elements is refused', () => {
+  assert.throws(() => fromXml('<mvc:View xmlns:mvc="sap.ui.core.mvc"/><mvc:View xmlns:mvc="sap.ui.core.mvc"/>', createDesign()), /more than one root/);
+});
+
+test('the namespaces are declared in the order the view writes its controls, however it was built', () => {
+  const build = (order) => {
+    const d = createDesign();
+    const page = d.root.aggs.content[0];
+    page.aggs = {};
+    for (const agg of order) page.aggs[agg] = [createNode(agg === 'headerContent' ? 'core:Icon' : 'l:HorizontalLayout')];
+    return generateClass(d);
+  };
+  assert.equal(build(['headerContent', 'content']), build(['content', 'headerContent']));
 });

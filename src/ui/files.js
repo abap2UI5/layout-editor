@@ -188,6 +188,7 @@ export function openClassFromUrl(params) {
 async function fetchClass(raw) {
   try {
     const href = sourceUrl(raw, location.href);
+    toast(`Opening ${href.split('/').pop()}…`);
     const res = await fetch(href, { signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw new Error(`${href} answered ${res.status}`);
     const text = await res.text();

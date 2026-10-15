@@ -454,3 +454,20 @@ test('tabbing into an event names nothing, a click takes the suggestion', async 
   await expect(ev).not.toHaveValue('');
   expect(Object.keys(await events())).toEqual(['press']);
 });
+
+test('after a view that failed, the next new view renders at once - no id of the old one in its way', async ({ designer: page }) => {
+  for (const round of [1, 2, 3]) {
+    await page.evaluate(() => window.designer.commit((d) => {
+      d.root.aggs.content[0].aggs.content.push({ id: 'nbroken1', type: 'NoSuchControl', props: {}, events: {}, aggs: {} });
+    }));
+    await expect(page.locator('#previewStatus')).toContainText('does not render');
+    // not back to the view on screen: a new one, with a new title
+    await page.evaluate((r) => window.designer.commit((d) => {
+      const p = d.root.aggs.content[0];
+      p.aggs.content = p.aggs.content.filter((n) => n.id !== 'nbroken1');
+      p.props.title = { m: 's', v: `Round ${r}` };
+    }), round);
+    await expect(preview(page).getByText(`Round ${round}`)).toBeVisible();
+    await expect(page.locator('#previewStatus')).toBeHidden();
+  }
+});

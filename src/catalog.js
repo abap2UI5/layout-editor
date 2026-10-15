@@ -637,7 +637,8 @@ export function runtimeDef(meta) {
 export function parseClassName(className) {
   const full = String(className || '').trim().replace(/\//g, '.');
   const i = full.lastIndexOf('.');
-  if (i < 1 || !/^[A-Za-z_][\w.]*$/.test(full)) return null;
+  // dotted names, each part a name: not `sap.m.`, not `sap..Button`
+  if (i < 1 || !/^[A-Za-z_]\w*(\.[A-Za-z_]\w*)+$/.test(full)) return null;
   return { lib: full.slice(0, i), name: full.slice(i + 1), module: full.replace(/\./g, '/') };
 }
 

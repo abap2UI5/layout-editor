@@ -72,6 +72,8 @@ export function openPalette() {
     if (c) c.run();
   };
   input.value = '';
+  // a click on the backdrop (the dialog element itself, outside its box) closes it
+  dlg.onclick = (e) => { if (e.target === dlg) dlg.close(); };
   input.oninput = () => { active = 0; render(); };
   input.onkeydown = (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, shown.length - 1); render(); }

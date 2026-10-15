@@ -34,6 +34,8 @@ export function offerRows(id) {
   toast(`${displayType(node.type)}: ${tree ? 'its nodes come from a table with a table field' : 'its rows can come from a table attribute of the class'}`, {
     label: tree ? 'Create nodes table' : 'Create table attribute',
     run: () => commit((d) => {
+      // deleted (or undone) since the offer: no table for nobody
+      if (!findNode(d.root, node.id)) return undefined;
       const name = newTableAttribute(d, tree);
       bindListToTable(d, node.id, agg, name);
       return node.id;

@@ -221,6 +221,14 @@ test('a design of an older version is migrated, a newer one refused', () => {
   assert.throws(() => normalizeDesign(d), /no migration/);
 });
 
+test('a class name is dotted names, each part a name', async () => {
+  const { parseClassName } = await import('../src/catalog.js');
+  assert.equal(parseClassName('sap.m.'), null);
+  assert.equal(parseClassName('sap..Button'), null);
+  assert.equal(parseClassName('Button'), null);
+  assert.deepEqual(parseClassName('sap.m.Button'), { lib: 'sap.m', name: 'Button', module: 'sap/m/Button' });
+});
+
 test('a control the UI5 runtime describes becomes a catalogue entry', async () => {
   const { runtimeDef, registerControl, getControl, parseClassName, RUNTIME } = await import('../src/catalog.js');
   const { prefixFor, typeFor } = await import('../src/model.js');

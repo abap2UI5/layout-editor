@@ -119,6 +119,12 @@ function wire() {
   $('#insertSearch').addEventListener('input', renderInsert);
   $('#className').addEventListener('input', (e) => {
     const v = e.target.value.toUpperCase().replace(/\s/g, '');
+    // the field shows the name the class gets, the caret stays in place
+    if (e.target.value !== v) {
+      const at = Math.max(0, e.target.selectionStart - (e.target.value.length - v.length));
+      e.target.value = v;
+      e.target.setSelectionRange(at, at);
+    }
     commit((d) => { d.className = v; }, { mergeKey: 'className', keepFocus: true });
   });
   $('#description').addEventListener('input', (e) => commit((d) => { d.description = e.target.value; }, { mergeKey: 'description', keepFocus: true }));

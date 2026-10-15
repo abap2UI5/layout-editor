@@ -231,6 +231,93 @@ test('a class renamed in the editor is renamed in its source', () => {
   assert.equal(out.replace(/zcl_renamed/g, allDesigns()[0][1].className.toLowerCase()), src);
 });
 
+test('a rename and a new attribute together: the declaration lands on a line of its own', () => {
+  const d = fromClass(generateClass(allDesigns()[0][1]), createDesign());
+  d.className = 'ZCL_A_MUCH_LONGER_NAME_NOW';
+  d.attributes.push({ name: 'extra', type: 'string', value: '' });
+  const out = generateClassSource(d);
+  assert.match(out, /^CLASS zcl_a_much_longer_name_now DEFINITION PUBLIC\./m);
+  assert.match(out, /\n {4}DATA extra TYPE string\.\n/);
+  for (const line of out.split('\n')) assert.ok(!/\bTY$/.test(line), line);
+  const { source, nodeIds } = classSource(d);
+  const first = nodeIds.findIndex(Boolean);
+  assert.match(source.split('\n')[first], /z2ui5_cl_ui5_view_builder=>factory\(/);
+});
+
+const appClass = (pub, main, onEvent = '') => `CLASS zcl_x DEFINITION PUBLIC.
+  PUBLIC SECTION.
+    INTERFACES z2ui5_if_app.
+${pub}
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+CLASS zcl_x IMPLEMENTATION.
+  METHOD z2ui5_if_app~main.
+${main}
+  ENDMETHOD.
+${onEvent}
+ENDCLASS.
+`;
+const viewHead = `    DATA(view) = z2ui5_cl_ui5_view_builder=>factory(
+        )->ele( n = \`View\` ns = \`mvc\`
+            )->a( n = \`xmlns\` v = \`sap.m\`
+            )->a( n = \`xmlns:mvc\` v = \`sap.ui.core.mvc\` ).`;
+
+test('a view built on after an IF is refused, not half imported', () => {
+  const src = appClass('    DATA name TYPE string.', `${viewHead}
+    DATA(page) = view->ele( \`Page\` ).
+    IF name IS INITIAL.
+      page->tag( \`Text\` )->a( n = \`text\` v = \`empty\` ).
+    ENDIF.
+    page->tag( \`Button\` )->a( n = \`text\` v = \`Go\` ).
+    client->view_display( view->stringify( ) ).`);
+  assert.throws(() => fromClass(src, createDesign()), /page->/);
+});
+
+test('a new event goes into the CASE of the events, not into one nested in a branch, and WHEN A OR B handles both', () => {
+  const onEvent = `  METHOD on_event.
+    CASE client->get_event( ).
+      WHEN \`SAVE\` OR \`CANCEL\`.
+        CASE name.
+          WHEN \`x\`.
+          WHEN OTHERS.
+        ENDCASE.
+      WHEN OTHERS.
+    ENDCASE.
+  ENDMETHOD.`;
+  const src = appClass('    DATA name TYPE string.', `${viewHead.replace(' ).', '')}
+            )->ele( \`Page\`
+                )->tag( \`Button\`
+                    )->a( n = \`press\` v = client->_event( \`SAVE\` ) ).
+    client->view_display( view->stringify( ) ).`, onEvent);
+  const d = fromClass(src, createDesign());
+  const btn = createNode('Button');
+  btn.events.press = 'DELETE';
+  const btn2 = createNode('Button');
+  btn2.events.press = 'CANCEL';
+  insertNode(d, btn, d.root.aggs.content[0].id);
+  insertNode(d, btn2, d.root.aggs.content[0].id);
+  const out = generateClassSource(d);
+  assert.ok(!out.includes('WHEN `CANCEL`.'), 'CANCEL is handled by WHEN `SAVE` OR `CANCEL`');
+  assert.match(out, /ENDCASE\.\n {6}WHEN `DELETE`\.\n.*\n {6}WHEN OTHERS\.\n {4}ENDCASE\./);
+});
+
+test('public attributes: a comma in a literal, VALUE with READ-ONLY, => in a seed row', () => {
+  const pub = readPublicSection(appClass("    DATA city TYPE string VALUE `Walldorf, DE`.\n    DATA cnt TYPE i VALUE 5 READ-ONLY.", ''));
+  assert.deepEqual(pub.attributes.map((a) => [a.name, a.value]), [['city', 'Walldorf, DE'], ['cnt', '5']]);
+  const attrs = [{ name: 't_x', type: 'table', fields: [{ name: 'ID', type: 'string' }, { name: 'NAME', type: 'string' }], rows: [] }];
+  const notes = readSeeds(appClass('', '    t_x = VALUE #( ( id = `1` name = `a` && cl_abap_char_utilities=>newline && `b` ) ).'), attrs);
+  assert.deepEqual(notes, []);
+  assert.deepEqual(attrs[0].rows, [{ ID: '1', NAME: 'a\nb' }]);
+});
+
+test('a 7.02 class is 7.02 whatever its builder variable is called', () => {
+  const src = generateClass(allDesigns702()[0][1]).replace(/DATA view TYPE REF TO/, 'DATA lo_view TYPE REF TO')
+    .replace(/^(\s*)view = /m, '$1lo_view = ').replace(/view->stringify/, 'lo_view->stringify');
+  assert.equal(fromClass(src, createDesign()).release, '702');
+});
+
 test('what cannot be read is refused with a reason', () => {
   assert.throws(() => fromClass('CLASS zcl_x DEFINITION PUBLIC.\n  PUBLIC SECTION.\n    INTERFACES z2ui5_if_app.\nENDCLASS.\nCLASS zcl_x IMPLEMENTATION.\nENDCLASS.\n', createDesign()), /Nothing here builds a view/);
   const two = generateClass(allDesigns()[0][1]);

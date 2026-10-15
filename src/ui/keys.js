@@ -4,6 +4,7 @@ import { state, select, commit, undo, redo } from './store.js';
 import { toast } from './dom.js';
 import { openPalette } from './palette.js';
 import { copySelection, pasteSelection } from './edit.js';
+import { saveDesign } from './files.js';
 
 
 export function onKey(e) {
@@ -13,6 +14,8 @@ export function onKey(e) {
   const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   const ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); return; }
+  // the design, not the editor's page
+  if (ctrl && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveDesign(); return; }
   if (ctrl && !typing && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if (ctrl && !typing && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
   if (typing) return;
