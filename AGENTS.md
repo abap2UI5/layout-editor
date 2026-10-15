@@ -48,6 +48,8 @@ The product is the generated class. It must:
   (inline declarations, string templates, constructor and table
   expressions); `npm test` runs abaplint at v702 on it (`abaplint-702.jsonc`,
   the rules of abap2UI5's own 7.02 check), `npm run verify:abap` runs both.
+- A starter (`src/starters.js`) uses only controls and properties of
+  `src/catalog.js`; every starter is a test design, rendered on 1.71 too.
 - `test/builder.mjs` models `z2ui5_cl_ui5_view_builder`. When the builder's
   semantics change upstream, change the model, and let `verify:abap` decide
   who is right.

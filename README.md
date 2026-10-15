@@ -79,7 +79,11 @@ From there it is your code:
 
 Also in the editor:
 
-- **Starters**: a blank page, a form, a table with search, and tabs.
+- **Starters**: a blank page, a form, a table with search, tabs, and the
+  floorplans: a list report (filter fields and a search over a table), an
+  object page (header, a form section and an items section), a worklist (a
+  table with a status column and a row press) and master-detail (a list
+  next to the details of the selected entry, in two columns).
 - **Any UI5 control** by its class name (`sap.m.Wizard`, a library of your
   own): the field at the end of *Controls*, or Ctrl+K. The canvas asks its
   UI5 for the control's properties, aggregations and events, and from then
