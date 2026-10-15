@@ -38,8 +38,12 @@ export function releaseOf(design) {
 // literal pieces around the constants of cl_abap_char_utilities on 7.02
 const CHAR_CONST = { '\r\n': 'cl_abap_char_utilities=>cr_lf', '\n': 'cl_abap_char_utilities=>newline', '\r': 'cl_abap_char_utilities=>cr_lf(1)', '\t': 'cl_abap_char_utilities=>horizontal_tab' };
 
+// the control characters XML 1.0 forbids: abap2UI5 drops them on the way
+// to the browser, and in a source they are invisible - never written
+const CONTROLS_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g;
+
 export function abapString(s, release) {
-  const str = String(s ?? '');
+  const str = String(s ?? '').replace(CONTROLS_RE, '');
   if (/[\n\r\t]/.test(str)) {
     if (release === '702') return abapStringPieces(str, Infinity, release).join(' && ');
     return `|${str.replace(/[\\|{}]/g, '\\$&').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}|`;
@@ -49,7 +53,7 @@ export function abapString(s, release) {
 
 // a long literal split into pieces joined with &&, so no line passes 255
 function abapStringPieces(s, width, release) {
-  const str = String(s ?? '');
+  const str = String(s ?? '').replace(CONTROLS_RE, '');
   if (/[\n\r\t]/.test(str)) {
     if (release !== '702') return templatePieces(str, width);
     return str.split(/(\r\n|[\n\r\t])/).filter(Boolean).flatMap((part) => (CHAR_CONST[part] ? [CHAR_CONST[part]] : abapStringPieces(part, width)));

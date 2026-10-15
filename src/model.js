@@ -738,5 +738,7 @@ function jsValue(type, v) {
     return t === '00:00:00' ? '' : t;
   }
   if (type === 'date' && v === '0000-00-00') return '';
-  return v == null ? '' : String(v);
+  // the control characters XML forbids: abap2UI5 drops them, the class
+  // does not write them
+  return v == null ? '' : String(v).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }

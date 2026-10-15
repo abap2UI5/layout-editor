@@ -261,3 +261,17 @@ test('the namespaces are declared in the order the view writes its controls, how
   };
   assert.equal(build(['headerContent', 'content']), build(['content', 'headerContent']));
 });
+
+test('a control character is written by neither the class nor the canvas - abap2UI5 drops it', async () => {
+  const { previewModel } = await import('../src/model.js');
+  for (const release of ['', '702']) {
+    const d = createDesign();
+    if (release) d.release = release;
+    d.attributes = [{ name: 's', type: 'string', value: 'a\u0001b' }];
+    const t = createNode('Text');
+    t.props.text = { m: 's', v: 'c\u0002d' };
+    insertNode(d, t, d.root.aggs.content[0].id);
+    assert.ok(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(generateClass(d)));
+    assert.deepEqual(previewModel(d), { S: 'ab' });
+  }
+});
