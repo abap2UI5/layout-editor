@@ -58,6 +58,11 @@ The product is the generated class. It must:
 - `test/builder.mjs` models `z2ui5_cl_ui5_view_builder`. When the builder's
   semantics change upstream, change the model, and let `verify:abap` decide
   who is right.
+- A UI5 on another host runs with the editor's rights: `?ui5=` from a
+  link takes only this server, localhost and SAP's CDNs (`isLinkableUi5( )`
+  in `src/ui/store.js`, the same list in `preview.html`, which takes any
+  host only when the editor frames it). Any other host comes from the UI5
+  field, typed by the user. Never widen the list for a link.
 - The preview module (`src/preview/init.js`) runs inside UI5 1.71: ES5
   style, `sap.ui.define`, no API newer than 1.71.
 

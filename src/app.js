@@ -206,6 +206,7 @@ loadPreview();
 // a class to open: ?src=<raw GitHub URL> (the playground's parameter) or
 // ?class=<name>&repo=<owner/repo>[&ref=<branch>][&path=<folder>]
 openClassFromUrl(new URLSearchParams(location.search));
+if (state.refusedUi5) toast(`The link named a UI5 on another host (${state.refusedUi5}); it is not loaded from a link. Type it into the UI5 field to use it.`);
 
 // a shared link: its design replaces the current one (Recent keeps that)
 if (location.hash.startsWith('#d=')) {

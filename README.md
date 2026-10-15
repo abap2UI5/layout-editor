@@ -209,8 +209,14 @@ URL ending in `/resources` works too, and so does a path on the editor's
 own server (`/…` or `./…`). Empty goes back to the CDN.
 
 ```
-https://editor.example.com/index.html?ui5=https://ui5.example.com/1.71.80/
+https://editor.example.com/index.html?ui5=http://127.0.0.1:8081/
 ```
+
+A UI5 runs its scripts with the editor's rights, so a link may only
+name a UI5 on the editor's own server, on `localhost` / `127.0.0.1`, or
+on SAP's UI5 CDNs (`sdk.openui5.org`, `ui5.sap.com`). A link that names
+any other host is not followed; the editor says so, and the URL works
+once you type it into the UI5 field yourself.
 
 A tree on disk needs a web server that sends
 `Access-Control-Allow-Origin` (UI5 loads its modules and themes with

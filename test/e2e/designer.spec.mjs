@@ -383,7 +383,11 @@ test('the canvas boots UI5 from a URL of your own', async ({ page }) => {
     await page.goto(`/preview.html?ui5=${encodeURIComponent(ui5)}`, { waitUntil: 'domcontentloaded' });
     return page.locator('#sap-ui-bootstrap').getAttribute('src');
   };
-  expect(await src('https://ui5.example.com/1.71.80/')).toBe('https://ui5.example.com/1.71.80/resources/sap-ui-core.js');
+  // a host of its own is refused when the page is opened by a link -
+  // its scripts would run on this origin; the editor's field below may
+  expect(await src('https://ui5.example.com/1.71.80/')).toBe('https://sdk.openui5.org/resources/sap-ui-core.js');
+  expect(await src('http://localhost:9999/ui5/')).toBe('http://localhost:9999/ui5/resources/sap-ui-core.js');
+  expect(await src('https://ui5.sap.com/1.71.80/')).toBe('https://ui5.sap.com/1.71.80/resources/sap-ui-core.js');
   expect(await src('/ui5/mine/resources')).toBe('/ui5/mine/resources/sap-ui-core.js');
   expect(await src('./ui5/resources/sap-ui-core.js')).toBe('./ui5/resources/sap-ui-core.js');
   expect(await src('1.71.80')).toBe('https://sdk.openui5.org/1.71.80/resources/sap-ui-core.js');
@@ -394,7 +398,11 @@ test('the canvas boots UI5 from a URL of your own', async ({ page }) => {
   await page.locator('#ui5version').dispatchEvent('change');
   await expect(page.locator('#ui5version')).not.toHaveClass(/invalid/);
   await expect(page.locator('#preview')).toHaveAttribute('src', /ui5=https%3A%2F%2Fui5\.example\.com%2F1\.71\.80/);
-});
+  // framed by the editor, the canvas takes the typed host
+  await expect(page.frameLocator('#preview').locator('#sap-ui-bootstrap')).toHaveAttribute('src', 'https://ui5.example.com/1.71.80/resources/sap-ui-core.js');
+  // the same host in a link to the editor is not taken, and says so -
+  // in a browser that has not been told it in the field before
+  await page.evaluate(() => { try { localStorage.clear(); } catch { /* fresh */ } });
   await page.goto(`/index.html?ui5=${encodeURIComponent('https://ui5.example.com/1.71.80')}`);
   await expect(page.locator('body')).toContainText('not loaded from a link');
   await expect(page.locator('#preview')).not.toHaveAttribute('src', /ui5\.example\.com/);
