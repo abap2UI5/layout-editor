@@ -10,6 +10,7 @@
 // module, which renders the panels (src/ui/*.js).
 import { validate, checkClassName } from './model.js';
 import { generateClass, fileName } from './abap.js';
+import { generateClassSource } from './clas.js';
 import { toXml } from './xml.js';
 import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection } from './ui/store.js';
 import { $, toast, download } from './ui/dom.js';
@@ -21,7 +22,7 @@ import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code
 import { loadPreview, postPreview, sendPreview } from './ui/preview.js';
 import { handleDrop, copySelection, pasteSelection, addControlByName } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
-import { newDialog, importDialog, recentDialog, shareLink, openFile, saveDesign, exportZip } from './ui/files.js';
+import { newDialog, importDialog, openClassDialog, openClassFromUrl, recentDialog, shareLink, openFile, saveDesign, exportZip, openInPlayground, openInVscode } from './ui/files.js';
 import { onKey } from './ui/keys.js';
 
 
@@ -107,7 +108,10 @@ function wire() {
   wireMenu($('#btnFile'), $('#fileMenu'));
   wireMenu($('#btnExport'), $('#exportMenu'));
   $('#btnNew').onclick = newDialog;
-  $('#btnOpen').onclick = () => openFile('.json,.xml');
+  $('#btnOpen').onclick = () => openFile('.json,.xml,.abap');
+  $('#btnOpenClass').onclick = openClassDialog;
+  $('#btnPlayground').onclick = openInPlayground;
+  $('#btnVscode').onclick = openInVscode;
   $('#btnSave').onclick = saveDesign;
   $('#btnImport').onclick = importDialog;
   $('#btnRecent').onclick = recentDialog;
@@ -117,9 +121,9 @@ function wire() {
   $('#btnCmd').onclick = openPalette;
   $('#btnZip').onclick = exportZip;
   $('#btnZip2').onclick = exportZip;
-  $('#btnCopy').onclick = () => copyText(generateClass(state.design), 'ABAP');
+  $('#btnCopy').onclick = () => copyText(generateClassSource(state.design), 'ABAP');
   $('#btnCopyXml').onclick = () => copyText(toXml(state.design), 'XML');
-  $('#btnDownloadAbap').onclick = () => download(fileName(state.design.className, 'clas.abap'), generateClass(state.design), 'text/plain');
+  $('#btnDownloadAbap').onclick = () => download(fileName(state.design.className, 'clas.abap'), generateClassSource(state.design), 'text/plain');
   for (const b of document.querySelectorAll('.rail-btn')) b.onclick = () => showPanel(b.dataset.panel);
   for (const b of document.querySelectorAll('[data-view]')) b.onclick = () => setView(b.dataset.view);
   for (const b of document.querySelectorAll('[data-code]')) b.onclick = () => setCode(b.dataset.code);
@@ -194,6 +198,10 @@ renderInsert();
 renderAll();
 loadPreview();
 
+// a class to open: ?src=<raw GitHub URL> (the playground's parameter) or
+// ?class=<name>&repo=<owner/repo>[&ref=<branch>][&path=<folder>]
+openClassFromUrl(new URLSearchParams(location.search));
+
 // a shared link: its design replaces the current one (Recent keeps that)
 if (location.hash.startsWith('#d=')) {
   designFromLink(location.hash).then((d) => {
@@ -203,4 +211,4 @@ if (location.hash.startsWith('#d=')) {
 }
 
 // for the browser tests and the curious: the state and the generators
-window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };
+window.designer = { state, generateClass, generateClassSource, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };

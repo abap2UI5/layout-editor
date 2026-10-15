@@ -50,6 +50,9 @@ export function loadPrefs() {
   // ?ui5=<version|local> overrides the stored version, for links and tests
   const q = new URLSearchParams(location.search).get('ui5');
   if (q !== null) state.prefs.ui5 = q;
+  // ?playground=<base url> sets where "Open in Playground" goes
+  const pg = new URLSearchParams(location.search).get('playground');
+  if (pg !== null) { state.prefs.playground = pg; savePrefs(); }
   state.view = state.prefs.view || 'split';
 }
 

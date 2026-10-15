@@ -156,6 +156,22 @@ export function kitchenSink(half) {
   return d;
 }
 
+// Designs that came out of a class: a starter's class read back in and
+// edited the way a user would - an attribute and an input with an event
+// added - so its export is the patched class, not a generated one
+export function importedDesigns(fromClass, generateClass) {
+  const form = STARTERS.find((s) => s.id === 'form').make();
+  form.className = 'ZCL_LE_IMPORTED_FORM';
+  const d = fromClass(generateClass(form), createDesign());
+  d.attributes.push({ name: 'note', type: 'string', value: '' });
+  const page = d.root.aggs.content[0];
+  const input = createNode('Input');
+  input.props.value = { m: 'b', v: 'note' };
+  input.events.submit = 'ADD';
+  insertNode(d, input, page.id);
+  return [['imported-form', d]];
+}
+
 export function allDesigns() {
   return [...STARTERS.map((s) => [s.id, s.make()]), ['kitchen-sink-1', kitchenSink(1)], ['kitchen-sink-2', kitchenSink(2)]];
 }

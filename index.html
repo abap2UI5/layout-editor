@@ -27,6 +27,7 @@
           <button id="btnNew" role="menuitem">New from template…</button>
           <button id="btnOpen" role="menuitem">Open design (.json)…</button>
           <button id="btnSave" role="menuitem">Save design (.json)</button>
+          <button id="btnOpenClass" role="menuitem" title="An abap2UI5 app class - its view, data and events become the design, the rest of the class is kept">Open ABAP class…</button>
           <button id="btnImport" role="menuitem">Import UI5 XML view…</button>
           <button id="btnRecent" role="menuitem">Recent designs…</button>
         </div>
@@ -42,6 +43,8 @@
           <button id="btnCopy" role="menuitem">Copy ABAP to clipboard</button>
           <button id="btnCopyXml" role="menuitem">Copy XML view</button>
           <button id="btnShare" role="menuitem" title="A link that carries the design">Copy share link</button>
+          <button id="btnPlayground" role="menuitem" title="Run the class in the browser playground - no system">Open in Playground</button>
+          <button id="btnVscode" role="menuitem" title="Open the class in VS Code with the abap2UI5 extension">Open in VS Code</button>
         </div>
       </div>
     </div>
@@ -130,7 +133,7 @@
     <div id="cmdkList" class="cmdk-list" role="listbox"></div>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <input id="fileInput" type="file" accept=".json,.xml,application/json,text/xml" hidden>
+  <input id="fileInput" type="file" accept=".json,.xml,.abap,application/json,text/xml,text/plain" hidden>
 
   <script type="module" src="src/app.js"></script>
 </body>

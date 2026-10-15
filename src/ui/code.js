@@ -2,7 +2,8 @@
 // to the design node that writes it; and the layout / code switches.
 import { state, savePrefs } from './store.js';
 import { $, toast } from './dom.js';
-import { generateClassMap, fileName } from '../abap.js';
+import { fileName } from '../abap.js';
+import { classSource } from '../clas.js';
 import { toXml } from '../xml.js';
 
 
@@ -31,10 +32,12 @@ export function renderCode() {
   let lines;
   let nodeIds;
   if (state.code === 'abap') {
-    const map = generateClassMap(d);
+    const map = classSource(d);
     lines = map.source.replace(/\n$/, '').split('\n');
     nodeIds = map.nodeIds;
-    $('#codeInfo').textContent = `${fileName(d.className, 'clas.abap')} · ${lines.length} lines`;
+    const origin = d.abap ? ' · imported class, the view regenerated' : '';
+    const notes = map.notes.length ? ` · ${map.notes.join(' · ')}` : '';
+    $('#codeInfo').textContent = `${fileName(d.className, 'clas.abap')} · ${lines.length} lines${origin}${notes}`;
   } else {
     lines = toXml(d).split('\n');
     nodeIds = [];

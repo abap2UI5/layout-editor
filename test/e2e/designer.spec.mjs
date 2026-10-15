@@ -316,3 +316,51 @@ test('a view UI5 cannot render says why on the canvas, and the next edit renders
   await expect(page.locator('#previewStatus')).toBeHidden();
   await expect(preview(page).getByText('Customer data')).toBeVisible();
 });
+
+test('an abap2UI5 class opens as a design and exports as the same class', async ({ designer: page }) => {
+  const original = await abapOf(page);
+  await page.locator('#btnFile').click();
+  await page.locator('#btnOpenClass').click();
+  await page.locator('#dlg textarea').fill(original);
+  await page.locator('#dlg').getByRole('button', { name: 'Open', exact: true }).click();
+  await expect(page.locator('#dlg')).toContainText('Opened ZCL_MY_FORM');
+  await page.locator('#dlg').getByRole('button', { name: 'OK' }).click();
+  await expect(preview(page).getByText('Customer data')).toBeVisible();
+  await expect(page.locator('#codeInfo')).toContainText('imported class');
+  const back = await page.evaluate(() => window.designer.generateClassSource(window.designer.state.design));
+  expect(back).toBe(original);
+  await waitRendered(page);
+});
+
+test('?src= opens a class from a URL, with a report of what the editor keeps as ABAP', async ({ page, ui5 }) => {
+  await page.addInitScript(() => { try { localStorage.clear(); } catch { /* fresh context */ } });
+  await page.goto(`/index.html?ui5=${encodeURIComponent(ui5)}&src=/test/fixtures/z2ui5_cl_smp_app_493.clas.abap`);
+  await expect(page.locator('#dlg')).toContainText('Opened Z2UI5_CL_SMP_APP_493');
+  await expect(page.locator('#dlg')).toContainText('Kept as ABAP');
+  await expect(page.locator('#dlg')).toContainText('Page.navButtonPress = client->_event_nav_app_leave( )');
+  await page.locator('#dlg').getByRole('button', { name: 'OK' }).click();
+  await waitRendered(page);
+  await expect(preview(page).getByRole('heading', { name: 'Hello World', exact: true })).toBeVisible();
+  expect(page.url()).not.toContain('src=');
+  const abap = await page.evaluate(() => window.designer.generateClassSource(window.designer.state.design));
+  expect(abap).toContain('" @keywords hello world');
+  expect(abap).toContain(')->a( n = `navButtonPress` v = client->_event_nav_app_leave( )');
+  expect(abap).toContain('      client->view_display( view->stringify( ) ).');
+});
+
+test('Open in Playground opens the playground with the class in the link', async ({ designer: page }) => {
+  const original = await page.evaluate(() => window.designer.generateClassSource(window.designer.state.design));
+  // the playground itself is not part of this test: its page is answered here
+  await page.context().route('https://abap2ui5.github.io/playground/**', (route) => route.fulfill({ body: '<!doctype html><title>playground</title>', contentType: 'text/html' }));
+  await page.locator('#btnExport').click();
+  const [popup] = await Promise.all([page.waitForEvent('popup'), page.locator('#btnPlayground').click()]);
+  await popup.waitForLoadState();
+  const url = new URL(popup.url());
+  expect(`${url.origin}${url.pathname}`).toBe('https://abap2ui5.github.io/playground/');
+  const files = await popup.evaluate(async (fragment) => {
+    const bytes = Uint8Array.from(atob(fragment.slice(1).replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0));
+    const text = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    return JSON.parse(text);
+  }, url.hash.slice(1));
+  expect(files).toEqual([{ name: 'zcl_my_form.clas.abap', source: original }]);
+});
