@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createDesign, createNode, insertNode, removeNode, moveNode, shiftNode, duplicateNode, dropTarget, findNode,
-  rowContext, bindListToTable, unbindList, validate, previewModel, typeName, attributeFits, renameAttribute, attributeUsage, collectEvents, normalizeDesign,
+  rowContext, aggAccepts, bindListToTable, unbindList, validate, previewModel, typeName, attributeFits, renameAttribute, attributeUsage, collectEvents, normalizeDesign,
 } from '../src/model.js';
 import { generateClass } from '../src/abap.js';
 import { toXml } from '../src/xml.js';
@@ -147,6 +147,29 @@ test('attributes: usage, rename and the preview model', () => {
   assert.deepEqual(collectEvents(d), ['CHANGED']);
 });
 
+test('an attribute named in an expression is used, and renamed with it', () => {
+  const d = createDesign();
+  d.attributes = [{ name: 'name', type: 'string', value: '' }, { name: 'names', type: 'string', value: '' }];
+  const text = createNode('Text');
+  text.props.text = { m: 'x', v: '{= ${/NAME} || ${/NAMES} }' };
+  insertNode(d, text, page(d).id);
+  assert.equal(attributeUsage(d, 'name'), 1);
+  renameAttribute(d, 'name', 'title');
+  assert.equal(text.props.text.v, '{= ${/TITLE} || ${/NAMES} }');
+});
+
+test('an attribute may not take the name of a method of the class', () => {
+  const d = createDesign();
+  d.attributes = [{ name: 'on_event', type: 'string', value: '' }];
+  assert.ok(errors(d).some((e) => /on_event/.test(e)));
+});
+
+test('a design from a file gets attributes of the shape the panels rely on', () => {
+  const d = normalizeDesign({ version: 1, root: { aggs: { content: [] } }, attributes: [{ name: 't_x', type: 'table' }, null, { name: 'a', type: 'nonsense' }] });
+  assert.deepEqual(d.attributes, [{ name: 't_x', type: 'table', fields: [], rows: [] }, { name: 'a', type: 'string' }]);
+  assert.doesNotThrow(() => validate(d));
+});
+
 test('the validation names what breaks the class', () => {
   const d = createDesign();
   d.className = 'MY_APP';
@@ -196,6 +219,41 @@ test('a design of an older version is migrated, a newer one refused', () => {
   assert.throws(() => normalizeDesign(d), /version 99/);
   d.version = 0;
   assert.throws(() => normalizeDesign(d), /no migration/);
+});
+
+test('a static value UI5 cannot take is said: a number or an enum fails the view, a size is logged', () => {
+  const d = createDesign();
+  const form = createNode('form:SimpleForm');
+  form.props.columnsM = { m: 's', v: 'abc' };
+  form.props.width = { m: 's', v: '1.5' };
+  insertNode(d, form, page(d).id);
+  const issues = validate(d);
+  assert.ok(issues.some((i) => i.level === 'error' && /columnsM: "abc" is not a whole number/.test(i.text)));
+  assert.ok(issues.some((i) => i.level === 'warning' && /width: "1.5" is not a CSS size/.test(i.text)));
+  form.props.columnsM.v = '2';
+  form.props.width.v = 'calc(100% - 2rem)';
+  assert.ok(!validate(d).some((i) => /columnsM|width/.test(i.text)));
+});
+
+test('the rows of a grid table come from its binding: nothing is dropped into them', () => {
+  const d = createDesign();
+  const grid = createNode('table:Table');
+  insertNode(d, grid, page(d).id);
+  assert.equal(aggAccepts(grid, 'rows', 'Button'), false);
+  const t = dropTarget(d, grid.id, 'Button');
+  assert.ok(!(t.parentId === grid.id && t.agg === 'rows'));
+});
+
+test('a new Wizard has the three steps UI5 wants at least', () => {
+  assert.equal(createNode('Wizard').aggs.steps.length, 3);
+});
+
+test('a class name is dotted names, each part a name', async () => {
+  const { parseClassName } = await import('../src/catalog.js');
+  assert.equal(parseClassName('sap.m.'), null);
+  assert.equal(parseClassName('sap..Button'), null);
+  assert.equal(parseClassName('Button'), null);
+  assert.deepEqual(parseClassName('sap.m.Button'), { lib: 'sap.m', name: 'Button', module: 'sap/m/Button' });
 });
 
 test('a control the UI5 runtime describes becomes a catalogue entry', async () => {
@@ -286,4 +344,47 @@ test('a table field of a table: nested types, nested rows, a list in a list, a t
   assert.ok(errors(d).some((t) => t.includes('table field NODES - a property')));
   inner.props.items = { m: 'f', v: 'TEXT' };
   assert.ok(errors(d).some((t) => t.includes('field TEXT, which is not a table')));
+});
+
+test('the canvas shows what abap2UI5 sends: midnight is no time, .5 and 1e3 are numbers, -0 is 0', async () => {
+  const { generateClass } = await import('../src/abap.js');
+  const d = createDesign();
+  d.attributes = [
+    { name: 'at', type: 'time', value: '00:00:00' }, { name: 'half', type: 'decimal', value: '.5' },
+    { name: 'big', type: 'decimal', value: '1e3' }, { name: 'zero', type: 'int', value: '-0' },
+  ];
+  assert.deepEqual(previewModel(d), { AT: '', HALF: 0.5, BIG: 1000, ZERO: 0 });
+  assert.ok(Object.is(previewModel(d).ZERO, 0));
+  const src = generateClass(d);
+  assert.match(src, /half = '0\.50'\./);
+  assert.match(src, /big = '1000\.00'\./);
+  assert.ok(!/\bat = /.test(src), 'midnight is the initial time');
+  assert.ok(validate(d).some((i) => i.level === 'warning' && /at: midnight/.test(i.text)));
+});
+
+test('a table of table fields only binds to a template of static text, not to a table field', () => {
+  const d = createDesign();
+  d.attributes = [{ name: 't_groups', type: 'table', fields: [{ name: 'KIDS', type: 'table', fields: [{ name: 'TEXT', type: 'string' }] }], rows: [] }];
+  for (const type of ['List', 'Table', 'table:Table', 'Select']) {
+    const l = createNode(type);
+    insertNode(d, l, page(d).id);
+    bindListToTable(d, l.id, type === 'table:Table' ? 'rows' : 'items', 't_groups');
+  }
+  assert.deepEqual(errors(d), []);
+});
+
+test('columns built by hand are a template of their own: binding the table again asks first', async () => {
+  const { hasOwnTemplate } = await import('../src/model.js');
+  const d = createDesign();
+  d.attributes = [table('t_a', ['X'], [])];
+  for (const [type, agg] of [['table:Table', 'rows'], ['Table', 'items'], ['List', 'items']]) {
+    const l = createNode(type);
+    insertNode(d, l, page(d).id);
+    assert.equal(hasOwnTemplate(l, agg, d), false, `${type}: the catalogue's start`);
+    bindListToTable(d, l.id, agg, 't_a');
+    assert.equal(hasOwnTemplate(l, agg, d), false, `${type}: what the binding generated`);
+    if (type === 'List') l.aggs.items[0].props.icon = { m: 's', v: 'sap-icon://add' };
+    else l.aggs.columns[0].props.width = { m: 's', v: '5rem' };
+    assert.equal(hasOwnTemplate(l, agg, d), true, `${type}: edited by hand`);
+  }
 });

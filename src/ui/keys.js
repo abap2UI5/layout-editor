@@ -4,6 +4,7 @@ import { state, select, commit, undo, redo } from './store.js';
 import { toast } from './dom.js';
 import { openPalette } from './palette.js';
 import { copySelection, pasteSelection } from './edit.js';
+import { saveDesign } from './files.js';
 
 
 export function onKey(e) {
@@ -13,6 +14,8 @@ export function onKey(e) {
   const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   const ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); return; }
+  // the design, not the editor's page
+  if (ctrl && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveDesign(); return; }
   if (ctrl && !typing && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if (ctrl && !typing && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
   if (typing) return;
@@ -22,6 +25,6 @@ export function onKey(e) {
   if (ctrl && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); pasteSelection(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && sel !== 'root') { e.preventDefault(); commit((d) => removeNode(d, sel)); }
   if (ctrl && (e.key === 'd' || e.key === 'D') && sel !== 'root') { e.preventDefault(); commit((d) => duplicateNode(d, sel) || toast('It cannot be duplicated: its slot takes one control')); }
-  if (e.altKey && e.key === 'ArrowUp') { const hit = findNode(state.design.root, sel); if (hit && hit.parent) select(hit.parent.id); }
+  if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); const hit = findNode(state.design.root, sel); if (hit && hit.parent) select(hit.parent.id); }
   if (e.key === 'Escape') select('root');
 }

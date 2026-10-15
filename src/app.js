@@ -26,17 +26,24 @@ import { newDialog, importDialog, openClassDialog, openClassFromUrl, recentDialo
 import { onKey } from './ui/keys.js';
 
 
+// every menu closes the others when it opens - and says so to a screen reader
+const menus = [];
 function wireMenu(button, menu) {
   const close = () => { menu.hidden = true; button.setAttribute('aria-expanded', 'false'); };
+  menus.push(close);
   button.addEventListener('click', (e) => {
     e.stopPropagation();
     const open = menu.hidden;
-    for (const m of document.querySelectorAll('.menu')) m.hidden = true;
+    for (const c of menus) c();
     menu.hidden = !open;
     button.setAttribute('aria-expanded', String(open));
   });
   menu.addEventListener('click', close);
   document.addEventListener('click', (e) => { if (!menu.contains(e.target)) close(); });
+  // Escape closes the menu and gives the focus back to its button
+  const onEscape = (e) => { if (e.key === 'Escape' && !menu.hidden) { e.stopPropagation(); close(); button.focus(); } };
+  menu.addEventListener('keydown', onEscape);
+  button.addEventListener('keydown', onEscape);
 }
 
 
@@ -60,9 +67,15 @@ function wireResizer(handle, pane, min, max) {
       state.prefs[key] = Math.round(Math.max(min, Math.min(max, from + delta)));
       applyWidths();
     };
-    const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); savePrefs(); };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      savePrefs();
+    };
     handle.addEventListener('pointermove', move);
     handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
   });
   handle.addEventListener('dblclick', () => { delete state.prefs[key]; applyWidths(); savePrefs(); });
 }
@@ -106,6 +119,12 @@ function wire() {
   $('#insertSearch').addEventListener('input', renderInsert);
   $('#className').addEventListener('input', (e) => {
     const v = e.target.value.toUpperCase().replace(/\s/g, '');
+    // the field shows the name the class gets, the caret stays in place
+    if (e.target.value !== v) {
+      const at = Math.max(0, e.target.selectionStart - (e.target.value.length - v.length));
+      e.target.value = v;
+      e.target.setSelectionRange(at, at);
+    }
     commit((d) => { d.className = v; }, { mergeKey: 'className', keepFocus: true });
   });
   $('#description').addEventListener('input', (e) => commit((d) => { d.description = e.target.value; }, { mergeKey: 'description', keepFocus: true }));
@@ -208,13 +227,17 @@ loadPreview();
 openClassFromUrl(new URLSearchParams(location.search));
 if (state.refusedUi5) toast(`The link named a UI5 on another host (${state.refusedUi5}); it is not loaded from a link. Type it into the UI5 field to use it.`);
 
-// a shared link: its design replaces the current one (Recent keeps that)
-if (location.hash.startsWith('#d=')) {
+// a shared link: its design replaces the current one (Recent keeps that) -
+// on load, and when a link is pasted into the address of an open editor
+function openLinkedDesign() {
+  if (!location.hash.startsWith('#d=')) return;
   designFromLink(location.hash).then((d) => {
     if (d) { replaceDesign(d); toast(`Opened ${d.className} from the link`); }
   }).catch((err) => toast(`The link holds no design: ${err.message}`))
     .finally(() => history.replaceState(null, '', location.pathname + location.search));
 }
+openLinkedDesign();
+window.addEventListener('hashchange', openLinkedDesign);
 
 // for the browser tests and the curious: the state and the generators
 window.designer = { state, generateClass, generateClassSource, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };

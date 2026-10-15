@@ -6,7 +6,8 @@
 // panel.
 import { findNode, normalizeDesign } from '../model.js';
 import { STARTERS } from '../starters.js';
-import { $, displayType } from './dom.js';
+import { toBase64Url } from '../handoff.js';
+import { $, displayType, toast } from './dom.js';
 
 const listeners = { change: [], select: [] };
 // on('change', fn(opts)) after every edit, on('select', fn(opts)) after
@@ -90,8 +91,8 @@ export function loadDesign() {
 export async function designToLink(d) {
   const bytes = new TextEncoder().encode(JSON.stringify(d));
   const packed = await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();
-  const b64 = btoa(String.fromCharCode(...new Uint8Array(packed))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `${location.origin}${location.pathname}#d=${b64}`;
+  // in chunks: one spread of a large design's bytes overflows the stack
+  return `${location.origin}${location.pathname}#d=${toBase64Url(new Uint8Array(packed))}`;
 }
 
 export async function designFromLink(hash) {
@@ -113,7 +114,16 @@ function persist(json) {
 // (`mergeKey`) and keeps the focus where it is (`keepFocus`).
 export function commit(fn, opts = {}) {
   const before = JSON.stringify(state.design);
-  const next = fn(state.design);
+  let next;
+  try {
+    next = fn(state.design);
+  } catch (err) {
+    // an edit that fails half way leaves nothing behind: the design is
+    // the one before it, and the panels never saw the half
+    state.design = JSON.parse(before);
+    toast(err.message);
+    return;
+  }
   const after = JSON.stringify(state.design);
   if (after === before && !opts.force) {
     if (typeof next === 'string') select(next);
@@ -173,6 +183,9 @@ export function replaceDesign(d) {
   state.redo = [];
   state.design = d;
   state.selected = d.root.aggs.content && d.root.aggs.content[0] ? d.root.aggs.content[0].id : 'root';
+  // typing into the new design is a step of its own, never merged into
+  // the replacement
+  state.lastMergeKey = null;
   state.collapsed.clear();
   state.rev += 1;
   persist();

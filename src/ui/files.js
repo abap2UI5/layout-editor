@@ -47,12 +47,15 @@ export async function shareLink() {
 
 // a class name typed in, inserted at the selection
 export function insertByNameDialog() {
-  const inp = h('input', { placeholder: 'sap.m.Wizard', spellcheck: 'false', 'aria-label': 'Class name' });
+  const inp = h('input', {
+    placeholder: 'sap.m.Wizard', spellcheck: 'false', 'aria-label': 'Class name',
+    onkeydown: (e) => { if (e.key === 'Enter' && inp.value.trim()) { e.preventDefault(); $('#dlg').close(); addControlByName(inp.value.trim()); } },
+  });
   dialog('Insert a UI5 control by class name', h('div', {},
     h('p', { class: 'hint', text: 'The canvas asks its UI5 for the control; properties, aggregations and events come from there. Not checked against 1.71.' }),
     inp), [
     { text: 'Cancel', action: () => true },
-    { text: 'Insert', primary: true, action: () => { addControlByName(inp.value.trim()); return true; } },
+    { text: 'Insert', primary: true, action: () => { if (inp.value.trim()) addControlByName(inp.value.trim()); return true; } },
   ]);
   inp.focus();
 }
@@ -68,21 +71,25 @@ export function importDialog() {
       text: 'Import', primary: true,
       action: () => {
         try {
-          const text = ta.value;
-          $('#dlg').close(); // the import opens its summary in the same dialog
-          importXmlText(text);
-          return false; // closed above - the summary may be open now
+          // the dialog closes only once the view is read: a view that does
+          // not parse leaves the pasted text where it is, to be fixed
+          importXmlText(ta.value, () => $('#dlg').close());
         } catch (err) {
           toast(err.message);
-          return false;
         }
+        return false; // closed above - the summary may be open now
       },
     },
   ]);
 }
 
-function importXmlText(text) {
-  replaceDesign(fromXml(text, clone(state.design)));
+// `before`: runs once the text is read and before the design is replaced
+// (the dialog it came from closes, so the summary can open in its place)
+function importXmlText(text, before) {
+  if (!text.trim()) throw new Error('Nothing to import');
+  const d = fromXml(text, clone(state.design));
+  if (before) before();
+  replaceDesign(d);
   const r = importReport();
   const lines = [];
   if (r.handlers.length) lines.push(`${r.handlers.length} event handler(s) dropped - abap2UI5 events are names: ${[...new Set(r.handlers)].slice(0, 6).join(', ')}${r.handlers.length > 6 ? ', …' : ''}`);
@@ -110,8 +117,11 @@ function createImportedAttributes(unresolved) {
     for (const u of unresolved) {
       let name = u.path.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^[^a-z]+/, 'a');
       if (u.agg && !name.startsWith('t_')) name = `t_${name}`;
+      // room for a number: a name of 30 characters, or one the class
+      // takes, would otherwise never become a free one
+      const base = name.slice(0, 27);
+      if (name.length > 30) name = base;
       let i = 1;
-      const base = name;
       while (d.attributes.some((a) => a.name === name) || checkAttributeName(name)) name = `${base}${++i}`;
       d.attributes.push(u.agg
         ? { name, type: 'table', fields: [{ name: 'TEXT', type: 'string' }], rows: [{ TEXT: 'Row 1' }] }
@@ -131,7 +141,10 @@ function createImportedAttributes(unresolved) {
 
 export function openClassDialog() {
   const ta = h('textarea', { placeholder: 'CLASS zcl_my_app DEFINITION PUBLIC.\n  PUBLIC SECTION.\n    INTERFACES z2ui5_if_app.\n…', spellcheck: 'false', 'aria-label': 'ABAP class' });
-  const url = h('input', { placeholder: 'https://raw.githubusercontent.com/owner/repo/main/src/zcl_my_app.clas.abap', spellcheck: 'false', 'aria-label': 'URL of the class' });
+  const url = h('input', {
+    placeholder: 'https://raw.githubusercontent.com/owner/repo/main/src/zcl_my_app.clas.abap', spellcheck: 'false', 'aria-label': 'URL of the class',
+    onkeydown: (e) => { if (e.key === 'Enter' && url.value.trim() && !ta.value.trim()) { e.preventDefault(); $('#dlg').close(); fetchClass(url.value.trim()); } },
+  });
   dialog('Open an abap2UI5 app class', h('div', {},
     h('p', { class: 'hint', text: 'Paste the class, open a .clas.abap file, or give its URL on GitHub. Its view becomes the design, its public attributes the data, its events the event names - and the class keeps everything else: the export writes the view back into it.' }),
     ta,
@@ -145,13 +158,11 @@ export function openClassDialog() {
         const text = ta.value.trim();
         if (!text && url.value.trim()) { $('#dlg').close(); fetchClass(url.value.trim()); return false; }
         try {
-          $('#dlg').close(); // the import opens its summary in the same dialog
-          importClassText(text);
-          return false;
+          importClassText(text, () => $('#dlg').close());
         } catch (err) {
           toast(err.message);
-          return false;
         }
+        return false; // closed above - the summary may be open now
       },
     },
   ]);
@@ -177,6 +188,7 @@ export function openClassFromUrl(params) {
 async function fetchClass(raw) {
   try {
     const href = sourceUrl(raw, location.href);
+    toast(`Opening ${href.split('/').pop()}…`);
     const res = await fetch(href, { signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw new Error(`${href} answered ${res.status}`);
     const text = await res.text();
@@ -187,9 +199,10 @@ async function fetchClass(raw) {
   }
 }
 
-function importClassText(text) {
+function importClassText(text, before) {
   if (!text) throw new Error('Nothing to open');
   const d = fromClass(text, clone(state.design));
+  if (before) before();
   replaceDesign(d);
   const r = classReport();
   const lines = [];
@@ -250,13 +263,17 @@ export function openFile(accept) {
     if (!f) return;
     const text = await f.text();
     try {
-      if (/\.xml$/i.test(f.name) || /^\s*</.test(text)) {
+      // a design is JSON - checked first: its indented lines start with a
+      // quote, which would read as an ABAP comment
+      if (/\.json$/i.test(f.name) || /^\s*\{/.test(text)) {
+        replaceDesign(normalizeDesign(JSON.parse(text)));
+        toast(`Opened ${f.name}`);
+      } else if (/\.xml$/i.test(f.name) || /^\s*</.test(text)) {
         importXmlText(text);
       } else if (/\.abap$/i.test(f.name) || /^\s*(?:"|\*|CLASS\b)/im.test(text)) {
         importClassText(text);
       } else {
-        replaceDesign(normalizeDesign(JSON.parse(text)));
-        toast(`Opened ${f.name}`);
+        throw new Error('not a design (.json), a view (.xml) or a class (.abap)');
       }
     } catch (err) {
       toast(`Cannot open ${f.name}: ${err.message}`);

@@ -38,8 +38,12 @@ export function releaseOf(design) {
 // literal pieces around the constants of cl_abap_char_utilities on 7.02
 const CHAR_CONST = { '\r\n': 'cl_abap_char_utilities=>cr_lf', '\n': 'cl_abap_char_utilities=>newline', '\r': 'cl_abap_char_utilities=>cr_lf(1)', '\t': 'cl_abap_char_utilities=>horizontal_tab' };
 
+// the control characters XML 1.0 forbids: abap2UI5 drops them on the way
+// to the browser, and in a source they are invisible - never written
+const CONTROLS_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g;
+
 export function abapString(s, release) {
-  const str = String(s ?? '');
+  const str = String(s ?? '').replace(CONTROLS_RE, '');
   if (/[\n\r\t]/.test(str)) {
     if (release === '702') return abapStringPieces(str, Infinity, release).join(' && ');
     return `|${str.replace(/[\\|{}]/g, '\\$&').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}|`;
@@ -49,14 +53,23 @@ export function abapString(s, release) {
 
 // a long literal split into pieces joined with &&, so no line passes 255
 function abapStringPieces(s, width, release) {
-  const str = String(s ?? '');
+  const str = String(s ?? '').replace(CONTROLS_RE, '');
   if (/[\n\r\t]/.test(str)) {
     if (release !== '702') return templatePieces(str, width);
     return str.split(/(\r\n|[\n\r\t])/).filter(Boolean).flatMap((part) => (CHAR_CONST[part] ? [CHAR_CONST[part]] : abapStringPieces(part, width)));
   }
-  if (str.length <= width) return [abapString(str)];
+  // the width counts as written: a backtick is doubled in the literal
+  const cost = (ch) => (ch === '`' ? 2 : 1);
+  if (str.length <= width / 2 || [...str].reduce((n, ch) => n + cost(ch), 0) <= width) return [abapString(str)];
   const parts = [];
-  for (let i = 0; i < str.length; i += width) parts.push(abapString(str.slice(i, i + width)));
+  let cur = '';
+  let len = 0;
+  for (const ch of str) {
+    if (cur && len + cost(ch) > width) { parts.push(abapString(cur)); cur = ''; len = 0; }
+    cur += ch;
+    len += cost(ch);
+  }
+  if (cur) parts.push(abapString(cur));
   return parts;
 }
 
@@ -129,9 +142,11 @@ export function abapValue(type, v, release) {
       return Number.isFinite(n) && n !== 0 ? String(n) : null;
     }
     case 'decimal': {
+      // every number the field takes - .5 and 1e3 too - as ABAP writes it
       const t = String(v).trim();
-      if (!/^-?\d+(\.\d+)?$/.test(t) || Number(t) === 0) return null;
-      return `'${t}'`;
+      const n = Number(t);
+      if (t === '' || !Number.isFinite(n) || n === 0) return null;
+      return /^-?\d+(\.\d+)?$/.test(t) ? `'${t}'` : `'${n.toFixed(2)}'`;
     }
     case 'bool': return v === true || v === 'true' || v === 'X' ? 'abap_true' : null;
     case 'date': {

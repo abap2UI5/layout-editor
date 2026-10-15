@@ -9,10 +9,20 @@ sap.ui.define([
 ], function (XMLView, Controller, JSONModel, MessageToast) {
   'use strict';
 
-  // two view ids in turn: the next view is created while the current one
-  // is still on screen, so a re-render does not flicker - and two views
-  // cannot share an id
+  // a new view id per view, never one used before: the next view is
+  // created while the current one is still on screen, so a re-render does
+  // not flicker - and a view whose destruction left controls behind (a
+  // SimpleForm that failed to render keeps its labels registered) can never
+  // collide with a later one
   var viewSeq = 0;
+  function nextViewId() {
+    viewSeq += 1;
+    return 'dsg' + viewSeq;
+  }
+  function destroyView(v) {
+    if (!v) return;
+    try { v.destroy(); } catch (e) { /* half built - gone either way */ }
+  }
   var view = null;
   var pending = null;
   var rendering = false;
@@ -47,7 +57,7 @@ sap.ui.define([
   // carry their template's id first (dsg0--<cell>-dsg0--<list>-0)
   function nodeIdOf(el) {
     while (el && el !== document.body) {
-      var m = el.id && /(?:^|-)dsg\d--(n[0-9a-z]+)/.exec(el.id);
+      var m = el.id && /(?:^|-)dsg\d+--(n[0-9a-z]+)/.exec(el.id);
       if (m) return m[1];
       el = el.parentElement;
     }
@@ -134,7 +144,6 @@ sap.ui.define([
       return;
     }
     rendering = true;
-    viewSeq += 1;
     var seq = ++renderSeq;
     var done = false;
     function finish() {
@@ -157,18 +166,19 @@ sap.ui.define([
       }
     }, RENDER_TIMEOUT);
     var promise;
+    var id = nextViewId();
     try {
-      promise = XMLView.create({ id: 'dsg' + (viewSeq % 2), definition: msg.xml, controller: new PreviewController() });
+      promise = XMLView.create({ id: id, definition: msg.xml, controller: new PreviewController() });
     } catch (err) {
       fail('The view does not render', err);
       finish();
       return;
     }
     promise.then(function (v) {
-      if (done) { v.destroy(); return; } // timed out meanwhile: the next render owns the canvas
+      if (done) { destroyView(v); return; } // timed out meanwhile: the next render owns the canvas
       try {
         v.setModel(new JSONModel(msg.model));
-        if (view) view.destroy();
+        destroyView(view);
         view = v;
         lastXml = msg.xml;
         v.placeAt('content');
@@ -178,7 +188,10 @@ sap.ui.define([
       } catch (err) {
         // the old view is gone or half replaced: say so, the next edit
         // renders anew
-        view = null;
+        // the new view goes; the old one, when it is still the one on
+        // screen, stays the current view
+        destroyView(v);
+        if (view === v || (view && view.bIsDestroyed)) view = null;
         lastXml = null;
         fail('The view does not render', err);
       }
@@ -220,6 +233,9 @@ sap.ui.define([
   window.addEventListener('message', function (e) {
     var msg = e.data || {};
     if (msg.target !== 'dsg-preview') return;
+    // only the editor that frames this page: a view's XML can carry script
+    // (core:HTML), which another page must not get to run on this origin
+    if (e.source !== window.parent || (location.origin !== 'null' && e.origin !== location.origin)) return;
     if (msg.type === 'describe') {
       describe(msg);
     } else if (msg.type === 'render') {

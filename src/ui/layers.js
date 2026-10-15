@@ -16,7 +16,7 @@ export function renderLayers() {
     const isRoot = node.id === 'root';
     const kids = canHaveChildren(node) && aggNames(node).some((a) => (node.aggs[a] || []).length);
     const collapsed = state.collapsed.has(node.id);
-    const bound = Object.values(node.props || {}).some((v) => v && v.m === 'b');
+    const bound = Object.values(node.props || {}).some((v) => v && (v.m === 'b' || v.m === 'f'));
     const lbl = isRoot ? '' : nodeLabel(node);
     const el = h('div', {
       class: `lrow${state.selected === node.id ? ' sel' : ''}`,
@@ -65,7 +65,7 @@ export function renderLayers() {
         const binding = node.props[a];
         const aggRow = h('div', { class: 'lrow agg', style: `padding-left:${18 + (depth + 1) * 14}px`, 'data-agg': a },
           h('span', { class: 'lagg', text: a }),
-          binding && binding.m === 'b' ? h('span', { class: 'lmeta', text: `@${binding.v}` }) : null);
+          binding && (binding.m === 'b' || binding.m === 'f') && binding.v ? h('span', { class: 'lmeta', text: `${binding.m === 'b' ? '@' : '#'}${binding.v}` }) : null);
         wireAggDrop(aggRow, node, a);
         box.append(aggRow);
         childDepth = depth + 2;

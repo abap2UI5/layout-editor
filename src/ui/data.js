@@ -91,8 +91,17 @@ function attrCard(a, idx) {
             'aria-label': 'Field type',
             onchange: (e) => commit((dd) => {
               const fld = fieldsAt(dd.attributes[idx], fieldPath)[fi];
+              const was = fld.type;
               fld.type = e.target.value;
               if (fld.type === 'table') { fld.fields = fld.fields && fld.fields.length ? fld.fields : [{ name: 'TEXT', type: 'string' }]; } else delete fld.fields;
+              // the sample rows follow: a table field holds rows, a scalar
+              // field a value - a value left of the other kind would reach
+              // the class and the canvas as it is
+              if ((was === 'table') !== (fld.type === 'table')) {
+                for (const r of rowsOfLevel(dd.attributes[idx].rows, fieldPath)) {
+                  if (fld.type === 'table') r[fld.name] = []; else delete r[fld.name];
+                }
+              }
             }),
           }, options(ATTRIBUTE_TYPES, f.type)),
           h('button', { class: 'icon danger', 'aria-label': 'Delete field', title: 'Delete field', onclick: () => commit((dd) => { fieldsAt(dd.attributes[idx], fieldPath).splice(fi, 1); }) }, '✕')));
@@ -130,6 +139,12 @@ function attrCard(a, idx) {
       h('button', { style: 'margin-top:6px', onclick: () => commit((dd) => { (dd.attributes[idx].rows = dd.attributes[idx].rows || []).push({}); }) }, '+ Row'));
   }
   return card;
+}
+
+// every row at the depth of a list of fields: the rows of the table, or
+// of the table field `fieldPath` down, in every row above it
+function rowsOfLevel(rows, fieldPath) {
+  return fieldPath.reduce((level, name) => level.flatMap((r) => (Array.isArray(r[name]) ? r[name] : [])), rows || []);
 }
 
 // rename a field - of the table, or of a table field `fieldPath` down -

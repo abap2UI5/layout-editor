@@ -3,11 +3,11 @@
 import { CONTROLS, DESCRIPTIONS, getControl, splitType, NAMESPACES } from '../catalog.js';
 import {
   createNode, findNode, insertNode, aggAccepts, rowContext, bindableAggs, bindListToTable, hasOwnTemplate, unbindList,
-  attributeFits, checkAttributeName, checkEventName,
+  attributeFits, checkAttributeName, checkEventName, checkStatic,
 } from '../model.js';
 import { state, commit } from './store.js';
 import { $, h, options, toast, displayType, rememberFocus, restoreFocus } from './dom.js';
-import { newTableAttribute } from './edit.js';
+import { newTableAttribute, offerRows } from './edit.js';
 
 const KINDS = { s: 'Aa', b: '@', f: '#', x: 'ƒx' };
 
@@ -69,7 +69,7 @@ export function renderInspector() {
           'aria-label': `Bind ${agg} to a table`,
           onchange: (e) => {
             const v = e.target.value;
-            const replace = !v || !hasOwnTemplate(node, agg)
+            const replace = !v || !hasOwnTemplate(node, agg, d)
               || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of ${v}?\n\nCancel keeps them and only sets the binding.`);
             commit((dd) => {
               if (v.startsWith('#')) bindListToTable(dd, node.id, agg, v.slice(1), replace, true);
@@ -103,17 +103,22 @@ export function renderInspector() {
   // as text, written to the class as it is, and removable
   const extras = Object.keys(node.props).filter((p) => !(c && c.props && c.props[p])).map((p) => [p, { type: 'string' }]).filter(visible);
   if (extras.length || !c) {
-    const inp = h('input', { placeholder: 'add property…', spellcheck: 'false', 'aria-label': 'Property name' });
+    const addProp = () => {
+      const n = inp.value.trim();
+      if (!/^[a-zA-Z][\w]*$/.test(n)) { inp.classList.add('invalid'); toast('A property name: a letter, then letters, digits or _'); return; }
+      if (node.props[n] || (c && c.props && c.props[n])) { toast(`${n} is there already`); return; }
+      commit((dd) => { findNode(dd.root, node.id).node.props[n] = { m: 's', v: '' }; });
+    };
+    const inp = h('input', {
+      placeholder: 'add property…', spellcheck: 'false', 'aria-label': 'Property name',
+      onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); addProp(); } },
+      oninput: (e) => e.target.classList.remove('invalid'),
+    });
     box.append(group(c ? 'Imported' : 'Properties', h('div', {},
       c ? h('p', { class: 'hint', text: 'Not in the palette - written to the class as it is.' }) : null,
       extras.map(([p, def]) => h('div', { class: 'extra' }, propRow(node, p, def, ctx),
         h('button', { class: 'icon danger', title: `Remove ${p}`, 'aria-label': `Remove ${p}`, onclick: () => commit((dd) => { delete findNode(dd.root, node.id).node.props[p]; }) }, '✕'))),
-      !q && !state.inspector.onlySet ? h('div', { class: 'add-row' }, inp, h('button', {
-        onclick: () => {
-          const n = inp.value.trim();
-          if (/^[a-zA-Z][\w]*$/.test(n)) commit((dd) => { findNode(dd.root, node.id).node.props[n] = { m: 's', v: '' }; });
-        },
-      }, 'Add')) : null)));
+      !q && !state.inspector.onlySet ? h('div', { class: 'add-row' }, inp, h('button', { onclick: addProp }, 'Add')) : null)));
   }
 
   // events
@@ -134,7 +139,13 @@ export function renderInspector() {
       if (!allowed.length) continue;
       const sel = h('select', {
         'aria-label': `Add to ${agg}`,
-        onchange: () => { if (sel.value) commit((dd) => insertNode(dd, createNode(sel.value), node.id, agg)); },
+        onchange: () => {
+          if (!sel.value) return;
+          let id = null;
+          commit((dd) => { id = insertNode(dd, createNode(sel.value), node.id, agg); return id; });
+          // a list or a table added here gets the offer of its rows too
+          if (id) offerRows(id);
+        },
       }, h('option', { value: '', text: `+ add to ${agg}…` }), options(allowed, null, Object.fromEntries(allowed.map((t) => [t, displayType(t)]))));
       rows.push(h('div', { class: 'add-row' }, sel));
     }
@@ -162,20 +173,29 @@ function eventRow(node, ev) {
     'data-focus': `ev-${ev}`,
     oninput: (e) => {
       const v = e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+      // the field shows what the class gets, the caret stays where it was
+      if (e.target.value !== v) {
+        const at = e.target.selectionStart;
+        e.target.value = v;
+        try { e.target.setSelectionRange(at, at); } catch { /* not focused */ }
+      }
       e.target.classList.toggle('invalid', !!v && !!checkEventName(v));
       commit((dd) => {
         const n = findNode(dd.root, node.id).node;
         if (v) n.events[ev] = v; else delete n.events[ev];
       }, { mergeKey: `ev:${node.id}:${ev}`, keepFocus: true });
     },
-    onfocus: (e) => {
-      if (!e.target.value) {
-        e.target.value = e.target.placeholder;
-        e.target.dispatchEvent(new Event('input'));
-        e.target.select();
-      }
-    },
+    // the suggestion is taken by a click into the empty field, or by Enter
+    // - never by the focus alone: tabbing through the events would name
+    // every one of them
+    onclick: (e) => { if (!e.target.value) take(e.target); },
+    onkeydown: (e) => { if (e.key === 'Enter' && !e.target.value) { e.preventDefault(); take(e.target); } },
   });
+  const take = (el) => {
+    el.value = el.placeholder;
+    el.dispatchEvent(new Event('input'));
+    el.select();
+  };
   return h('div', { class: 'event' }, h('label', { text: ev }), inp);
 }
 
@@ -187,9 +207,13 @@ function suggestEvent(node, ev) {
 }
 
 function newTableFor(node, agg) {
+  // a template built by hand stays unless the user lets it go - as when
+  // the rows are bound to a table that is there
+  const replace = !hasOwnTemplate(node, agg, state.design)
+    || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of the new table?\n\nCancel keeps them and only sets the binding.`);
   commit((d) => {
     const name = newTableAttribute(d, node.type === 'Tree');
-    bindListToTable(d, node.id, agg, name);
+    bindListToTable(d, node.id, agg, name, replace);
     return node.id;
   });
   toast('Table attribute created - edit it on the Data tab');
@@ -200,6 +224,16 @@ function attrTypeFor(def) {
   if (def.type === 'int') return 'int';
   if (def.type === 'float') return 'decimal';
   return 'string';
+}
+
+// a value as the UI5 expression that says the same: a binding keeps its
+// path, so switching to ƒx is a start to edit, not a blank
+function asExpression(value) {
+  if (!value || !value.v) return '';
+  if (value.m === 's') return value.v;
+  if (value.m === 'b') return value.arr ? `{path:'/${value.v.toUpperCase()}',parameters:{arrayNames:['${value.arr}']}}` : `{/${value.v.toUpperCase()}}`;
+  if (value.m === 'f') return `{${value.v}}`;
+  return value.v;
 }
 
 function propRow(node, p, def, ctx) {
@@ -221,7 +255,7 @@ function propRow(node, p, def, ctx) {
         const fits = d.attributes.filter((a) => attributeFits(def, a.type));
         n.props[p] = { m: 'b', v: fits[0] ? fits[0].name : '' };
       } else if (mm === 'f') n.props[p] = { m: 'f', v: ctx && ctx.fields[0] ? ctx.fields[0].name : '' };
-      else n.props[p] = { m: 'x', v: value && value.m === 's' ? value.v : '' };
+      else n.props[p] = { m: 'x', v: asExpression(value) };
     }),
   }, options(Object.keys(kinds), m, kinds));
 
@@ -236,13 +270,22 @@ function propRow(node, p, def, ctx) {
         onchange: (e) => update((n) => { if (e.target.value) n.props[p] = { m: 's', v: e.target.value }; else delete n.props[p]; }),
       }, h('option', { value: '', text: '— default —' }), options(vals, v));
     } else {
+      const bad = checkStatic(def, v);
       editor = h('input', {
         value: v,
+        class: bad ? 'invalid' : null,
+        title: bad || null,
         'aria-label': p,
         'data-focus': focusKey,
         spellcheck: def.type === 'string' ? 'true' : 'false',
         placeholder: def.hint || (def.type === 'cssSize' ? 'e.g. 10rem' : def.type === 'icon' ? 'sap-icon://…' : ''),
-        oninput: (e) => update((n) => { if (e.target.value !== '') n.props[p] = { m: 's', v: e.target.value }; else delete n.props[p]; }, { mergeKey: `p:${node.id}:${p}`, keepFocus: true }),
+        oninput: (e) => {
+          // a value UI5 would refuse shows as one while it is typed
+          const w = checkStatic(def, e.target.value);
+          e.target.classList.toggle('invalid', !!w);
+          e.target.title = w || '';
+          update((n) => { if (e.target.value !== '') n.props[p] = { m: 's', v: e.target.value }; else delete n.props[p]; }, { mergeKey: `p:${node.id}:${p}`, keepFocus: true });
+        },
       });
     }
   } else if (m === 'b') {

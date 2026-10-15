@@ -119,8 +119,8 @@ Also in the editor:
 - **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z, **Delete** or **Backspace**
   removes the selection, **Ctrl+D** duplicates it, **Ctrl+C / Ctrl+X /
   Ctrl+V** copy, cut and paste it (also into another design or tab),
-  **Alt+↑** selects the parent, **Escape** the view. In the outline the
-  arrow keys walk the tree.
+  **Alt+↑** selects the parent, **Escape** the view, **Ctrl+S** saves the
+  design. In the outline the arrow keys walk the tree.
 - A drop on the canvas lands before, into or after the control under the
   pointer: the upper quarter is before, the lower after. The panels on the
   left and right can be dragged wider.

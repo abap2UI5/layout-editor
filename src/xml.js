@@ -8,10 +8,16 @@
 // routes every event to one handler that shows the event name.
 
 import { NAMESPACES, CONTROLS, getControl, splitType, dropAggOf } from './catalog.js';
-import { aggNames, newId, walk, isDirectAgg } from './model.js';
+import { aggNames, newId, isDirectAgg } from './model.js';
 
+// as z2ui5_cl_ui5_util_context=>c_escape_xml( ) escapes: a line break or
+// a tab as a character reference - written as it is, XML attribute-value
+// normalization turns it into a space, and the canvas would show one line
+// where the app shows two; the control characters XML 1.0 forbids dropped
 export function escapeXml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/\n/g, '&#xA;').replace(/\r/g, '&#xD;').replace(/\t/g, '&#x9;')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
 
 // literal text must not be read as a binding: UI5 parses `{` in every
@@ -43,9 +49,15 @@ export function valueToXml(value, opts) {
 }
 
 // every prefix the design uses, so the View declares exactly those
+// - in the order the view writes its controls, so the same view always
+// declares them in the same order, however it was built
 export function usedNamespaces(design) {
   const used = new Set(['', 'mvc']);
-  walk(design.root, (n) => { used.add(splitType(n.type).ns); });
+  const visit = (n) => {
+    used.add(splitType(n.type).ns);
+    for (const a of aggNames(n)) for (const ch of n.aggs[a] || []) visit(ch);
+  };
+  visit(design.root);
   return [...used].filter((ns) => ns in NAMESPACES || (design.namespaces && ns in design.namespaces));
 }
 
@@ -125,6 +137,7 @@ export function parseXml(src) {
     if (src.startsWith('<?', lt) || src.startsWith('<!', lt)) { i = end(src.indexOf('>', lt), 1); continue; }
     if (src[lt + 1] === '/') {
       const gt = src.indexOf('>', lt);
+      if (gt < 0) throw new Error(`XML: unterminated closing tag at ${lt}`);
       const name = src.slice(lt + 2, gt).trim();
       const top = stack.pop();
       if (!top || top.name !== name) throw new Error(`XML: </${name}> does not close <${top ? top.name : '?'}>`);
@@ -149,6 +162,7 @@ export function parseXml(src) {
     i = j;
   }
   if (stack.length !== 1) throw new Error(`XML: <${stack[stack.length - 1].name}> is not closed`);
+  if (root.children.length > 1) throw new Error(`XML: more than one root element (<${root.children[0].name}>, <${root.children[1].name}>)`);
   return root.children[0];
 
   function end(pos, len) {

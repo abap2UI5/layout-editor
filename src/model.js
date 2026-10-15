@@ -75,7 +75,23 @@ export function normalizeDesign(d) {
   d.description = String(d.description || '');
   // the ABAP release of the class: 7.02, or nothing for 7.40 and later
   if (d.release === '702') d.release = '702'; else delete d.release;
-  d.attributes = Array.isArray(d.attributes) ? d.attributes : [];
+  d.attributes = (Array.isArray(d.attributes) ? d.attributes : []).filter((a) => a && typeof a === 'object');
+  // the shape the panels and the generator rely on: a name and a type, a
+  // table with fields and rows (a table field with fields of its own)
+  const fieldsOf = (list) => (Array.isArray(list) ? list : []).filter((f) => f && typeof f === 'object').map((f) => {
+    f.name = String(f.name || '');
+    if (!ATTRIBUTE_TYPES.includes(f.type)) f.type = 'string';
+    if (f.type === 'table') f.fields = fieldsOf(f.fields);
+    return f;
+  });
+  for (const a of d.attributes) {
+    a.name = String(a.name || '');
+    if (!ATTRIBUTE_TYPES.includes(a.type)) a.type = 'string';
+    if (a.type === 'table') {
+      a.fields = fieldsOf(a.fields);
+      a.rows = Array.isArray(a.rows) ? a.rows.filter((r) => r && typeof r === 'object') : [];
+    }
+  }
   d.root.id = 'root';
   d.root.type = 'mvc:View';
   const seen = new Set(['root']);
@@ -340,55 +356,61 @@ export function bindListToTable(design, nodeId, agg, attrName, replace = true, v
   }
   if (!hit || !attr || attr.type !== 'table') return;
   const node = hit.node;
-  const all = attr.fields && attr.fields.length ? attr.fields : [{ name: 'TEXT', type: 'string' }];
   // the scalar fields make the template; a table field is what a tree
-  // descends into
-  const fields = all.filter((x) => x.type !== 'table').length ? all.filter((x) => x.type !== 'table') : all;
-  const f = (i) => ({ m: 'f', v: (fields[i] || fields[0]).name });
+  // descends into, never the text of a cell. A table of table fields only
+  // gets a template with the catalogue's static texts, to bind by hand
+  const fields = (attr.fields || []).filter((x) => x.type !== 'table');
+  const f = (i) => (fields.length ? { m: 'f', v: (fields[i] || fields[0]).name } : undefined);
+  // the columns of a table: one per scalar field, or one of static text
+  const cols = fields.length ? fields : [{ name: 'ITEM', type: 'string', fixed: true }];
   node.props[agg] = viaField ? { m: 'f', v: attr.name } : { m: 'b', v: attr.name };
   if (node.type === 'Tree' && childrenField(attr)) node.props[agg].arr = childrenField(attr);
   if (!replace) return;
   if (node.type === 'Tree') {
     const item = createNode('StandardTreeItem');
-    item.props.title = f(0);
+    if (fields.length) item.props.title = f(0); else item.props.title = { m: 's', v: 'Node' };
     node.aggs.items = [item];
   } else if (node.type === 'Table') {
-    node.aggs.columns = fields.map((fld) => {
+    node.aggs.columns = cols.map((fld) => {
       const col = createNode('Column');
       col.aggs.header = [createNode('Text', { props: { text: label(fld.name) } })];
       return col;
     });
     const row = createNode('ColumnListItem');
-    row.aggs.cells = fields.map((fld) => {
+    row.aggs.cells = cols.map((fld) => {
       const cell = createNode(fld.type === 'bool' ? 'CheckBox' : 'Text');
       delete cell.props.text;
       if (fld.type === 'bool') {
         cell.props.selected = { m: 'f', v: fld.name };
         cell.props.editable = { m: 's', v: 'false' };
       } else {
-        cell.props.text = { m: 'f', v: fld.name };
+        cell.props.text = fld.fixed ? { m: 's', v: 'Item' } : { m: 'f', v: fld.name };
       }
       return cell;
     });
     node.aggs.items = [row];
   } else if (node.type === 'List') {
     const item = createNode('StandardListItem');
-    item.props.title = f(0);
+    item.props.title = fields.length ? f(0) : { m: 's', v: 'Item' };
     if (fields[1]) item.props.description = f(1);
     if (fields[2]) item.props.info = f(2);
     node.aggs.items = [item];
   } else if (node.type === 'Select' || node.type === 'ComboBox') {
     const item = createNode('core:Item');
-    item.props.key = f(0);
-    item.props.text = fields[1] ? f(1) : f(0);
+    if (fields.length) {
+      item.props.key = f(0);
+      item.props.text = fields[1] ? f(1) : f(0);
+    }
     node.aggs.items = [item];
   } else if (node.type === 'SegmentedButton') {
     const item = createNode('SegmentedButtonItem');
-    item.props.key = f(0);
-    item.props.text = fields[1] ? f(1) : f(0);
+    if (fields.length) {
+      item.props.key = f(0);
+      item.props.text = fields[1] ? f(1) : f(0);
+    }
     node.aggs.items = [item];
   } else if (node.type === 'table:Table') {
-    node.aggs.columns = fields.map((fld) => {
+    node.aggs.columns = cols.map((fld) => {
       const col = createNode('table:Column', { props: { label: label(fld.name) }, aggs: {} });
       const cell = createNode(fld.type === 'bool' ? 'CheckBox' : 'Text');
       delete cell.props.text;
@@ -396,7 +418,7 @@ export function bindListToTable(design, nodeId, agg, attrName, replace = true, v
         cell.props.selected = { m: 'f', v: fld.name };
         cell.props.editable = { m: 's', v: 'false' };
       } else {
-        cell.props.text = { m: 'f', v: fld.name };
+        cell.props.text = fld.fixed ? { m: 's', v: 'Item' } : { m: 'f', v: fld.name };
       }
       col.aggs.template = [cell];
       return col;
@@ -406,17 +428,30 @@ export function bindListToTable(design, nodeId, agg, attrName, replace = true, v
 
 // Is the content of a list's aggregation still what the catalogue starts
 // it with - or what binding it to a table generated? Then binding it anew
-// may replace it without asking
-export function hasOwnTemplate(node, agg) {
-  const items = node.aggs[agg] || [];
-  if (!items.length) return false;
-  const c = getControl(node.type);
-  const init = (c && c.init && c.init.aggs && c.init.aggs[agg]) || [];
-  const same = (n, spec) => n.type === spec.type
-    && Object.entries(spec.props || {}).every(([k, v]) => n.props[k] && n.props[k].m === 's' && n.props[k].v === v)
-    && Object.keys(n.props).every((k) => (spec.props || {})[k] !== undefined || n.props[k].m === 'f');
-  if (items.length === init.length && items.every((n, i) => same(n, init[i]))) return false;
+// may replace it without asking. A table's columns count too: binding
+// replaces them with the rows' template (a grid table keeps its template
+// in the columns alone). `design`: to recognise what the current binding
+// generated
+const REPLACED = { Table: ['columns', 'items'], 'table:Table': ['columns'] };
+
+export function hasOwnTemplate(node, agg, design) {
+  const aggs = REPLACED[node.type] || [agg];
+  if (aggs.every((a) => !(node.aggs[a] || []).length)) return false;
+  const shape = (n, a) => JSON.stringify(n.aggs[a] || [], (k, v) => (k === 'id' ? undefined : v));
+  const sameAs = (other) => aggs.every((a) => shape(node, a) === shape(other, a));
+  // the catalogue's start
+  if (sameAs(createNode(node.type))) return false;
+  // what binding to the table it is bound to generates
+  const b = node.props[agg];
+  if (design && b && (b.m === 'b' || b.m === 'f')) {
+    const copy = clone(design);
+    bindListToTable(copy, node.id, agg, b.v, true, b.m === 'f');
+    const regenerated = findNode(copy.root, node.id);
+    if (regenerated && sameAs(regenerated.node)) return false;
+  }
+  if (REPLACED[node.type]) return true;
   // one template whose values are all fields: generated by a binding
+  const items = node.aggs[agg] || [];
   const generated = (n) => Object.values(n.props).every((v) => v.m === 'f' || (v.m === 's' && v.v === 'false'))
     && Object.values(n.aggs).flat().every(generated);
   return !(items.length === 1 && generated(items[0]));
@@ -441,25 +476,44 @@ export function collectEvents(design) {
   return out;
 }
 
-// Where an attribute is used, so the data panel can refuse to delete a
-// bound one silently
+// the path of an attribute in a UI5 expression: /NAME, as abap2UI5 sends
+// it - {/NAME}, {= ${/NAME} }, {path:'/NAME'}
+function pathPattern(name) {
+  return new RegExp(`([{'"$:\\s])/${name.replace(/[^\w]/g, '')}(?![\\w/])`, 'gi');
+}
+
+// Where an attribute is used - bound, or named in an expression - so the
+// data panel can refuse to delete a used one silently
 export function attributeUsage(design, name) {
   let count = 0;
+  const re = pathPattern(name);
   walk(design.root, (n) => {
-    for (const v of Object.values(n.props || {})) if (v && v.m === 'b' && v.v === name) count += 1;
+    for (const v of Object.values(n.props || {})) {
+      if (v && v.m === 'b' && v.v === name) count += 1;
+      else if (v && v.m === 'x' && typeof v.v === 'string' && v.v.match(re)) count += 1;
+    }
   });
   return count;
 }
 
+// a renamed attribute: its bindings follow, and so do the expressions
+// that name its path
 export function renameAttribute(design, from, to) {
+  const re = pathPattern(from);
   walk(design.root, (n) => {
-    for (const v of Object.values(n.props || {})) if (v && v.m === 'b' && v.v === from) v.v = to;
+    for (const v of Object.values(n.props || {})) {
+      if (v && v.m === 'b' && v.v === from) v.v = to;
+      else if (v && v.m === 'x' && typeof v.v === 'string') v.v = v.v.replace(re, `$1/${to.toUpperCase()}`);
+    }
   });
 }
 
 // ------------------------------------------------------------- validation
 
-const ABAP_RESERVED = new Set(['client', 'view', 'me', 'result', 'super', 'data', 'type', 'table', 'value', 'line', 'index']);
+// the names the generated class uses itself - its methods included: an
+// attribute on_event would clash with the method of that name
+const ABAP_RESERVED = new Set(['client', 'view', 'me', 'result', 'super', 'data', 'type', 'table', 'value', 'line', 'index',
+  'view_display', 'on_event', 'model_init', 'main', 'z2ui5_if_app']);
 
 export function checkClassName(name) {
   if (!name) return 'Class name is empty';
@@ -536,15 +590,24 @@ export function validate(design) {
     }
   }
   walk(design.root, (n, parent, agg) => {
+    const nodeDef = getControl(n.type);
     for (const [p, v] of Object.entries(n.props || {})) {
       if (!v) continue;
+      if (v.m === 's') {
+        const pd = nodeDef && nodeDef.props && nodeDef.props[p];
+        const w = checkStatic(pd, v.v);
+        // a number or an enum value UI5 cannot parse fails the view; a size
+        // or a flag it logs and replaces by the default
+        if (w) issues.push({ level: ['int', 'float', 'enum'].includes(pd.type) ? 'error' : 'warning', text: `${n.type}.${p}: ${w}`, node: n.id });
+      }
       if (v.m === 'b' && !names.has(v.v)) issues.push({ level: 'error', text: `${n.type}.${p} is bound to ${v.v}, which is not an attribute`, node: n.id });
       else if (v.m === 'b') {
         const attr = attrByName.get(v.v);
         const isAgg = bindableAggs(n).includes(p);
         if (isAgg && attr.type !== 'table') issues.push({ level: 'error', text: `${n.type}.${p} repeats the rows of ${v.v}, which is not a table`, node: n.id });
         if (!isAgg && attr.type === 'table') issues.push({ level: 'error', text: `${n.type}.${p} is bound to the table ${v.v} - a property takes a single value`, node: n.id });
-        const def = CONTROLS[n.type] && CONTROLS[n.type].props && CONTROLS[n.type].props[p];
+        const nc = getControl(n.type);
+        const def = nc && nc.props && nc.props[p];
         if (def && !isAgg && !attributeFits(def, attr.type)) issues.push({ level: 'warning', text: `${n.type}.${p} is ${def.type}, ${v.v} is ${attr.type}`, node: n.id });
       }
       if (v.m === 'f') {
@@ -575,7 +638,7 @@ export function validate(design) {
         if (ctx && !(ctx.fields || []).some((f) => f.name === b.arr && f.type === 'table')) issues.push({ level: 'error', text: `${n.type}.${a}: ${b.v} has no table field ${b.arr} to take the children from`, node: n.id });
       }
     }
-    const c = CONTROLS[n.type];
+    const c = getControl(n.type);
     if (c && c.input && !rowContext(design, n.id)) {
       const v = n.props[c.input];
       const wired = (v && (v.m === 'b' || v.m === 'x')) || Object.values(n.events || {}).some(Boolean);
@@ -596,12 +659,31 @@ export function checkValue(type, v) {
   if (v === '' || v == null) return null;
   const t = String(v).trim();
   if (type === 'decimal') {
-    if (!/^-?\d+(\.\d+)?$/.test(t)) return `"${t}" is not a number`;
-    if ((t.split('.')[1] || '').length > 2) return `"${t}" has more than 2 decimals - the class rounds it`;
+    if (!Number.isFinite(Number(t))) return `"${t}" is not a number`;
+    if (/^-?\d*\.\d{3,}$/.test(t) || (/e/i.test(t) && Number(t) !== Math.round(Number(t) * 100) / 100)) return `"${t}" has more than 2 decimals - the class rounds it`;
   }
   if (type === 'int' && !/^-?\d+$/.test(t)) return `"${t}" is not a whole number`;
   if (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(t)) return `"${t}" is not a date (yyyy-mm-dd)`;
   if (type === 'time' && !/^\d{2}:\d{2}:\d{2}$/.test(t)) return `"${t}" is not a time (hh:mm:ss)`;
+  if (type === 'time' && t === '00:00:00') return 'midnight is ABAP\'s initial time - the app gets no time, as if it were empty';
+  return null;
+}
+
+// sap.ui.core.CSSSize as UI5 1.71 checks it (sap/ui/core/library.js)
+const CSS_UNIT = '([rR][eE][mM]|[eE][mM]|[eE][xX]|[pP][xX]|[cC][mM]|[mM][mM]|[iI][nN]|[pP][tT]|[pP][cC]|[vV][wW]|[vV][hH]|[vV][mM][iI][nN]|[vV][mM][aA][xX]|%)';
+const CSS_NUM = '([0-9]+|[0-9]*\\.[0-9]+)';
+const CSS_SIZE = new RegExp(`^(auto|inherit|[-+]?(0*|${CSS_NUM}${CSS_UNIT})|calc\\(\\s*(\\(\\s*)*[-+]?(${CSS_NUM}${CSS_UNIT}?)(\\s*(\\)\\s*)*(\\s[-+]\\s|[*\\/])\\s*(\\(\\s*)*([-+]?(${CSS_NUM}${CSS_UNIT}?)))*\\s*(\\)\\s*)*\\))$`);
+
+// A static value UI5 does not take for the type of its property - it logs
+// it, and the control falls back to its default: null when it fits
+export function checkStatic(def, v) {
+  if (!def || v === '' || v == null) return null;
+  const t = String(v);
+  if (def.type === 'int' && !/^[-+]?\d+$/.test(t)) return `"${t}" is not a whole number`;
+  if (def.type === 'float' && !/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(t)) return `"${t}" is not a number`;
+  if (def.type === 'boolean' && t !== 'true' && t !== 'false') return `"${t}" is not true or false`;
+  if (def.type === 'cssSize' && !CSS_SIZE.test(t)) return `"${t}" is not a CSS size - e.g. 10rem, 50%, 200px or auto`;
+  if (def.type === 'enum' && def.values && !def.values.includes(t)) return `"${t}" is not one of ${def.values.join(', ')}`;
   return null;
 }
 
@@ -660,8 +742,16 @@ function jsRows(fields, rows) {
 // decimal to 2 places and pads a time to seconds, so does the canvas
 function jsValue(type, v) {
   if (type === 'bool') return v === true || v === 'true' || v === 'X';
-  if (type === 'int') return v === '' || v == null ? 0 : parseInt(v, 10) || 0;
-  if (type === 'decimal') return v === '' || v == null ? 0 : Math.round((Number(v) || 0) * 100) / 100;
-  if (type === 'time' && /^\d{2}:\d{2}$/.test(String(v))) return `${v}:00`;
-  return v == null ? '' : String(v);
+  // + 0: a -0 is a 0, as abap2UI5 sends it
+  if (type === 'int') return v === '' || v == null ? 0 : (parseInt(v, 10) || 0) + 0;
+  if (type === 'decimal') return v === '' || v == null ? 0 : Math.round((Number(String(v).trim()) || 0) * 100) / 100 + 0;
+  // midnight is ABAP's initial time, which abap2UI5 sends as no time
+  if (type === 'time') {
+    const t = /^\d{2}:\d{2}$/.test(String(v)) ? `${v}:00` : v == null ? '' : String(v);
+    return t === '00:00:00' ? '' : t;
+  }
+  if (type === 'date' && v === '0000-00-00') return '';
+  // the control characters XML forbids: abap2UI5 drops them, the class
+  // does not write them
+  return v == null ? '' : String(v).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
