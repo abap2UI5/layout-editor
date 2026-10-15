@@ -123,12 +123,48 @@ function closingParen(mask, from, to = mask.length) {
   return -1;
 }
 
-// the text of a literal token ('...', `...`), or undefined
+// the constants of cl_abap_char_utilities the 7.02 class joins its line
+// breaks and tabs with (src/abap.js, CHAR_CONST)
+const CHAR_UTILITIES = {
+  'cl_abap_char_utilities=>cr_lf': '\r\n',
+  'cl_abap_char_utilities=>newline': '\n',
+  'cl_abap_char_utilities=>cr_lf(1)': '\r',
+  'cl_abap_char_utilities=>horizontal_tab': '\t',
+};
+const TEMPLATE_ESCAPES = { n: '\n', r: '\r', t: '\t', '\\': '\\', '|': '|', '{': '{', '}': '}' };
+
+// the text of a literal token ('...', `...`), of a string template with
+// no embedded expression (|a\nb|, the way 7.40 writes a line break), or of
+// a char constant of cl_abap_char_utilities - undefined for anything else
 function literalText(token) {
   const t = token.trim();
+  const constant = CHAR_UTILITIES[t.toLowerCase()];
+  if (constant !== undefined) return constant;
   const q = t[0];
-  if ((q !== "'" && q !== '`') || t[t.length - 1] !== q || t.length < 2) return undefined;
-  return t.slice(1, -1).split(q + q).join(q);
+  if (t.length < 2 || t[t.length - 1] !== q) return undefined;
+  if (q === '|') return plainTemplateText(t.slice(1, -1));
+  if (q !== "'" && q !== '`') return undefined;
+  // one literal only: a lone quote inside means two literals and
+  // what stands between them (`a` && `b`), which concatText( ) reads
+  const inner = t.slice(1, -1).split(q + q);
+  if (inner.some((part) => part.includes(q))) return undefined;
+  return inner.join(q);
+}
+
+// the body of a string template as text, or undefined when it embeds an
+// expression ({ ... }) or holds an escape the generator does not write
+function plainTemplateText(body) {
+  let out = '';
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '{' || ch === '}' || ch === '|') return undefined;
+    if (ch !== '\\') { out += ch; continue; }
+    const esc = TEMPLATE_ESCAPES[body[i + 1]];
+    if (esc === undefined) return undefined;
+    out += esc;
+    i += 1;
+  }
+  return out;
 }
 
 // an ABAP operand on one line: every run of blanks outside a literal (and
@@ -313,7 +349,32 @@ function attrValue(attr) {
   const bind = bindPath(raw);
   if (bind) return { xml: `{${bind}}` };
   if (raw[0] === '|' && raw[raw.length - 1] === '|') return templateText(raw.slice(1, -1));
-  return null;
+  return concatBindText(raw);
+}
+
+// the 7.02 form of the tree binding: literals and bare bind paths joined
+// with && (`{path:'` && client->_bind( ... ) && `',...}`) as the text it
+// renders to; null when a piece is anything else
+function concatBindText(raw) {
+  const mask = maskSource(raw);
+  if (mask.indexOf('&&') < 0) return null;
+  let out = '';
+  let at = 0;
+  while (at <= raw.length) {
+    const seg = mask.indexOf('&&', at);
+    const end = seg < 0 ? raw.length : seg;
+    const piece = raw.slice(at, end).trim();
+    const text = literalText(piece);
+    if (text !== undefined) out += text;
+    else {
+      const p = bindPath(piece, true);
+      if (!p) return null;
+      out += p;
+    }
+    if (seg < 0) break;
+    at = seg + 2;
+  }
+  return { xml: out };
 }
 
 // A string template whose embedded expressions are all bare bind paths -
@@ -521,7 +582,8 @@ export function readPublicSection(source) {
 // an ABAP operand as the data panel's value of that type, or undefined
 function seedValue(type, operand) {
   const op = operand.trim();
-  const lit = literalText(op);
+  // one literal, or the pieces a long text or a line break is written in
+  const lit = literalText(op) ?? concatText(maskSource(op), op, 0, op.length);
   switch (type) {
     case 'string': return lit;
     case 'int': return /^-?\d+$/.test(op) ? op : lit !== undefined && /^-?\d+$/.test(lit) ? lit : undefined;
@@ -555,8 +617,38 @@ export function readSeeds(source, attributes) {
   }
   const byName = new Map(attributes.map((a) => [a.name, a]));
   const notes = [];
+  // the 7.02 form of the rows: fields set on a work area, the work area
+  // APPENDed to the table (or to a table field of an outer work area),
+  // CLEARed for the next row - kept as operands until the APPEND to the
+  // attribute says which fields, and so which types, they are
+  const work = new Map();
+  const workArea = (name) => { if (!work.has(name)) work.set(name, {}); return work.get(name); };
   for (const st of statementsOf(mask, from, to)) {
     const text = mask.slice(st.start, st.end);
+    const field = /^\s*(\w+)-(\w+)\s*=(?!=)/.exec(text);
+    if (field && !byName.has(field[1].toLowerCase())) {
+      workArea(field[1].toLowerCase())[field[2].toUpperCase()] = source.slice(st.start + field[0].length, st.end - 1);
+      continue;
+    }
+    const append = /^\s*APPEND\s+(\w+)\s+TO\s+(?:me->)?(\w+)(?:-(\w+))?\s*\.$/i.exec(text);
+    if (append) {
+      const row = workArea(append[1].toLowerCase());
+      const target = append[2].toLowerCase();
+      const attr = byName.get(target);
+      if (attr && !append[3] && attr.type === 'table') {
+        if (!attr.appended) { attr.rows = []; attr.appended = true; }
+        attr.rows.push(workRow(row, attr.fields, attr.name, notes));
+      } else if (!attr && append[3]) {
+        const outer = workArea(target);
+        const key = append[3].toUpperCase();
+        if (!Array.isArray(outer[key])) outer[key] = [];
+        outer[key].push(row);
+      }
+      work.set(append[1].toLowerCase(), {});
+      continue;
+    }
+    const clear = /^\s*CLEAR\s+(\w+)\s*\.$/i.exec(text);
+    if (clear && !byName.has(clear[1].toLowerCase())) { work.set(clear[1].toLowerCase(), {}); continue; }
     const m = /^\s*(?:me->)?(\w+)\s*=(?!=)/.exec(text);
     if (!m) continue;
     const attr = byName.get(m[1].toLowerCase());
@@ -573,8 +665,28 @@ export function readSeeds(source, attributes) {
     }
     attr.seeded = true;
   }
-  for (const a of attributes) delete a.seeded;
+  for (const a of attributes) { delete a.seeded; delete a.appended; }
   return notes;
+}
+
+// a work area of the 7.02 form (field -> operand, or -> the work areas
+// APPENDed to that table field) as a row of the data panel
+function workRow(area, fields, where, notes) {
+  const row = {};
+  for (const [name, value] of Object.entries(area)) {
+    const field = (fields || []).find((f) => f.name === name);
+    if (!field) { notes.push(`${where}-${name}: no such field`); continue; }
+    if (Array.isArray(value)) {
+      if (field.type === 'table') row[name] = value.map((sub) => workRow(sub, field.fields, `${where}-${name}`, notes));
+      else notes.push(`${where}-${name}: not a table field, its value is left out`);
+      continue;
+    }
+    if (field.type === 'table') { notes.push(`${where}-${name}: a table field set to a value, left out`); continue; }
+    const v = seedValue(field.type, value);
+    if (v === undefined) notes.push(`${where}-${name}: not a literal, left empty`);
+    else row[name] = v;
+  }
+  return row;
 }
 
 // VALUE #( ( a = 1 b = `x` ) ( ... ) ) -> rows; a field that is itself a
@@ -651,6 +763,10 @@ export function fromClass(source, base) {
   // the description is the abapGit sidecar's, which a .clas.abap does not carry
   design.description = '';
   design.attributes = pub.attributes;
+  // a class without inline declarations that declares its builder is
+  // the 7.02 form (src/abap.js) - and stays 7.02 when it is generated anew
+  const masked = maskSource(src);
+  design.release = /\bDATA\s+view\s+TYPE\s+REF\s+TO\s+z2ui5_cl_ui5_view_builder\b/i.test(masked) && !/\bDATA\s*\(/i.test(masked) ? '702' : '';
   const seedNotes = readSeeds(src, design.attributes);
   const dropped = [];
   const raws = [];

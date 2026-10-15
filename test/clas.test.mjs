@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { prepareAbap } from '@abap2ui5/linter/reconstruct';
-import { allDesigns } from './fixtures.mjs';
+import { allDesigns, allDesigns702 } from './fixtures.mjs';
 import { generateClass } from '../src/abap.js';
 import { toXml } from '../src/xml.js';
 import { createDesign, createNode, insertNode, validate, walk, aggNames, clone } from '../src/model.js';
@@ -38,7 +38,7 @@ function canonical(design) {
 const events = (xml) => xml.replace(/"\.eB\(\)"/g, '"EVENT"').replace(/"\.onEvent\('[A-Z0-9_]+'\)"/g, '"EVENT"');
 const flat = (xml) => xml.replace(/>\s+</g, '><');
 
-for (const [id, design] of allDesigns()) {
+for (const [id, design] of [...allDesigns(), ...allDesigns702()]) {
   test(`${id}: generate -> import -> generate is byte-identical`, () => {
     const src = generateClass(design);
     const back = fromClass(src, createDesign());
@@ -83,6 +83,30 @@ test('the attributes and their seeds come out of the class as the data panel hol
   assert.equal(by.t_tree.fields[1].type, 'table', 'a table field is a table');
   assert.deepEqual(by.t_tree.rows[0].NODES, [{ TEXT: 'Child 1', DONE: true }, { TEXT: 'Child 2', DONE: false }]);
   assert.deepEqual(by.t_tree.rows[1].NODES, undefined, 'a row without nodes has none');
+});
+
+test('line breaks, tabs and long texts come back as they were written, in both releases', () => {
+  const [, d] = allDesigns().find(([id]) => id === 'texts');
+  for (const release of ['', '702']) {
+    const source = generateClass(Object.assign(clone(d), { release }));
+    const back = fromClass(source, createDesign());
+    const by = Object.fromEntries(back.attributes.map((a) => [a.name, a]));
+    const want = Object.fromEntries(d.attributes.map((a) => [a.name, a]));
+    assert.equal(by.note.value, want.note.value, `a string template / char constants (${release || '7.40'})`);
+    assert.equal(by.long_text.value, want.long_text.value, `pieces joined with && (${release || '7.40'})`);
+    assert.equal(by.t_notes.rows[0].BODY, 'first\nsecond');
+    assert.equal(by.t_notes.rows[0].LINES[1].TEXT, want.long_text.value);
+    assert.deepEqual(classReport().seeds || [], [], 'every seed was read');
+  }
+});
+
+test('a string template with an expression in it is not a literal', () => {
+  const d = createDesign();
+  d.className = 'ZCL_LE_TEMPLATE';
+  d.attributes = [{ name: 'greeting', type: 'string', value: '' }];
+  const source = generateClass(d).replace("greeting = ``.", 'greeting = |Hello { sy-uname }|.');
+  const back = fromClass(source, createDesign());
+  assert.equal(back.attributes.find((a) => a.name === 'greeting').value, '');
 });
 
 test('a real sample imports: the view, the controls the palette does not know, and a report of what it could not take', () => {
