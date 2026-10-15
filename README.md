@@ -79,7 +79,11 @@ From there it is your code:
 
 Also in the editor:
 
-- **Starters**: a blank page, a form, a table with search, and tabs.
+- **Starters**: a blank page, a form, a table with search, tabs, and the
+  floorplans: a list report (filter fields and a search over a table), an
+  object page (header, a form section and an items section), a worklist (a
+  table with a status column and a row press) and master-detail (a list
+  next to the details of the selected entry, in two columns).
 - **Any UI5 control** by its class name (`sap.m.Wizard`, a library of your
   own): the field at the end of *Controls*, or Ctrl+K. The canvas asks its
   UI5 for the control's properties, aggregations and events, and from then
@@ -131,7 +135,12 @@ Also in the editor:
 - An abap2UI5 release that ships `z2ui5_cl_ui5_view_builder`. The class is
   verified against **abap2UI5 1.147.0**.
 - ABAP 7.40 or later, or ABAP Cloud. The class uses inline declarations and
-  `VALUE #( )`, like every abap2UI5 sample.
+  `VALUE #( )`, like every abap2UI5 sample. For an older system, choose
+  **ABAP 7.02** next to the class name: the class then declares its
+  variables at the top of a method, fills its sample rows with `APPEND`,
+  and writes a line break as `cl_abap_char_utilities=>newline` joined with
+  `&&` - no inline declarations, string templates or constructor
+  expressions. The choice is saved with the design.
 - Every control and property the palette offers exists in **UI5 1.71**:
   121 controls of sap.m, sap.ui.core, sap.ui.layout, sap.ui.unified,
   sap.ui.table, sap.f and sap.uxap. A control inserted by class name is
@@ -162,9 +171,9 @@ Each claim above is backed by a check that runs in CI:
 
 | Check | What it proves |
 |---|---|
-| `npm test` | The palette against the **real metadata of UI5 1.71.80** (`test/ui5-1.71.json`): every property, enum value, aggregation, default aggregation and event exists. The class file format (no BOM, LF, max. 255 characters per line, no trailing blanks) and the `.clas.xml` format abapGit writes. The generated chain, replayed by a model of `z2ui5_cl_ui5_view_builder`, builds exactly the editor's view. An imported view comes back unchanged. |
+| `npm test` | The palette against the **real metadata of UI5 1.71.80** (`test/ui5-1.71.json`): every property, enum value, aggregation, default aggregation and event exists. The class file format (no BOM, LF, max. 255 characters per line, no trailing blanks) and the `.clas.xml` format abapGit writes. The generated chain, replayed by a model of `z2ui5_cl_ui5_view_builder`, builds exactly the editor's view. An imported view comes back unchanged. The 7.02 classes contain none of the constructs 7.02 lacks, and pass **abaplint at syntax version 7.02** with the rules of abap2UI5's own 7.02 check (`abaplint-702.jsonc`, also `npm run check:abap702`). |
 | `npm run check:abap` | The [abap2UI5 linter](https://abap2ui5.github.io/linter/) on the generated classes: controls, properties, enum values and icons against 1.71, plus the `chain-house-layout` rule. |
-| `npm run verify:abap` | Every starter and a kitchen sink with every control of the palette is **transpiled against abap2UI5** (`@abap2ui5/node-runtime`, type-checked) and **run on it**. The view and the model of the first roundtrip have to equal the editor's, attribute for attribute and value for value. Every event has to reach `on_event`. |
+| `npm run verify:abap` | Every starter and a kitchen sink with every control of the palette, each as a 7.40 and as a 7.02 class, is **transpiled against abap2UI5** (`@abap2ui5/node-runtime`, type-checked) and **run on it**. The view and the model of the first roundtrip have to equal the editor's, attribute for attribute and value for value. Every event has to reach `on_event`. |
 | `npm run test:e2e` | The editor in Chromium: drag and drop, selection on canvas, outline and code, the control toolbar, the command palette, building blocks, properties, binding, events, undo, import, ZIP download. Every design renders on the current UI5 **and on 1.71**. |
 
 ## Development
@@ -188,6 +197,37 @@ the CDN):
 npm run ui5:trees          # .ui5/1.144.0 and .ui5/1.71.80
 npm run test:e2e:local     # the browser tests on them
 UI5_RESOURCES=.ui5/1.144.0 npm run serve   # the editor with ?ui5=local
+```
+
+### A UI5 of your own
+
+The canvas can load UI5 from any URL instead of the CDN: a UI5 on a web
+server of your own, or a `resources/` tree on disk. Enter the URL in the UI5 field above the canvas, or open the editor
+with `?ui5=<URL>`. The URL is the folder that holds `resources/`
+(`https://host/ui5/` for `https://host/ui5/resources/sap-ui-core.js`); a
+URL ending in `/resources` works too, and so does a path on the editor's
+own server (`/…` or `./…`). Empty goes back to the CDN.
+
+```
+https://editor.example.com/index.html?ui5=https://ui5.example.com/1.71.80/
+```
+
+A tree on disk needs a web server that sends
+`Access-Control-Allow-Origin` (UI5 loads its modules and themes with
+requests the browser checks), for example `npx http-server -p 8081 --cors`
+in the folder above `resources/`, and `?ui5=http://127.0.0.1:8081/`. A
+release before 1.102 has no Horizon theme; the canvas switches to Quartz
+once UI5 has said which release it is. A built UI5 (as the CDN serves
+it) brings its compiled themes; a tree from the npm packages
+(`npm run ui5:trees`) has the theme sources only, and the canvas shows the
+controls unthemed.
+
+The browser tests take the same URLs, one for the current release and
+one for 1.71 - and `E2E_PORT` when another checkout runs its tests on the
+default port at the same time:
+
+```bash
+UI5_URL=http://127.0.0.1:8081/1.144.0/ UI5_URL_171=http://127.0.0.1:8081/1.71.80/ npm run test:e2e
 ```
 
 `npm run ui5:metadata` regenerates `test/ui5-1.71.json` from a real UI5

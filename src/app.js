@@ -84,6 +84,7 @@ function renderAll(opts = {}) {
   if (document.activeElement !== cn) cn.value = d.className;
   cn.classList.toggle('invalid', !!checkClassName(d.className));
   if (document.activeElement !== $('#description')) $('#description').value = d.description || '';
+  $('#abapRelease').value = d.release || '';
   renderLayers();
   // keep the input being typed into: re-rendering its panel would drop it
   if (!opts.keepFocus || !$('#inspector').contains(document.activeElement)) renderInspector();
@@ -98,6 +99,9 @@ function renderAll(opts = {}) {
 }
 
 
+// a UI5 of your own for the canvas: the folder that holds resources/
+const isUi5Url = (v) => /^(https?:\/\/|\.{0,2}\/)[^"'<>\s]*$/.test(v);
+
 function wire() {
   $('#insertSearch').addEventListener('input', renderInsert);
   $('#className').addEventListener('input', (e) => {
@@ -105,6 +109,7 @@ function wire() {
     commit((d) => { d.className = v; }, { mergeKey: 'className', keepFocus: true });
   });
   $('#description').addEventListener('input', (e) => commit((d) => { d.description = e.target.value; }, { mergeKey: 'description', keepFocus: true }));
+  $('#abapRelease').addEventListener('change', (e) => commit((d) => { if (e.target.value) d.release = e.target.value; else delete d.release; }));
   wireMenu($('#btnFile'), $('#fileMenu'));
   wireMenu($('#btnExport'), $('#exportMenu'));
   $('#btnNew').onclick = newDialog;
@@ -153,7 +158,7 @@ function wire() {
   ver.value = state.prefs.ui5 && !state.prefs.ui5.startsWith('local') ? state.prefs.ui5 : '';
   ver.onchange = () => {
     const v = ver.value.trim();
-    if (v && !/^\d+\.\d+\.\d+$/.test(v)) { ver.classList.add('invalid'); toast('A version like 1.71.80, or empty for the latest'); return; }
+    if (v && !/^\d+\.\d+\.\d+$/.test(v) && !isUi5Url(v)) { ver.classList.add('invalid'); toast('A version like 1.71.80, the URL of a UI5 of your own, or empty for the latest'); return; }
     ver.classList.remove('invalid');
     state.prefs.ui5 = v;
     const minor = /^1\.(\d+)\./.exec(v);

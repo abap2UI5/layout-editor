@@ -48,6 +48,13 @@ The product is the generated class. It must:
   editor cannot represent is kept as raw ABAP on its node or listed in the
   import report - never dropped silently. Every starter's class must
   round-trip byte-identically (`test/clas.test.mjs`).
+- The class comes in two releases (`design.release`): 7.40 and later, and
+  7.02. A generator change keeps the 7.02 class free of what 7.02 lacks
+  (inline declarations, string templates, constructor and table
+  expressions); `npm test` runs abaplint at v702 on it (`abaplint-702.jsonc`,
+  the rules of abap2UI5's own 7.02 check), `npm run verify:abap` runs both.
+- A starter (`src/starters.js`) uses only controls and properties of
+  `src/catalog.js`; every starter is a test design, rendered on 1.71 too.
 - `test/builder.mjs` models `z2ui5_cl_ui5_view_builder`. When the builder's
   semantics change upstream, change the model, and let `verify:abap` decide
   who is right.
@@ -61,6 +68,7 @@ The product is the generated class. It must:
 | `npm run serve` | The designer on http://127.0.0.1:8080/ |
 | `npm test` | Unit tests (catalogue vs. 1.71, class format, chain vs. builder model, import) |
 | `npm run check:abap` | abap2UI5 linter over the generated classes |
+| `npm run check:abap702` | abaplint at v702 over the generated 7.02 classes (also part of `npm test`) |
 | `npm run verify:abap` | Transpile and run the generated classes on abap2UI5 |
 | `npm run test:e2e` | The designer in Chromium, UI5 current and 1.71 |
 | `npm run verify` | All of the above |

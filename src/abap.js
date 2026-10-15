@@ -16,23 +16,92 @@ import { usedNamespaces, namespaceUri } from './xml.js';
 
 const MAX_LINE = 255;
 
+// ------------------------------------------------------------- the release
+
+// The ABAP release the class is written for. 7.40 and later (ABAP Cloud
+// included) is the syntax of every abap2UI5 sample: inline declarations,
+// string templates, VALUE #( ). 7.02 is the oldest release abap2UI5 runs
+// on: explicit declarations at the top of a method, && for a text with a
+// line break, a row variable appended per sample row, WITH DEFAULT KEY, a
+// functional call compared with abap_true. The chain is the same in both -
+// method chaining is 7.02. Stored in the design (`release`), so a saved
+// design always gives the same class.
+export const ABAP_RELEASES = { 740: 'ABAP 7.40 or later, ABAP Cloud', 702: 'ABAP 7.02' };
+
+export function releaseOf(design) {
+  return design && design.release === '702' ? '702' : '740';
+}
+
 // ------------------------------------------------------------- literals
 
-export function abapString(s) {
+// a text with a line break or a tab: a string template on 7.40, the
+// literal pieces around the constants of cl_abap_char_utilities on 7.02
+const CHAR_CONST = { '\r\n': 'cl_abap_char_utilities=>cr_lf', '\n': 'cl_abap_char_utilities=>newline', '\r': 'cl_abap_char_utilities=>cr_lf(1)', '\t': 'cl_abap_char_utilities=>horizontal_tab' };
+
+export function abapString(s, release) {
   const str = String(s ?? '');
   if (/[\n\r\t]/.test(str)) {
+    if (release === '702') return abapStringPieces(str, Infinity, release).join(' && ');
     return `|${str.replace(/[\\|{}]/g, '\\$&').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')}|`;
   }
   return '`' + str.replace(/`/g, '``') + '`';
 }
 
 // a long literal split into pieces joined with &&, so no line passes 255
-function abapStringPieces(s, width) {
+function abapStringPieces(s, width, release) {
   const str = String(s ?? '');
-  if (str.length <= width || /[\n\r\t]/.test(str)) return [abapString(str)];
+  if (/[\n\r\t]/.test(str)) {
+    if (release !== '702') return templatePieces(str, width);
+    return str.split(/(\r\n|[\n\r\t])/).filter(Boolean).flatMap((part) => (CHAR_CONST[part] ? [CHAR_CONST[part]] : abapStringPieces(part, width)));
+  }
+  if (str.length <= width) return [abapString(str)];
   const parts = [];
   for (let i = 0; i < str.length; i += width) parts.push(abapString(str.slice(i, i + width)));
   return parts;
+}
+
+// a text with a line break on 7.40: string templates of at most `width`
+// characters each, cut between two characters of the text so no escape
+// is torn apart
+function templatePieces(str, width) {
+  const parts = [];
+  let cur = '';
+  let len = 2;
+  for (const ch of str) {
+    const esc = /[\\|{}\n\r\t]/.test(ch) ? 2 : 1;
+    if (cur && len + esc > width) { parts.push(abapString(cur)); cur = ''; len = 2; }
+    cur += ch;
+    len += esc;
+  }
+  if (cur) parts.push(abapString(cur));
+  return parts;
+}
+
+// A seed value too long for one line comes out of abapValue( ) as its
+// pieces between markers; wrapPieces( ) puts every piece after the first
+// on a line of its own, `&&` under the start of the value - wherever the
+// value ended up in the line (a row of VALUE #( ), an assignment).
+const PIECES = '\u0001';
+const PIECE = '\u0002';
+
+function wrapPieces(lines) {
+  const out = [];
+  const wrap = (line) => {
+    const i = line.indexOf(PIECES);
+    if (i < 0) { out.push(line); return; }
+    const rest = line.slice(i + 1);
+    const next = rest.indexOf(PIECES);
+    const value = next < 0 ? rest : rest.slice(0, next);
+    const tail = rest.slice(value.length);
+    const segs = value.split(PIECE);
+    const pad = ' '.repeat(Math.max(0, i - 3));
+    if (segs.length === 1) { wrap(line.slice(0, i) + rest); return; }
+    out.push(line.slice(0, i) + segs[0]);
+    segs.slice(1, -1).forEach((seg) => out.push(`${pad}&& ${seg}`));
+    wrap(`${pad}&& ${segs[segs.length - 1]}${tail}`);
+  };
+  lines.forEach(wrap);
+  return out;
 }
 
 export function abapType(type) {
@@ -48,10 +117,13 @@ export function abapType(type) {
 }
 
 // a seed value as an ABAP operand, or null when it is the initial value
-export function abapValue(type, v) {
+export function abapValue(type, v, release) {
   if (v === undefined || v === null || v === '') return null;
   switch (type) {
-    case 'string': return abapString(v);
+    case 'string': {
+      const pieces = abapStringPieces(v, 120, release);
+      return pieces.length === 1 ? pieces[0] : PIECES + pieces.join(PIECE);
+    }
     case 'int': {
       const n = parseInt(v, 10);
       return Number.isFinite(n) && n !== 0 ? String(n) : null;
@@ -80,18 +152,21 @@ export function fileName(className, ext) {
 
 // ------------------------------------------------------------- the view
 
-function attrExpr(value) {
+function attrExpr(value, release) {
   switch (value.m) {
     case 's': {
       const s = String(value.v ?? '');
-      return { p: /[{}\\]/.test(s) ? 't' : 'v', pieces: abapStringPieces(s, 120) };
+      return { p: /[{}\\]/.test(s) ? 't' : 'v', pieces: abapStringPieces(s, 120, release) };
     }
     case 'b':
       // a tree: the path with the field its children come from
-      if (value.arr) return { p: 'v', pieces: [`|\\{path:'{ client->_bind( val = ${value.v} path = abap_true ) }',parameters:\\{arrayNames:['${value.arr}']\\}\\}|`] };
+      if (value.arr) {
+        if (release === '702') return { p: 'v', pieces: [`\`{path:'\` && client->_bind( val = ${value.v} path = abap_true ) && \`',parameters:{arrayNames:['${value.arr}']}}\``] };
+        return { p: 'v', pieces: [`|\\{path:'{ client->_bind( val = ${value.v} path = abap_true ) }',parameters:\\{arrayNames:['${value.arr}']\\}\\}|`] };
+      }
       return { p: 'v', pieces: [`client->_bind( ${value.v} )`] };
     case 'f': return { p: 'v', pieces: [abapString(`{${value.v}}`)] };
-    case 'x': return { p: 'v', pieces: abapStringPieces(value.v, 120) };
+    case 'x': return { p: 'v', pieces: abapStringPieces(value.v, 120, release) };
     default: throw new Error(`unknown value mode ${value.m}`);
   }
 }
@@ -102,14 +177,16 @@ function eleCall(verb, name, ns) {
 
 // The view_display body: the chain lines, without the method frame
 export function viewChain(design, indent = 4) {
+  const release = releaseOf(design);
   const out = []; // { text, kind: 'ele'|'tag'|'a'|'end'|'start', blank, node }
   const base = indent + 4;
   let owner = 'root'; // the design node the lines being written belong to
-  out.push({ text: `${' '.repeat(indent)}DATA(view) = z2ui5_cl_ui5_view_builder=>factory(`, kind: 'start' });
+  // on 7.02 the variable is declared at the top of the method (buildClass)
+  out.push({ text: `${' '.repeat(indent)}${release === '702' ? 'view' : 'DATA(view)'} = z2ui5_cl_ui5_view_builder=>factory(`, kind: 'start' });
 
   // the mvc:View root with its namespace declarations
-  const viewAttrs = usedNamespaces(design).map((ns) => [ns ? `xmlns:${ns}` : 'xmlns', attrExpr({ m: 's', v: namespaceUri(design, ns) })]);
-  viewAttrs.push(['displayBlock', attrExpr({ m: 's', v: 'true' })], ['height', attrExpr({ m: 's', v: '100%' })]);
+  const viewAttrs = usedNamespaces(design).map((ns) => [ns ? `xmlns:${ns}` : 'xmlns', attrExpr({ m: 's', v: namespaceUri(design, ns) }, release)]);
+  viewAttrs.push(['displayBlock', attrExpr({ m: 's', v: 'true' }, release)], ['height', attrExpr({ m: 's', v: '100%' }, release)]);
   out.push({ text: `${' '.repeat(base)})->${eleCall('ele', 'View', 'mvc')}`, kind: 'ele' });
   pushAttrs(viewAttrs, base + 4);
   emitChildren([['content', design.root.aggs.content || [], true]], base, true);
@@ -145,7 +222,7 @@ export function viewChain(design, indent = 4) {
     for (const [name, value] of Object.entries(node.props || {})) {
       if (!value || (value.m === 's' && (value.v === '' || value.v == null))) continue;
       if ((value.m === 'b' || value.m === 'f' || value.m === 'x') && !value.v) continue;
-      attrs.push([name, attrExpr(value)]);
+      attrs.push([name, attrExpr(value, release)]);
     }
     for (const [ev, name] of Object.entries(node.events || {})) {
       if (name) attrs.push([ev, { p: 'v', pieces: [`client->_event( ${abapString(name)} )`] }]);
@@ -249,7 +326,7 @@ function nestedRowLines(cells, indent, tail) {
         if (row.every(([, x]) => typeof x === 'string') && inner.length + 2 + row.map(([a, b]) => `${a} = ${b}`).join(' ').length + 2 + rowTail.length <= MAX_LINE) {
           lines.push(`${inner}( ${row.map(([a, b]) => `${a} = ${b}`).join(' ')} )${rowTail}`);
         } else if (row.length) {
-          lines.push(...nestedRowLines(row, inner, rowTail.slice(2)));
+          lines.push(...nestedRowLines(row, inner, rowTail));
         } else {
           lines.push(`${inner}( )${rowTail}`);
         }
@@ -287,7 +364,8 @@ function seedTable(attr) {
   } else if (sameShape && nonEmpty.length > 1) {
     const cols = nonEmpty[0].length;
     const widths = [];
-    for (let i = 0; i < cols; i++) widths[i] = Math.max(...nonEmpty.map((r) => cellText(...r[i]).length));
+    // a value in pieces goes onto lines of its own and sets no column
+    for (let i = 0; i < cols; i++) widths[i] = Math.max(0, ...nonEmpty.map((r) => cellText(...r[i])).filter((t) => !t.includes(PIECES)).map((t) => t.length));
     rendered = nonEmpty.map((r) => `( ${r.map((cell, i) => (i < cols - 1 ? cellText(...cell).padEnd(widths[i]) : cellText(...cell))).join(' ')} )`);
   } else {
     rendered = nonEmpty.map((r) => `( ${r.map((cell) => cellText(...cell)).join(' ')} )`);
@@ -313,6 +391,52 @@ function seedTable(attr) {
   return lines;
 }
 
+// 7.02 has no VALUE #( ): one row variable per table (and per table
+// field), filled field by field and appended, CLEAR before every row but
+// the first - so a field a row leaves out is initial, as in VALUE #( ).
+// `names`: the names a row variable must not take (the attributes, client,
+// view, the row variables so far). Returns the declarations and the lines.
+function seedTable702(attr, names) {
+  const lines = [];
+  const decls = [];
+  const appended = new Set();
+  const vars = new Map(); // type name -> row variable
+  const declare = (type, stem) => {
+    if (vars.has(type)) return vars.get(type);
+    let v = `${stem}_row`;
+    for (let i = 2; names.has(v); i++) v = `${stem}_row_${i}`;
+    names.add(v);
+    vars.set(type, v);
+    decls.push([`DATA ${v}`, `TYPE ${type}.`]);
+    return v;
+  };
+  const emitRows = (rows, fields, path, target, stem) => {
+    const v = declare(typeName(attr, path), stem);
+    const scalar = fields.filter((f) => f.type !== 'table' && (rows || []).some((r) => abapValue(f.type, r[f.name]) !== null));
+    const nested = fields.filter((f) => f.type === 'table');
+    const w = Math.max(0, ...scalar.map((f) => `${v}-${f.name.toLowerCase()}`.length));
+    for (const r of rows || []) {
+      if (appended.has(v)) lines.push('', `    CLEAR ${v}.`);
+      for (const f of scalar) {
+        const val = abapValue(f.type, r[f.name]);
+        if (val === null) continue;
+        const head = `    ${`${v}-${f.name.toLowerCase()}`.padEnd(w)} = `;
+        // a long text in pieces, so no line passes 255
+        const [first, ...rest] = f.type === 'string' ? abapStringPieces(r[f.name], 120, '702') : [val];
+        lines.push(`${head}${first}${rest.length ? '' : '.'}`);
+        rest.forEach((piece, i) => lines.push(`${' '.repeat(head.length - 3)}&& ${piece}${i === rest.length - 1 ? '.' : ''}`));
+      }
+      for (const f of nested) {
+        if ((r[f.name] || []).length) emitRows(r[f.name], f.fields || [], [...path, f.name], `${v}-${f.name.toLowerCase()}`, f.name.toLowerCase());
+      }
+      lines.push(`    APPEND ${v} TO ${target}.`);
+      appended.add(v);
+    }
+  };
+  emitRows(attr.rows, attr.fields || [], [], attr.name, attr.name.replace(/^[a-z]?t_/, ''));
+  return { decls, lines };
+}
+
 export function generateClass(design) {
   return buildClass(design).source;
 }
@@ -326,16 +450,33 @@ export function generateClassMap(design) {
 
 function buildClass(design) {
   const cls = design.className.toLowerCase();
+  const release = releaseOf(design);
+  const old = release === '702';
+  const tableKey = old ? 'WITH DEFAULT KEY' : 'WITH EMPTY KEY';
+  // 7.02 has no predicative method call: the result is compared
+  const check = (m) => `client->${m}( )${old ? ' = abap_true' : ''}`;
   const events = collectEvents(design);
   const tables = design.attributes.filter((a) => a.type === 'table');
   const scalars = design.attributes.filter((a) => a.type !== 'table');
 
   const seed = [];
   for (const a of scalars) {
-    const v = abapValue(a.type, a.value);
+    const v = abapValue(a.type, a.value, release);
     if (v !== null) seed.push(`    ${a.name} = ${v}.`);
   }
-  for (const t of tables) seed.push(...seedTable(t));
+  const seedDecls = [];
+  if (old) {
+    const names = new Set([...design.attributes.map((a) => a.name.toLowerCase()), 'client', 'view', 'me']);
+    for (const t of tables) {
+      const { decls, lines } = seedTable702(t, names);
+      if (!lines.length) continue;
+      seedDecls.push(...decls);
+      if (seed.length) seed.push('');
+      seed.push(...lines);
+    }
+  } else {
+    for (const t of tables) seed.push(...seedTable(t));
+  }
   const hasInit = seed.length > 0;
   const hasEvents = events.length > 0;
 
@@ -350,12 +491,12 @@ function buildClass(design) {
     for (const ty of tableTypes(t)) {
       L.push('    TYPES:');
       L.push(`      BEGIN OF ${ty.name},`);
-      L.push(...aligned(ty.fields.map((f) => [f.name.toLowerCase(), `TYPE ${f.type === 'table' ? `STANDARD TABLE OF ${typeName(t, [...ty.path, f.name])} WITH EMPTY KEY` : abapType(f.type)},`]), 8));
+      L.push(...aligned(ty.fields.map((f) => [f.name.toLowerCase(), `TYPE ${f.type === 'table' ? `STANDARD TABLE OF ${typeName(t, [...ty.path, f.name])} ${tableKey}` : abapType(f.type)},`]), 8));
       L.push(`      END OF ${ty.name}.`);
     }
   }
   const dataRows = [
-    ...tables.map((t) => [`DATA ${t.name}`, `TYPE STANDARD TABLE OF ${typeName(t)} WITH EMPTY KEY.`]),
+    ...tables.map((t) => [`DATA ${t.name}`, `TYPE STANDARD TABLE OF ${typeName(t)} ${tableKey}.`]),
     ...scalars.map((a) => [`DATA ${a.name}`, `TYPE ${abapType(a.type)}.`]),
   ];
   if (dataRows.length) L.push(...aligned(dataRows, 4));
@@ -376,16 +517,16 @@ function buildClass(design) {
   L.push('');
   L.push('    me->client = client.');
   if (hasInit) {
-    L.push('    IF client->check_on_init( ).');
+    L.push(`    IF ${check('check_on_init')}.`);
     L.push('      model_init( ).');
     L.push('      view_display( ).');
-    L.push('    ELSEIF client->check_on_navigated( ).');
+    L.push(`    ELSEIF ${check('check_on_navigated')}.`);
   } else {
-    L.push('    IF client->check_on_navigated( ).');
+    L.push(`    IF ${check('check_on_navigated')}.`);
   }
   L.push('      view_display( ).');
   if (hasEvents) {
-    L.push('    ELSEIF client->check_on_event( ).');
+    L.push(`    ELSEIF ${check('check_on_event')}.`);
     L.push('      on_event( ).');
   }
   L.push('    ENDIF.');
@@ -394,6 +535,10 @@ function buildClass(design) {
   L.push('');
   L.push('  METHOD view_display.');
   L.push('');
+  if (old) {
+    L.push('    DATA view TYPE REF TO z2ui5_cl_ui5_view_builder.');
+    L.push('');
+  }
   const chain = viewChain(design, 4);
   const chainStart = L.length;
   L.push(...chain);
@@ -418,7 +563,11 @@ function buildClass(design) {
     L.push('');
     L.push('  METHOD model_init.');
     L.push('');
-    L.push(...seed);
+    if (seedDecls.length) {
+      L.push(...aligned(seedDecls, 4));
+      L.push('');
+    }
+    L.push(...wrapPieces(seed));
     L.push('');
     L.push('  ENDMETHOD.');
   }
