@@ -69,7 +69,7 @@ export function renderInspector() {
           'aria-label': `Bind ${agg} to a table`,
           onchange: (e) => {
             const v = e.target.value;
-            const replace = !v || !hasOwnTemplate(node, agg)
+            const replace = !v || !hasOwnTemplate(node, agg, d)
               || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of ${v}?\n\nCancel keeps them and only sets the binding.`);
             commit((dd) => {
               if (v.startsWith('#')) bindListToTable(dd, node.id, agg, v.slice(1), replace, true);
@@ -207,9 +207,13 @@ function suggestEvent(node, ev) {
 }
 
 function newTableFor(node, agg) {
+  // a template built by hand stays unless the user lets it go - as when
+  // the rows are bound to a table that is there
+  const replace = !hasOwnTemplate(node, agg, state.design)
+    || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of the new table?\n\nCancel keeps them and only sets the binding.`);
   commit((d) => {
     const name = newTableAttribute(d, node.type === 'Tree');
-    bindListToTable(d, node.id, agg, name);
+    bindListToTable(d, node.id, agg, name, replace);
     return node.id;
   });
   toast('Table attribute created - edit it on the Data tab');

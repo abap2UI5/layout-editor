@@ -372,3 +372,19 @@ test('a table of table fields only binds to a template of static text, not to a 
   }
   assert.deepEqual(errors(d), []);
 });
+
+test('columns built by hand are a template of their own: binding the table again asks first', async () => {
+  const { hasOwnTemplate } = await import('../src/model.js');
+  const d = createDesign();
+  d.attributes = [table('t_a', ['X'], [])];
+  for (const [type, agg] of [['table:Table', 'rows'], ['Table', 'items'], ['List', 'items']]) {
+    const l = createNode(type);
+    insertNode(d, l, page(d).id);
+    assert.equal(hasOwnTemplate(l, agg, d), false, `${type}: the catalogue's start`);
+    bindListToTable(d, l.id, agg, 't_a');
+    assert.equal(hasOwnTemplate(l, agg, d), false, `${type}: what the binding generated`);
+    if (type === 'List') l.aggs.items[0].props.icon = { m: 's', v: 'sap-icon://add' };
+    else l.aggs.columns[0].props.width = { m: 's', v: '5rem' };
+    assert.equal(hasOwnTemplate(l, agg, d), true, `${type}: edited by hand`);
+  }
+});
