@@ -327,3 +327,23 @@ test('the class is written for ABAP 7.02 when chosen, and saved with the design'
   await expect(page.locator('#abapRelease')).toHaveValue('');
   await expect(page.locator('#code')).toContainText('DATA(view) = z2ui5_cl_ui5_view_builder=>factory(');
 });
+
+test('the canvas boots UI5 from a URL of your own', async ({ page }) => {
+  // the bootstrap the preview writes - no UI5 is loaded, from anywhere
+  await page.route((url) => url.pathname.endsWith('/sap-ui-core.js'), (route) => route.abort());
+  const src = async (ui5) => {
+    await page.goto(`/preview.html?ui5=${encodeURIComponent(ui5)}`, { waitUntil: 'domcontentloaded' });
+    return page.locator('#sap-ui-bootstrap').getAttribute('src');
+  };
+  expect(await src('https://ui5.example.com/1.71.80/')).toBe('https://ui5.example.com/1.71.80/resources/sap-ui-core.js');
+  expect(await src('/ui5/mine/resources')).toBe('/ui5/mine/resources/sap-ui-core.js');
+  expect(await src('./ui5/resources/sap-ui-core.js')).toBe('./ui5/resources/sap-ui-core.js');
+  expect(await src('1.71.80')).toBe('https://sdk.openui5.org/1.71.80/resources/sap-ui-core.js');
+  expect(await src('/"><b>')).toBe('https://sdk.openui5.org/%2F%22%3E%3Cb%3E/resources/sap-ui-core.js');
+  // the editor's field takes the URL and hands it to the canvas
+  await page.goto('/index.html');
+  await page.locator('#ui5version').fill('https://ui5.example.com/1.71.80');
+  await page.locator('#ui5version').dispatchEvent('change');
+  await expect(page.locator('#ui5version')).not.toHaveClass(/invalid/);
+  await expect(page.locator('#preview')).toHaveAttribute('src', /ui5=https%3A%2F%2Fui5\.example\.com%2F1\.71\.80/);
+});

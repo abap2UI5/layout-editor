@@ -155,6 +155,37 @@ npm run test:e2e:local     # the browser tests on them
 UI5_RESOURCES=.ui5/1.144.0 npm run serve   # the editor with ?ui5=local
 ```
 
+### A UI5 of your own
+
+The canvas can load UI5 from any URL instead of the CDN: a UI5 on a web
+server of your own, or a `resources/` tree on disk. Enter the URL in the UI5 field above the canvas, or open the editor
+with `?ui5=<URL>`. The URL is the folder that holds `resources/`
+(`https://host/ui5/` for `https://host/ui5/resources/sap-ui-core.js`); a
+URL ending in `/resources` works too, and so does a path on the editor's
+own server (`/…` or `./…`). Empty goes back to the CDN.
+
+```
+https://editor.example.com/index.html?ui5=https://ui5.example.com/1.71.80/
+```
+
+A tree on disk needs a web server that sends
+`Access-Control-Allow-Origin` (UI5 loads its modules and themes with
+requests the browser checks), for example `npx http-server -p 8081 --cors`
+in the folder above `resources/`, and `?ui5=http://127.0.0.1:8081/`. A
+release before 1.102 has no Horizon theme; the canvas switches to Quartz
+once UI5 has said which release it is. A built UI5 (as the CDN serves
+it) brings its compiled themes; a tree from the npm packages
+(`npm run ui5:trees`) has the theme sources only, and the canvas shows the
+controls unthemed.
+
+The browser tests take the same URLs, one for the current release and
+one for 1.71 - and `E2E_PORT` when another checkout runs its tests on the
+default port at the same time:
+
+```bash
+UI5_URL=http://127.0.0.1:8081/1.144.0/ UI5_URL_171=http://127.0.0.1:8081/1.71.80/ npm run test:e2e
+```
+
 `npm run ui5:metadata` regenerates `test/ui5-1.71.json` from a real UI5
 runtime. Run it when the palette gains a control.
 
