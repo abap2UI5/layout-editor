@@ -10,6 +10,7 @@
 // module, which renders the panels (src/ui/*.js).
 import { validate, checkClassName } from './model.js';
 import { generateClass, fileName } from './abap.js';
+import { generateClassSource } from './clas.js';
 import { toXml } from './xml.js';
 import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection } from './ui/store.js';
 import { $, toast, download } from './ui/dom.js';
@@ -21,7 +22,7 @@ import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code
 import { loadPreview, postPreview, sendPreview } from './ui/preview.js';
 import { handleDrop, copySelection, pasteSelection, addControlByName } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
-import { newDialog, importDialog, recentDialog, shareLink, openFile, saveDesign, exportZip } from './ui/files.js';
+import { newDialog, importDialog, openClassDialog, openClassFromUrl, recentDialog, shareLink, openFile, saveDesign, exportZip, openInPlayground, openInVscode } from './ui/files.js';
 import { onKey } from './ui/keys.js';
 
 
@@ -83,6 +84,7 @@ function renderAll(opts = {}) {
   if (document.activeElement !== cn) cn.value = d.className;
   cn.classList.toggle('invalid', !!checkClassName(d.className));
   if (document.activeElement !== $('#description')) $('#description').value = d.description || '';
+  $('#abapRelease').value = d.release || '';
   renderLayers();
   // keep the input being typed into: re-rendering its panel would drop it
   if (!opts.keepFocus || !$('#inspector').contains(document.activeElement)) renderInspector();
@@ -97,6 +99,9 @@ function renderAll(opts = {}) {
 }
 
 
+// a UI5 of your own for the canvas: the folder that holds resources/
+const isUi5Url = (v) => /^(https?:\/\/|\.{0,2}\/)[^"'<>\s]*$/.test(v);
+
 function wire() {
   $('#insertSearch').addEventListener('input', renderInsert);
   $('#className').addEventListener('input', (e) => {
@@ -104,10 +109,14 @@ function wire() {
     commit((d) => { d.className = v; }, { mergeKey: 'className', keepFocus: true });
   });
   $('#description').addEventListener('input', (e) => commit((d) => { d.description = e.target.value; }, { mergeKey: 'description', keepFocus: true }));
+  $('#abapRelease').addEventListener('change', (e) => commit((d) => { if (e.target.value) d.release = e.target.value; else delete d.release; }));
   wireMenu($('#btnFile'), $('#fileMenu'));
   wireMenu($('#btnExport'), $('#exportMenu'));
   $('#btnNew').onclick = newDialog;
-  $('#btnOpen').onclick = () => openFile('.json,.xml');
+  $('#btnOpen').onclick = () => openFile('.json,.xml,.abap');
+  $('#btnOpenClass').onclick = openClassDialog;
+  $('#btnPlayground').onclick = openInPlayground;
+  $('#btnVscode').onclick = openInVscode;
   $('#btnSave').onclick = saveDesign;
   $('#btnImport').onclick = importDialog;
   $('#btnRecent').onclick = recentDialog;
@@ -117,9 +126,9 @@ function wire() {
   $('#btnCmd').onclick = openPalette;
   $('#btnZip').onclick = exportZip;
   $('#btnZip2').onclick = exportZip;
-  $('#btnCopy').onclick = () => copyText(generateClass(state.design), 'ABAP');
+  $('#btnCopy').onclick = () => copyText(generateClassSource(state.design), 'ABAP');
   $('#btnCopyXml').onclick = () => copyText(toXml(state.design), 'XML');
-  $('#btnDownloadAbap').onclick = () => download(fileName(state.design.className, 'clas.abap'), generateClass(state.design), 'text/plain');
+  $('#btnDownloadAbap').onclick = () => download(fileName(state.design.className, 'clas.abap'), generateClassSource(state.design), 'text/plain');
   for (const b of document.querySelectorAll('.rail-btn')) b.onclick = () => showPanel(b.dataset.panel);
   for (const b of document.querySelectorAll('[data-view]')) b.onclick = () => setView(b.dataset.view);
   for (const b of document.querySelectorAll('[data-code]')) b.onclick = () => setCode(b.dataset.code);
@@ -149,7 +158,7 @@ function wire() {
   ver.value = state.prefs.ui5 && !state.prefs.ui5.startsWith('local') ? state.prefs.ui5 : '';
   ver.onchange = () => {
     const v = ver.value.trim();
-    if (v && !/^\d+\.\d+\.\d+$/.test(v)) { ver.classList.add('invalid'); toast('A version like 1.71.80, or empty for the latest'); return; }
+    if (v && !/^\d+\.\d+\.\d+$/.test(v) && !isUi5Url(v)) { ver.classList.add('invalid'); toast('A version like 1.71.80, the URL of a UI5 of your own, or empty for the latest'); return; }
     ver.classList.remove('invalid');
     state.prefs.ui5 = v;
     const minor = /^1\.(\d+)\./.exec(v);
@@ -194,6 +203,11 @@ renderInsert();
 renderAll();
 loadPreview();
 
+// a class to open: ?src=<raw GitHub URL> (the playground's parameter) or
+// ?class=<name>&repo=<owner/repo>[&ref=<branch>][&path=<folder>]
+openClassFromUrl(new URLSearchParams(location.search));
+if (state.refusedUi5) toast(`The link named a UI5 on another host (${state.refusedUi5}); it is not loaded from a link. Type it into the UI5 field to use it.`);
+
 // a shared link: its design replaces the current one (Recent keeps that)
 if (location.hash.startsWith('#d=')) {
   designFromLink(location.hash).then((d) => {
@@ -203,4 +217,4 @@ if (location.hash.startsWith('#d=')) {
 }
 
 // for the browser tests and the curious: the state and the generators
-window.designer = { state, generateClass, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };
+window.designer = { state, generateClass, generateClassSource, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };

@@ -23,17 +23,34 @@
   </style>
   <script>
     // ?ui5=<version> boots that version from the OpenUI5 CDN, ?ui5=local or
-    // ?ui5=local:<name> a tree tools/serve.mjs serves, nothing the latest
+    // ?ui5=local:<name> a tree tools/serve.mjs serves, ?ui5=<URL> a UI5 of
+    // your own: the folder that holds resources/ (http(s)://…, /… or ./…),
+    // nothing the latest from the CDN
     (function () {
       var p = new URLSearchParams(location.search);
       var v = p.get('ui5') || '';
       var local = /^local(?::([\w.-]+))?$/.exec(v);
+      var own = /^(https?:\/\/|\.{0,2}\/)[^"'<>\s]*$/.test(v);
+      // a UI5 on another host runs its scripts on this origin: a link may
+      // name only this server, localhost or SAP's CDNs - any other host
+      // only the editor that frames this page, where the user typed it
+      if (own && /^https?:/.test(v)) {
+        var host = '';
+        try { host = new URL(v).hostname; } catch (e) { own = false; }
+        var trusted = [location.hostname, 'localhost', '127.0.0.1', '[::1]', 'sdk.openui5.org', 'ui5.sap.com', 'openui5.hana.ondemand.com', 'sapui5.hana.ondemand.com'];
+        var framed = false;
+        try { framed = window.parent !== window && window.parent.location.origin === location.origin; } catch (e) { framed = false; }
+        if (trusted.indexOf(host) < 0 && !framed) { own = false; v = ''; }
+      }
       var src = local ? '/ui5/' + (local[1] || 'local') + '/resources/sap-ui-core.js'
+        : own ? v.replace(/\/+$/, '').replace(/\/resources(\/sap-ui-core\.js)?$/, '') + '/resources/sap-ui-core.js'
         : v ? 'https://sdk.openui5.org/' + encodeURIComponent(v) + '/resources/sap-ui-core.js'
         : 'https://sdk.openui5.org/resources/sap-ui-core.js';
       var theme = p.get('theme') || 'sap_horizon';
       // Horizon exists from 1.102 on; an older release gets Quartz
-      var minor = /^1\.(\d+)\./.exec(v) || (local && local[1] && /^1\.?(\d+)/.exec(local[1]));
+      // (a URL of your own that names no version: src/preview/init.js
+      // switches once UI5 says which it is)
+      var minor = /^1\.(\d+)\./.exec(v) || (local && local[1] && /^1\.?(\d+)/.exec(local[1])) || (own && /\b1\.(\d+)\.\d+\b/.exec(v));
       if (theme === 'sap_horizon' && minor && Number(minor[1]) < 102) theme = 'sap_fiori_3';
       document.write('<script id="sap-ui-bootstrap" src="' + src + '" data-sap-ui-theme="' + theme.replace(/[^\w]/g, '') +
         '" data-sap-ui-libs="sap.m" data-sap-ui-compatVersion="edge" data-sap-ui-async="true" data-sap-ui-oninit="module:designer/init"' +
@@ -50,8 +67,8 @@
       var el = document.getElementById('dsg-loading');
       if (!el || !el.parentNode) return;
       el.innerHTML = '<div style="max-width:28rem;text-align:center;line-height:1.5"><b>UI5 is not loading.</b><br>' +
-        'The canvas loads OpenUI5 from sdk.openui5.org. Without access to it, serve a local tree (README: <code>?ui5=local</code>), ' +
-        'or check the version in the toolbar.</div>';
+        'The canvas loads OpenUI5 from sdk.openui5.org. Without access to it, point it at a UI5 of your own (README: <code>?ui5=</code>), ' +
+        'or check the version or URL in the toolbar.</div>';
       window.parent.postMessage({ source: 'dsg-preview', type: 'error', message: 'UI5 did not load', boot: true }, '*');
     }, 25000);
   </script>

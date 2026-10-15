@@ -316,3 +316,94 @@ test('a view UI5 cannot render says why on the canvas, and the next edit renders
   await expect(page.locator('#previewStatus')).toBeHidden();
   await expect(preview(page).getByText('Customer data')).toBeVisible();
 });
+
+test('an abap2UI5 class opens as a design and exports as the same class', async ({ designer: page }) => {
+  const original = await abapOf(page);
+  await page.locator('#btnFile').click();
+  await page.locator('#btnOpenClass').click();
+  await page.locator('#dlg textarea').fill(original);
+  await page.locator('#dlg').getByRole('button', { name: 'Open', exact: true }).click();
+  await expect(page.locator('#dlg')).toContainText('Opened ZCL_MY_FORM');
+  await page.locator('#dlg').getByRole('button', { name: 'OK' }).click();
+  await expect(preview(page).getByText('Customer data')).toBeVisible();
+  await expect(page.locator('#codeInfo')).toContainText('imported class');
+  const back = await page.evaluate(() => window.designer.generateClassSource(window.designer.state.design));
+  expect(back).toBe(original);
+  await waitRendered(page);
+});
+
+test('?src= opens a class from a URL, with a report of what the editor keeps as ABAP', async ({ page, ui5 }) => {
+  await page.addInitScript(() => { try { localStorage.clear(); } catch { /* fresh context */ } });
+  await page.goto(`/index.html?ui5=${encodeURIComponent(ui5)}&src=/test/fixtures/z2ui5_cl_smp_app_493.clas.abap`);
+  await expect(page.locator('#dlg')).toContainText('Opened Z2UI5_CL_SMP_APP_493');
+  await expect(page.locator('#dlg')).toContainText('Kept as ABAP');
+  await expect(page.locator('#dlg')).toContainText('Page.navButtonPress = client->_event_nav_app_leave( )');
+  await page.locator('#dlg').getByRole('button', { name: 'OK' }).click();
+  await waitRendered(page);
+  await expect(preview(page).getByRole('heading', { name: 'Hello World', exact: true })).toBeVisible();
+  expect(page.url()).not.toContain('src=');
+  const abap = await page.evaluate(() => window.designer.generateClassSource(window.designer.state.design));
+  expect(abap).toContain('" @keywords hello world');
+  expect(abap).toContain(')->a( n = `navButtonPress` v = client->_event_nav_app_leave( )');
+  expect(abap).toContain('      client->view_display( view->stringify( ) ).');
+});
+
+test('Open in Playground opens the playground with the class in the link', async ({ designer: page }) => {
+  const original = await page.evaluate(() => window.designer.generateClassSource(window.designer.state.design));
+  // the playground itself is not part of this test: its page is answered here
+  await page.context().route('https://abap2ui5.github.io/playground/**', (route) => route.fulfill({ body: '<!doctype html><title>playground</title>', contentType: 'text/html' }));
+  await page.locator('#btnExport').click();
+  const [popup] = await Promise.all([page.waitForEvent('popup'), page.locator('#btnPlayground').click()]);
+  await popup.waitForLoadState();
+  const url = new URL(popup.url());
+  expect(`${url.origin}${url.pathname}`).toBe('https://abap2ui5.github.io/playground/');
+  const files = await popup.evaluate(async (fragment) => {
+    const bytes = Uint8Array.from(atob(fragment.slice(1).replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0));
+    const text = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    return JSON.parse(text);
+  }, url.hash.slice(1));
+  expect(files).toEqual([{ name: 'zcl_my_form.clas.abap', source: original }]);
+});
+
+test('the class is written for ABAP 7.02 when chosen, and saved with the design', async ({ designer: page }) => {
+  await page.locator('#abapRelease').selectOption('702');
+  await expect(page.locator('#code')).toContainText('DATA view TYPE REF TO z2ui5_cl_ui5_view_builder.');
+  await expect(page.locator('#code')).toContainText('IF client->check_on_init( ) = abap_true.');
+  expect(await abapOf(page)).not.toMatch(/DATA\(|VALUE #\(/);
+  expect(await page.evaluate(() => window.designer.state.design.release)).toBe('702');
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#abapRelease')).toHaveValue('');
+  await expect(page.locator('#code')).toContainText('DATA(view) = z2ui5_cl_ui5_view_builder=>factory(');
+});
+
+test('the canvas boots UI5 from a URL of your own', async ({ page }) => {
+  // the bootstrap the preview writes - no UI5 is loaded, from anywhere
+  await page.route((url) => url.pathname.endsWith('/sap-ui-core.js'), (route) => route.abort());
+  const src = async (ui5) => {
+    await page.goto(`/preview.html?ui5=${encodeURIComponent(ui5)}`, { waitUntil: 'domcontentloaded' });
+    return page.locator('#sap-ui-bootstrap').getAttribute('src');
+  };
+  // a host of its own is refused when the page is opened by a link -
+  // its scripts would run on this origin; the editor's field below may
+  expect(await src('https://ui5.example.com/1.71.80/')).toBe('https://sdk.openui5.org/resources/sap-ui-core.js');
+  expect(await src('http://localhost:9999/ui5/')).toBe('http://localhost:9999/ui5/resources/sap-ui-core.js');
+  expect(await src('https://ui5.sap.com/1.71.80/')).toBe('https://ui5.sap.com/1.71.80/resources/sap-ui-core.js');
+  expect(await src('/ui5/mine/resources')).toBe('/ui5/mine/resources/sap-ui-core.js');
+  expect(await src('./ui5/resources/sap-ui-core.js')).toBe('./ui5/resources/sap-ui-core.js');
+  expect(await src('1.71.80')).toBe('https://sdk.openui5.org/1.71.80/resources/sap-ui-core.js');
+  expect(await src('/"><b>')).toBe('https://sdk.openui5.org/%2F%22%3E%3Cb%3E/resources/sap-ui-core.js');
+  // the editor's field takes the URL and hands it to the canvas
+  await page.goto('/index.html');
+  await page.locator('#ui5version').fill('https://ui5.example.com/1.71.80');
+  await page.locator('#ui5version').dispatchEvent('change');
+  await expect(page.locator('#ui5version')).not.toHaveClass(/invalid/);
+  await expect(page.locator('#preview')).toHaveAttribute('src', /ui5=https%3A%2F%2Fui5\.example\.com%2F1\.71\.80/);
+  // framed by the editor, the canvas takes the typed host
+  await expect(page.frameLocator('#preview').locator('#sap-ui-bootstrap')).toHaveAttribute('src', 'https://ui5.example.com/1.71.80/resources/sap-ui-core.js');
+  // the same host in a link to the editor is not taken, and says so -
+  // in a browser that has not been told it in the field before
+  await page.evaluate(() => { try { localStorage.clear(); } catch { /* fresh */ } });
+  await page.goto(`/index.html?ui5=${encodeURIComponent('https://ui5.example.com/1.71.80')}`);
+  await expect(page.locator('body')).toContainText('not loaded from a link');
+  await expect(page.locator('#preview')).not.toHaveAttribute('src', /ui5\.example\.com/);
+});

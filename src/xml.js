@@ -165,8 +165,11 @@ export function parseXml(src) {
 // Event handlers, ids and core:require are dropped - they name controller
 // methods abap2UI5 does not have. What was dropped or could not be
 // resolved is listed in the report (`importReport( )`), so the designer
-// can say so and offer to create the attributes.
-export function fromXml(src, base) {
+// can say so and offer to create the attributes. With `options.events` a
+// handler in the preview flavour this module writes, `.onEvent('NAME')`,
+// is the event NAME instead - what a view read out of a class carries;
+// `options.onNode(el, node)` sees every element with the node it became.
+export function fromXml(src, base, options = {}) {
   const doc = parseXml(src);
   if (!doc) throw new Error('XML: empty document');
   const uriToPrefix = {};
@@ -247,10 +250,13 @@ export function fromXml(src, base) {
     const c = getControl(type);
     if (!c && !report.unknown.includes(type)) report.unknown.push(type);
     const node = { id: newId(), type, props: {}, events: {}, aggs: {} };
+    if (options.onNode) options.onNode(el, node);
     const bindable = c && c.aggs ? Object.keys(c.aggs).filter((a) => c.aggs[a].bindable) : [];
     for (const [k, v] of Object.entries(el.attrs)) {
       if (k === 'xmlns' || k.startsWith('xmlns:') || k.includes(':')) continue;
       if (k === 'id') { report.ids += 1; continue; }
+      const named = options.events && /^\.onEvent\('([A-Z0-9_]+)'\)$/.exec(v);
+      if (named) { node.events[k] = named[1]; continue; }
       if ((c && c.events && c.events.includes(k)) || /^\s*\.[A-Za-z_$]/.test(v)) { report.handlers.push(`${local}.${k}`); continue; }
       node.props[k] = isBinding(v) ? bindingValue(v, k, bindable.includes(k), rowTable) : { m: 's', v: unescapeBindingLiteral(v) };
     }

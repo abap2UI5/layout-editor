@@ -45,11 +45,29 @@ export const state = {
   prefs: { device: '100%', theme: 'sap_horizon', ui5: '', view: 'split' },
 };
 
+const TRUSTED_UI5_HOSTS = ['localhost', '127.0.0.1', '[::1]', 'sdk.openui5.org', 'ui5.sap.com', 'openui5.hana.ondemand.com', 'sapui5.hana.ondemand.com'];
+
+// a ?ui5= a link may set: a version, local, a path on this server, or a
+// URL on this host, localhost or one of SAP's UI5 CDNs
+export function isLinkableUi5(v) {
+  if (!/^https?:/i.test(v)) return true;
+  try {
+    const { hostname } = new URL(v);
+    return hostname === location.hostname || TRUSTED_UI5_HOSTS.includes(hostname);
+  } catch { return false; }
+}
+
 export function loadPrefs() {
   try { Object.assign(state.prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch { /* defaults */ }
   // ?ui5=<version|local> overrides the stored version, for links and tests
+  // - but a UI5 on a host of its own only when the user typed it into
+  // the UI5 field: its scripts run on this origin, a link is anybody's
   const q = new URLSearchParams(location.search).get('ui5');
-  if (q !== null) state.prefs.ui5 = q;
+  if (q !== null && isLinkableUi5(q)) state.prefs.ui5 = q;
+  else if (q !== null) state.refusedUi5 = q;
+  // ?playground=<base url> sets where "Open in Playground" goes
+  const pg = new URLSearchParams(location.search).get('playground');
+  if (pg !== null) { state.prefs.playground = pg; savePrefs(); }
   state.view = state.prefs.view || 'split';
 }
 

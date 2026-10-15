@@ -41,11 +41,28 @@ The product is the generated class. It must:
 - `defaultAgg` is UI5's default aggregation and nothing else, because
   children of the default aggregation are written without a wrapper tag.
   Where a drop should land somewhere else, use `dropAgg`.
-- Generator changes (`src/abap.js`, `src/xml.js`) need all four checks:
-  `npm run verify` (unit, linter, runtime, browser).
+- Generator changes (`src/abap.js`, `src/xml.js`, `src/clas.js`) need all
+  four checks: `npm run verify` (unit, linter, runtime, browser).
+- An imported class (`src/clas.js`) is patched, not regenerated: only the
+  view chain is rewritten, every other line stays the author's. What the
+  editor cannot represent is kept as raw ABAP on its node or listed in the
+  import report - never dropped silently. Every starter's class must
+  round-trip byte-identically (`test/clas.test.mjs`).
+- The class comes in two releases (`design.release`): 7.40 and later, and
+  7.02. A generator change keeps the 7.02 class free of what 7.02 lacks
+  (inline declarations, string templates, constructor and table
+  expressions); `npm test` runs abaplint at v702 on it (`abaplint-702.jsonc`,
+  the rules of abap2UI5's own 7.02 check), `npm run verify:abap` runs both.
+- A starter (`src/starters.js`) uses only controls and properties of
+  `src/catalog.js`; every starter is a test design, rendered on 1.71 too.
 - `test/builder.mjs` models `z2ui5_cl_ui5_view_builder`. When the builder's
   semantics change upstream, change the model, and let `verify:abap` decide
   who is right.
+- A UI5 on another host runs with the editor's rights: `?ui5=` from a
+  link takes only this server, localhost and SAP's CDNs (`isLinkableUi5( )`
+  in `src/ui/store.js`, the same list in `preview.html`, which takes any
+  host only when the editor frames it). Any other host comes from the UI5
+  field, typed by the user. Never widen the list for a link.
 - The preview module (`src/preview/init.js`) runs inside UI5 1.71: ES5
   style, `sap.ui.define`, no API newer than 1.71.
 
@@ -56,6 +73,7 @@ The product is the generated class. It must:
 | `npm run serve` | The designer on http://127.0.0.1:8080/ |
 | `npm test` | Unit tests (catalogue vs. 1.71, class format, chain vs. builder model, import) |
 | `npm run check:abap` | abap2UI5 linter over the generated classes |
+| `npm run check:abap702` | abaplint at v702 over the generated 7.02 classes (also part of `npm test`) |
 | `npm run verify:abap` | Transpile and run the generated classes on abap2UI5 |
 | `npm run test:e2e` | The designer in Chromium, UI5 current and 1.71 |
 | `npm run verify` | All of the above |

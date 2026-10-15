@@ -5,8 +5,10 @@
 // does the last part for real, on the transpiled abap2UI5.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { allDesigns, kitchenSink } from './fixtures.mjs';
-import { generateClass, generateClassXml, abapGitFiles, viewChain, abapString } from '../src/abap.js';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { allDesigns, allDesigns702, kitchenSink } from './fixtures.mjs';
+import { generateClass, generateClassXml, abapGitFiles, viewChain, abapString, releaseOf } from '../src/abap.js';
 import { toXml, fromXml, escapeBindingLiteral } from '../src/xml.js';
 import { validate, clone, walk } from '../src/model.js';
 import { zip, crc32 } from '../src/zip.js';
@@ -14,7 +16,7 @@ import { builderXml } from './builder.mjs';
 
 const flat = (xml) => xml.replace(/>\s+</g, '><');
 
-for (const [id, design] of allDesigns()) {
+for (const [id, design] of [...allDesigns(), ...allDesigns702()]) {
   test(`${id}: the design has no problems`, () => {
     assert.deepEqual(validate(design).filter((i) => i.level !== 'info'), []);
   });
@@ -37,7 +39,9 @@ for (const [id, design] of allDesigns()) {
     assert.match(src, new RegExp(`^CLASS ${cls} DEFINITION PUBLIC\\.\\n`));
     assert.match(src, /INTERFACES z2ui5_if_app\./);
     assert.match(src, /DATA client TYPE REF TO z2ui5_if_client\./);
-    assert.match(src, /me->client = client\.\n {4}IF client->check_on_(init|navigated)\( \)\./);
+    assert.match(src, releaseOf(design) === '702'
+      ? /me->client = client\.\n {4}IF client->check_on_(init|navigated)\( \) = abap_true\./
+      : /me->client = client\.\n {4}IF client->check_on_(init|navigated)\( \)\./);
     assert.match(src, /client->view_display\( view->stringify\( \) \)\./);
     const hasEvents = JSON.stringify(design.root).includes('"events":{"');
     assert.equal(/METHOD on_event\./.test(src), hasEvents, 'on_event exactly when the view raises events');
@@ -80,6 +84,60 @@ for (const [id, design] of allDesigns()) {
   });
 }
 
+// What 7.02 does not have - the constructs abap2UI5's own downport
+// (abaplint's `downport` rule at v702) rewrites. Each is a statement or an
+// expression that would not compile there; the abaplint run below is the
+// authority, this list is the readable half of it.
+const NOT_IN_702 = [
+  [/\bDATA\(/, 'inline declaration DATA( )'],
+  [/\bFIELD-SYMBOL\(/, 'inline FIELD-SYMBOL( )'],
+  [/\|[^|\n]*\|/, 'string template |...|'],
+  [/\b(VALUE|NEW|COND|SWITCH|CONV|REF|CORRESPONDING|EXACT|REDUCE|FILTER)\s+#?\w*\s*\(/, 'constructor expression'],
+  [/\bLINE_EXISTS\(/, 'line_exists( )'],
+  [/\w\[\s/, 'table expression itab[ ]'],
+  [/\bFOR\s+\w+\s+IN\b/, 'FOR iteration'],
+  [/\bWITH EMPTY KEY\b/, 'WITH EMPTY KEY'],
+  [/\b(IF|ELSEIF)\s+\w+->\w+\(\s*\)\.$/m, 'predicative method call'],
+  [/->\*/, 'dereference chain ->*'],
+];
+
+for (const [id, design] of allDesigns702()) {
+  test(`${id}: the class uses no construct 7.02 lacks`, () => {
+    const src = generateClass(design);
+    assert.match(src, /^ {4}DATA view TYPE REF TO z2ui5_cl_ui5_view_builder\.$/m);
+    assert.match(src, /^ {4}view = z2ui5_cl_ui5_view_builder=>factory\($/m);
+    for (const line of src.split('\n')) {
+      // a backtick literal may hold anything; what is outside it is ABAP
+      const code = line.replace(/`(?:[^`]|``)*`/g, '``');
+      for (const [re, what] of NOT_IN_702) assert.ok(!re.test(code), `${what} in: ${line.trim()}`);
+    }
+    if (design.attributes.some((a) => a.type === 'table' && (a.rows || []).length)) {
+      assert.match(src, /^ {4}DATA \w+_row +TYPE ty_s_\w+\.$/m, 'a row variable per table');
+      assert.match(src, /^ {4}APPEND \w+_row TO \w+\.$/m);
+    }
+  });
+}
+
+test('the 7.02 classes pass abaplint at v702 (abaplint-702.jsonc)', async () => {
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const { writeClasses } = await import('../tools/gen-classes.mjs');
+  await writeClasses();
+  const bin = fileURLToPath(new URL('../node_modules/@abaplint/cli/abaplint', import.meta.url));
+  let out;
+  try {
+    out = execFileSync('node', [bin, 'abaplint-702.jsonc', '--format', 'json'], { cwd: root, encoding: 'utf8' });
+  } catch (err) {
+    out = `${err.stdout || ''}${err.stderr || ''}`;
+    assert.fail(`abaplint: ${out.slice(0, 1500)}`);
+  }
+  // the JSON report is the list of issues: none
+  const issues = JSON.parse(out.slice(out.indexOf('[')));
+  assert.deepEqual(issues.map((i) => `${i.file.filename}:${i.start.row} ${i.key} ${i.description}`), []);
+  const { readdirSync } = await import('node:fs');
+  const written = readdirSync(`${root}.verify/abap`).filter((f) => f.endsWith('_702.clas.abap'));
+  assert.equal(written.length, allDesigns702().length, 'every 7.02 class was checked');
+});
+
 test('the .clas.xml is what abapGit writes', () => {
   const d = kitchenSink();
   d.description = "Tom's <app> & more";
@@ -103,16 +161,22 @@ test('a namespaced class gets abapGit file names', () => {
 test('literals', () => {
   assert.equal(abapString('a`b'), '`a``b`');
   assert.equal(abapString('two\nlines {x} |y|'), '|two\\nlines \\{x\\} \\|y\\||');
+  assert.equal(abapString('two\nlines {x} |y|', '702'), '`two` && cl_abap_char_utilities=>newline && `lines {x} |y|`');
+  assert.equal(abapString('a\r\nb\tc', '702'), '`a` && cl_abap_char_utilities=>cr_lf && `b` && cl_abap_char_utilities=>horizontal_tab && `c`');
   assert.equal(escapeBindingLiteral('a {b} \\c'), 'a \\{b\\} \\\\c');
 });
 
 test('a long text is split so no line passes 255 characters', () => {
-  const d = kitchenSink();
-  const long = 'x'.repeat(700);
-  walk(d.root, (n) => { if (n.type === 'Title') n.props.text = { m: 's', v: long }; });
-  const src = generateClass(d);
-  assert.ok(src.split('\n').every((l) => l.length <= 255));
-  assert.equal(builderXml(viewChain(d).join('\n')), flat(toXml(d)));
+  for (const release of ['740', '702']) {
+    const d = kitchenSink();
+    d.release = release;
+    const long = 'x'.repeat(700);
+    walk(d.root, (n) => { if (n.type === 'Title') n.props.text = { m: 's', v: `${long}\n${long}` }; });
+    d.attributes.find((a) => a.name === 't_rows').rows[0].NAME = long;
+    const src = generateClass(d);
+    assert.ok(src.split('\n').every((l) => l.length <= 255), release);
+    assert.equal(builderXml(viewChain(d).join('\n')), flat(toXml(d)), release);
+  }
 });
 
 test('the zip is a zip', () => {

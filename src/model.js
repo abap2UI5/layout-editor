@@ -73,6 +73,8 @@ export function normalizeDesign(d) {
   }
   d.className = String(d.className || 'ZCL_MY_APP');
   d.description = String(d.description || '');
+  // the ABAP release of the class: 7.02, or nothing for 7.40 and later
+  if (d.release === '702') d.release = '702'; else delete d.release;
   d.attributes = Array.isArray(d.attributes) ? d.attributes : [];
   d.root.id = 'root';
   d.root.type = 'mvc:View';

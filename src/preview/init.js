@@ -327,5 +327,11 @@ sap.ui.define([
     post({ type: 'error', message: text, runtime: true });
   });
 
+  // Horizon exists from 1.102 on: a UI5 of your own (?ui5=<URL>) that
+  // turns out older gets Quartz, as a version from the CDN does
+  var minor = /^1\.(\d+)\./.exec(sap.ui.version);
+  var core = sap.ui.getCore();
+  if (minor && Number(minor[1]) < 102 && core.getConfiguration().getTheme() === 'sap_horizon') core.applyTheme('sap_fiori_3');
+
   post({ type: 'ready', version: sap.ui.version });
 });

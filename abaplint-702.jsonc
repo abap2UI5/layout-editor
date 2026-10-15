@@ -1,0 +1,34 @@
+{
+  // abaplint on the classes the designer generates for ABAP 7.02
+  // (npm run check:abap702 writes them to .verify/abap first): the
+  // syntax version and the rules of abap2UI5's own 7.02 gate
+  // (.github/abaplint/abap_702.jsonc in abap2UI5/abap2UI5), against the
+  // downported framework that @abap2ui5/node-runtime ships.
+  "global": {
+    "files": "/.verify/abap/**/*_702.clas.abap"
+  },
+  "dependencies": [
+    { "folder": "/node_modules/@abap2ui5/node-runtime/downport", "files": "/**/*.abap" },
+    { "folder": "/test/abaplint-deps", "files": "/**/*.abap" }
+  ],
+  "syntax": {
+    "version": "v702",
+    "errorNamespace": "."
+  },
+  "rules": {
+    "downport": true,
+    "begin_end_names": true,
+    "check_ddic": true,
+    "check_include": true,
+    "check_syntax": true,
+    "global_class": true,
+    "definitions_top": true,
+    "implement_methods": true,
+    "method_implemented_twice": true,
+    "parser_error": true,
+    "superclass_final": true,
+    "unknown_types": true,
+    "xml_bom": true,
+    "xml_consistency": true
+  }
+}
