@@ -571,8 +571,16 @@ export function validate(design) {
     }
   }
   walk(design.root, (n, parent, agg) => {
+    const nodeDef = getControl(n.type);
     for (const [p, v] of Object.entries(n.props || {})) {
       if (!v) continue;
+      if (v.m === 's') {
+        const pd = nodeDef && nodeDef.props && nodeDef.props[p];
+        const w = checkStatic(pd, v.v);
+        // a number or an enum value UI5 cannot parse fails the view; a size
+        // or a flag it logs and replaces by the default
+        if (w) issues.push({ level: ['int', 'float', 'enum'].includes(pd.type) ? 'error' : 'warning', text: `${n.type}.${p}: ${w}`, node: n.id });
+      }
       if (v.m === 'b' && !names.has(v.v)) issues.push({ level: 'error', text: `${n.type}.${p} is bound to ${v.v}, which is not an attribute`, node: n.id });
       else if (v.m === 'b') {
         const attr = attrByName.get(v.v);
@@ -638,6 +646,24 @@ export function checkValue(type, v) {
   if (type === 'int' && !/^-?\d+$/.test(t)) return `"${t}" is not a whole number`;
   if (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(t)) return `"${t}" is not a date (yyyy-mm-dd)`;
   if (type === 'time' && !/^\d{2}:\d{2}:\d{2}$/.test(t)) return `"${t}" is not a time (hh:mm:ss)`;
+  return null;
+}
+
+// sap.ui.core.CSSSize as UI5 1.71 checks it (sap/ui/core/library.js)
+const CSS_UNIT = '([rR][eE][mM]|[eE][mM]|[eE][xX]|[pP][xX]|[cC][mM]|[mM][mM]|[iI][nN]|[pP][tT]|[pP][cC]|[vV][wW]|[vV][hH]|[vV][mM][iI][nN]|[vV][mM][aA][xX]|%)';
+const CSS_NUM = '([0-9]+|[0-9]*\\.[0-9]+)';
+const CSS_SIZE = new RegExp(`^(auto|inherit|[-+]?(0*|${CSS_NUM}${CSS_UNIT})|calc\\(\\s*(\\(\\s*)*[-+]?(${CSS_NUM}${CSS_UNIT}?)(\\s*(\\)\\s*)*(\\s[-+]\\s|[*\\/])\\s*(\\(\\s*)*([-+]?(${CSS_NUM}${CSS_UNIT}?)))*\\s*(\\)\\s*)*\\))$`);
+
+// A static value UI5 does not take for the type of its property - it logs
+// it, and the control falls back to its default: null when it fits
+export function checkStatic(def, v) {
+  if (!def || v === '' || v == null) return null;
+  const t = String(v);
+  if (def.type === 'int' && !/^[-+]?\d+$/.test(t)) return `"${t}" is not a whole number`;
+  if (def.type === 'float' && !/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(t)) return `"${t}" is not a number`;
+  if (def.type === 'boolean' && t !== 'true' && t !== 'false') return `"${t}" is not true or false`;
+  if (def.type === 'cssSize' && !CSS_SIZE.test(t)) return `"${t}" is not a CSS size - e.g. 10rem, 50%, 200px or auto`;
+  if (def.type === 'enum' && def.values && !def.values.includes(t)) return `"${t}" is not one of ${def.values.join(', ')}`;
   return null;
 }
 

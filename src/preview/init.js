@@ -9,23 +9,18 @@ sap.ui.define([
 ], function (XMLView, Controller, JSONModel, MessageToast) {
   'use strict';
 
-  // view ids in turn: the next view is created while the current one is
-  // still on screen, so a re-render does not flicker - and two views cannot
-  // share an id. An id is busy from its creation until its view is
-  // destroyed: a render that failed or timed out never hands the next one
-  // the id of a view that is still there
+  // a new view id per view, never one used before: the next view is
+  // created while the current one is still on screen, so a re-render does
+  // not flicker - and a view whose destruction left controls behind (a
+  // SimpleForm that failed to render keeps its labels registered) can never
+  // collide with a later one
   var viewSeq = 0;
-  var busy = {};
   function nextViewId() {
-    for (var i = 0; i < 10; i++) {
-      var id = 'dsg' + ((viewSeq + i) % 10);
-      if (!busy[id]) { viewSeq = (viewSeq + i + 1) % 10; busy[id] = true; return id; }
-    }
-    return null;
+    viewSeq += 1;
+    return 'dsg' + viewSeq;
   }
   function destroyView(v) {
     if (!v) return;
-    delete busy[v.getId()];
     try { v.destroy(); } catch (e) { /* half built - gone either way */ }
   }
   var view = null;
@@ -62,7 +57,7 @@ sap.ui.define([
   // carry their template's id first (dsg0--<cell>-dsg0--<list>-0)
   function nodeIdOf(el) {
     while (el && el !== document.body) {
-      var m = el.id && /(?:^|-)dsg\d--(n[0-9a-z]+)/.exec(el.id);
+      var m = el.id && /(?:^|-)dsg\d+--(n[0-9a-z]+)/.exec(el.id);
       if (m) return m[1];
       el = el.parentElement;
     }
@@ -172,11 +167,9 @@ sap.ui.define([
     }, RENDER_TIMEOUT);
     var promise;
     var id = nextViewId();
-    if (!id) { fail('The view does not render', 'ten views are still loading - reload the canvas'); finish(); return; }
     try {
       promise = XMLView.create({ id: id, definition: msg.xml, controller: new PreviewController() });
     } catch (err) {
-      delete busy[id];
       fail('The view does not render', err);
       finish();
       return;
@@ -203,7 +196,6 @@ sap.ui.define([
         fail('The view does not render', err);
       }
     }, function (err) {
-      delete busy[id];
       fail('The view does not render', err);
     }).then(finish, function (err) { fail('The view does not render', err); finish(); });
   }

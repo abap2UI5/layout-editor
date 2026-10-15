@@ -3,7 +3,7 @@
 import { CONTROLS, DESCRIPTIONS, getControl, splitType, NAMESPACES } from '../catalog.js';
 import {
   createNode, findNode, insertNode, aggAccepts, rowContext, bindableAggs, bindListToTable, hasOwnTemplate, unbindList,
-  attributeFits, checkAttributeName, checkEventName,
+  attributeFits, checkAttributeName, checkEventName, checkStatic,
 } from '../model.js';
 import { state, commit } from './store.js';
 import { $, h, options, toast, displayType, rememberFocus, restoreFocus } from './dom.js';
@@ -266,13 +266,22 @@ function propRow(node, p, def, ctx) {
         onchange: (e) => update((n) => { if (e.target.value) n.props[p] = { m: 's', v: e.target.value }; else delete n.props[p]; }),
       }, h('option', { value: '', text: '— default —' }), options(vals, v));
     } else {
+      const bad = checkStatic(def, v);
       editor = h('input', {
         value: v,
+        class: bad ? 'invalid' : null,
+        title: bad || null,
         'aria-label': p,
         'data-focus': focusKey,
         spellcheck: def.type === 'string' ? 'true' : 'false',
         placeholder: def.hint || (def.type === 'cssSize' ? 'e.g. 10rem' : def.type === 'icon' ? 'sap-icon://…' : ''),
-        oninput: (e) => update((n) => { if (e.target.value !== '') n.props[p] = { m: 's', v: e.target.value }; else delete n.props[p]; }, { mergeKey: `p:${node.id}:${p}`, keepFocus: true }),
+        oninput: (e) => {
+          // a value UI5 would refuse shows as one while it is typed
+          const w = checkStatic(def, e.target.value);
+          e.target.classList.toggle('invalid', !!w);
+          e.target.title = w || '';
+          update((n) => { if (e.target.value !== '') n.props[p] = { m: 's', v: e.target.value }; else delete n.props[p]; }, { mergeKey: `p:${node.id}:${p}`, keepFocus: true });
+        },
       });
     }
   } else if (m === 'b') {

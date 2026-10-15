@@ -212,7 +212,7 @@ export const CONTROLS = {
     events: ['complete', 'stepActivate'],
     aggs: { steps: { allow: ['WizardStep'] } },
     defaultAgg: 'steps',
-    init: { aggs: { steps: [{ type: 'WizardStep', props: { title: 'Step 1', validated: 'true' } }, { type: 'WizardStep', props: { title: 'Step 2' } }] } },
+    init: { aggs: { steps: [{ type: 'WizardStep', props: { title: 'Step 1', validated: 'true' } }, { type: 'WizardStep', props: { title: 'Step 2' } }, { type: 'WizardStep', props: { title: 'Step 3' } }] } },
   },
   WizardStep: {
     category: 'Parts',
@@ -569,7 +569,7 @@ export const CONTROLS = {
     category: 'Lists',
     props: { title: altStr, visibleRowCount: int, visibleRowCountMode: en(['Fixed', 'Interactive', 'Auto']), selectionMode: en(['None', 'Single', 'MultiToggle']), selectionBehavior: en(['Row', 'RowSelector', 'RowOnly']), enableSelectAll: bool, showNoData: bool, enableColumnReordering: bool, rowHeight: int, width: size, visible: bool },
     events: ['rowSelectionChange', 'cellClick'],
-    aggs: { extension: { allow: ['Toolbar', 'OverflowToolbar'] }, columns: { allow: ['table:Column'], templateFor: 'rows' }, rows: { bindable: true, noTemplate: true }, footer: { single: true } },
+    aggs: { extension: { allow: ['Toolbar', 'OverflowToolbar'] }, columns: { allow: ['table:Column'], templateFor: 'rows' }, rows: { bindable: true, noTemplate: true, allow: [] }, footer: { single: true } },
     defaultAgg: 'columns',
     init: {
       props: { title: 'Table', visibleRowCount: '5' },

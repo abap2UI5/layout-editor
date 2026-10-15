@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createDesign, createNode, insertNode, removeNode, moveNode, shiftNode, duplicateNode, dropTarget, findNode,
-  rowContext, bindListToTable, unbindList, validate, previewModel, typeName, attributeFits, renameAttribute, attributeUsage, collectEvents, normalizeDesign,
+  rowContext, aggAccepts, bindListToTable, unbindList, validate, previewModel, typeName, attributeFits, renameAttribute, attributeUsage, collectEvents, normalizeDesign,
 } from '../src/model.js';
 import { generateClass } from '../src/abap.js';
 import { toXml } from '../src/xml.js';
@@ -219,6 +219,33 @@ test('a design of an older version is migrated, a newer one refused', () => {
   assert.throws(() => normalizeDesign(d), /version 99/);
   d.version = 0;
   assert.throws(() => normalizeDesign(d), /no migration/);
+});
+
+test('a static value UI5 cannot take is said: a number or an enum fails the view, a size is logged', () => {
+  const d = createDesign();
+  const form = createNode('form:SimpleForm');
+  form.props.columnsM = { m: 's', v: 'abc' };
+  form.props.width = { m: 's', v: '1.5' };
+  insertNode(d, form, page(d).id);
+  const issues = validate(d);
+  assert.ok(issues.some((i) => i.level === 'error' && /columnsM: "abc" is not a whole number/.test(i.text)));
+  assert.ok(issues.some((i) => i.level === 'warning' && /width: "1.5" is not a CSS size/.test(i.text)));
+  form.props.columnsM.v = '2';
+  form.props.width.v = 'calc(100% - 2rem)';
+  assert.ok(!validate(d).some((i) => /columnsM|width/.test(i.text)));
+});
+
+test('the rows of a grid table come from its binding: nothing is dropped into them', () => {
+  const d = createDesign();
+  const grid = createNode('table:Table');
+  insertNode(d, grid, page(d).id);
+  assert.equal(aggAccepts(grid, 'rows', 'Button'), false);
+  const t = dropTarget(d, grid.id, 'Button');
+  assert.ok(!(t.parentId === grid.id && t.agg === 'rows'));
+});
+
+test('a new Wizard has the three steps UI5 wants at least', () => {
+  assert.equal(createNode('Wizard').aggs.steps.length, 3);
 });
 
 test('a class name is dotted names, each part a name', async () => {
