@@ -18,6 +18,10 @@
       <label for="className">Class</label>
       <input id="className" spellcheck="false" autocomplete="off" maxlength="30">
       <input id="description" placeholder="Description" maxlength="60" autocomplete="off" aria-label="Description">
+      <select id="abapRelease" aria-label="ABAP release" title="The ABAP release the class is written for">
+        <option value="">ABAP 7.40+</option>
+        <option value="702">ABAP 7.02</option>
+      </select>
     </div>
     <div class="bar-actions">
       <button id="btnCmd" class="ghost cmd" title="Command palette (Ctrl+K)"><span>Search or insert…</span><kbd>Ctrl K</kbd></button>

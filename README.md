@@ -110,7 +110,12 @@ Also in the editor:
 - An abap2UI5 release that ships `z2ui5_cl_ui5_view_builder`. The class is
   verified against **abap2UI5 1.147.0**.
 - ABAP 7.40 or later, or ABAP Cloud. The class uses inline declarations and
-  `VALUE #( )`, like every abap2UI5 sample.
+  `VALUE #( )`, like every abap2UI5 sample. For an older system, choose
+  **ABAP 7.02** next to the class name: the class then declares its
+  variables at the top of a method, fills its sample rows with `APPEND`,
+  and writes a line break as `cl_abap_char_utilities=>newline` joined with
+  `&&` - no inline declarations, string templates or constructor
+  expressions. The choice is saved with the design.
 - Every control and property the palette offers exists in **UI5 1.71**:
   121 controls of sap.m, sap.ui.core, sap.ui.layout, sap.ui.unified,
   sap.ui.table, sap.f and sap.uxap. A control inserted by class name is
@@ -122,9 +127,9 @@ Each claim above is backed by a check that runs in CI:
 
 | Check | What it proves |
 |---|---|
-| `npm test` | The palette against the **real metadata of UI5 1.71.80** (`test/ui5-1.71.json`): every property, enum value, aggregation, default aggregation and event exists. The class file format (no BOM, LF, max. 255 characters per line, no trailing blanks) and the `.clas.xml` format abapGit writes. The generated chain, replayed by a model of `z2ui5_cl_ui5_view_builder`, builds exactly the editor's view. An imported view comes back unchanged. |
+| `npm test` | The palette against the **real metadata of UI5 1.71.80** (`test/ui5-1.71.json`): every property, enum value, aggregation, default aggregation and event exists. The class file format (no BOM, LF, max. 255 characters per line, no trailing blanks) and the `.clas.xml` format abapGit writes. The generated chain, replayed by a model of `z2ui5_cl_ui5_view_builder`, builds exactly the editor's view. An imported view comes back unchanged. The 7.02 classes contain none of the constructs 7.02 lacks, and pass **abaplint at syntax version 7.02** with the rules of abap2UI5's own 7.02 check (`abaplint-702.jsonc`, also `npm run check:abap702`). |
 | `npm run check:abap` | The [abap2UI5 linter](https://abap2ui5.github.io/linter/) on the generated classes: controls, properties, enum values and icons against 1.71, plus the `chain-house-layout` rule. |
-| `npm run verify:abap` | Every starter and a kitchen sink with every control of the palette is **transpiled against abap2UI5** (`@abap2ui5/node-runtime`, type-checked) and **run on it**. The view and the model of the first roundtrip have to equal the editor's, attribute for attribute and value for value. Every event has to reach `on_event`. |
+| `npm run verify:abap` | Every starter and a kitchen sink with every control of the palette, each as a 7.40 and as a 7.02 class, is **transpiled against abap2UI5** (`@abap2ui5/node-runtime`, type-checked) and **run on it**. The view and the model of the first roundtrip have to equal the editor's, attribute for attribute and value for value. Every event has to reach `on_event`. |
 | `npm run test:e2e` | The editor in Chromium: drag and drop, selection on canvas, outline and code, the control toolbar, the command palette, building blocks, properties, binding, events, undo, import, ZIP download. Every design renders on the current UI5 **and on 1.71**. |
 
 ## Development

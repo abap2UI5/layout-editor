@@ -83,6 +83,7 @@ function renderAll(opts = {}) {
   if (document.activeElement !== cn) cn.value = d.className;
   cn.classList.toggle('invalid', !!checkClassName(d.className));
   if (document.activeElement !== $('#description')) $('#description').value = d.description || '';
+  $('#abapRelease').value = d.release || '';
   renderLayers();
   // keep the input being typed into: re-rendering its panel would drop it
   if (!opts.keepFocus || !$('#inspector').contains(document.activeElement)) renderInspector();
@@ -104,6 +105,7 @@ function wire() {
     commit((d) => { d.className = v; }, { mergeKey: 'className', keepFocus: true });
   });
   $('#description').addEventListener('input', (e) => commit((d) => { d.description = e.target.value; }, { mergeKey: 'description', keepFocus: true }));
+  $('#abapRelease').addEventListener('change', (e) => commit((d) => { if (e.target.value) d.release = e.target.value; else delete d.release; }));
   wireMenu($('#btnFile'), $('#fileMenu'));
   wireMenu($('#btnExport'), $('#exportMenu'));
   $('#btnNew').onclick = newDialog;

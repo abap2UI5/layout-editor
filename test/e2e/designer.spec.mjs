@@ -316,3 +316,14 @@ test('a view UI5 cannot render says why on the canvas, and the next edit renders
   await expect(page.locator('#previewStatus')).toBeHidden();
   await expect(preview(page).getByText('Customer data')).toBeVisible();
 });
+
+test('the class is written for ABAP 7.02 when chosen, and saved with the design', async ({ designer: page }) => {
+  await page.locator('#abapRelease').selectOption('702');
+  await expect(page.locator('#code')).toContainText('DATA view TYPE REF TO z2ui5_cl_ui5_view_builder.');
+  await expect(page.locator('#code')).toContainText('IF client->check_on_init( ) = abap_true.');
+  expect(await abapOf(page)).not.toMatch(/DATA\(|VALUE #\(/);
+  expect(await page.evaluate(() => window.designer.state.design.release)).toBe('702');
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#abapRelease')).toHaveValue('');
+  await expect(page.locator('#code')).toContainText('DATA(view) = z2ui5_cl_ui5_view_builder=>factory(');
+});

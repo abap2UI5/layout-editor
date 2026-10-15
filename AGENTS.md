@@ -43,6 +43,11 @@ The product is the generated class. It must:
   Where a drop should land somewhere else, use `dropAgg`.
 - Generator changes (`src/abap.js`, `src/xml.js`) need all four checks:
   `npm run verify` (unit, linter, runtime, browser).
+- The class comes in two releases (`design.release`): 7.40 and later, and
+  7.02. A generator change keeps the 7.02 class free of what 7.02 lacks
+  (inline declarations, string templates, constructor and table
+  expressions); `npm test` runs abaplint at v702 on it (`abaplint-702.jsonc`,
+  the rules of abap2UI5's own 7.02 check), `npm run verify:abap` runs both.
 - `test/builder.mjs` models `z2ui5_cl_ui5_view_builder`. When the builder's
   semantics change upstream, change the model, and let `verify:abap` decide
   who is right.
@@ -56,6 +61,7 @@ The product is the generated class. It must:
 | `npm run serve` | The designer on http://127.0.0.1:8080/ |
 | `npm test` | Unit tests (catalogue vs. 1.71, class format, chain vs. builder model, import) |
 | `npm run check:abap` | abap2UI5 linter over the generated classes |
+| `npm run check:abap702` | abaplint at v702 over the generated 7.02 classes (also part of `npm test`) |
 | `npm run verify:abap` | Transpile and run the generated classes on abap2UI5 |
 | `npm run test:e2e` | The designer in Chromium, UI5 current and 1.71 |
 | `npm run verify` | All of the above |

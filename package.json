@@ -11,6 +11,7 @@
     "serve": "node tools/serve.mjs 8080",
     "test": "node --test test/*.test.mjs",
     "check:abap": "node tools/gen-classes.mjs && abap2ui5lint --config abap2ui5lint.jsonc --no-render",
+    "check:abap702": "node tools/gen-classes.mjs && abaplint abaplint-702.jsonc",
     "verify:abap": "node tools/verify-abap.mjs",
     "test:e2e": "playwright test",
     "ui5:metadata": "node tools/ui5-metadata.mjs 1.71.80",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@abap2ui5/linter": "0.8.5",
     "@abap2ui5/node-runtime": "1.147.0",
+    "@abaplint/cli": "2.120.80",
     "@abaplint/transpiler-cli": "2.14.3",
     "@playwright/test": "1.56.1",
     "express": "5.3.0"

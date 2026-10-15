@@ -156,7 +156,53 @@ export function kitchenSink(half) {
   return d;
 }
 
+// texts the two releases write differently: line breaks, tabs and texts
+// longer than a line - a string template on 7.40, literal pieces around
+// cl_abap_char_utilities on 7.02 - in an attribute and in the rows of a
+// table and of its table field, a long text in the view
+export function texts() {
+  const long = 'A text longer than one line of ABAP takes, so the class writes it in pieces. '.repeat(5).trim();
+  const d = createDesign();
+  d.className = 'ZCL_DSG_TEXTS';
+  d.description = 'line breaks, tabs and long texts';
+  d.attributes = [
+    { name: 'note', type: 'string', value: 'Line one\nLine two\tafter a tab\r\nafter CR LF `quoted` {braces} |bars|' },
+    { name: 'long_text', type: 'string', value: long },
+    {
+      name: 't_notes', type: 'table',
+      fields: [{ name: 'TITLE', type: 'string' }, { name: 'BODY', type: 'string' }, { name: 'LINES', type: 'table', fields: [{ name: 'TEXT', type: 'string' }] }],
+      rows: [
+        { TITLE: 'Two lines', BODY: 'first\nsecond', LINES: [{ TEXT: 'a\tb' }, { TEXT: long }] },
+        { TITLE: 'Long', BODY: long, LINES: [] },
+        { TITLE: 'Plain', BODY: '' },
+      ],
+    },
+  ];
+  const page = d.root.aggs.content[0];
+  page.props.title = { m: 's', v: 'Texts' };
+  page.aggs.content = [];
+  // a line break in a view attribute stays out: abap2UI5 sends it as &#xA;,
+  // the canvas's XML (src/xml.js) as it is - the unit tests hold the chain
+  insertNode(d, createNode('Text', { props: { text: `{braces} and ${long}` } }), page.id);
+  const area = createNode('TextArea', { props: { rows: '4' } });
+  area.props.value = { m: 'b', v: 'note' };
+  insertNode(d, area, page.id);
+  const text = createNode('Text', { props: {} });
+  text.props.text = { m: 'b', v: 'long_text' };
+  insertNode(d, text, page.id);
+  const list = createNode('List');
+  insertNode(d, list, page.id);
+  bindListToTable(d, list.id, 'items', 't_notes');
+  return d;
+}
+
 export function allDesigns() {
-  return [...STARTERS.map((s) => [s.id, s.make()]), ['kitchen-sink-1', kitchenSink(1)], ['kitchen-sink-2', kitchenSink(2)]];
+  return [...STARTERS.map((s) => [s.id, s.make()]), ['kitchen-sink-1', kitchenSink(1)], ['kitchen-sink-2', kitchenSink(2)], ['texts', texts()]];
+}
+
+// the same designs as 7.02 classes, under a class name of their own so
+// both releases can stand next to each other in one check
+export function allDesigns702() {
+  return allDesigns().map(([id, d]) => [`${id}-702`, Object.assign(d, { className: `${d.className}_702`, release: '702' })]);
 }
 
