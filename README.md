@@ -85,8 +85,29 @@ Also in the editor:
   UI5 for the control's properties, aggregations and events, and from then
   on it works like one of the palette's. Nothing has checked it against
   1.71, and *Checks* says so.
+- **Open ABAP class** reads an existing abap2UI5 app class: paste it, open
+  a `.clas.abap` file, or link it with `?src=<raw URL>` (the playground's
+  parameter; raw.githubusercontent.com, a github.com file page, or a gist)
+  or `?class=<name>&repo=<owner/repo>[&ref=<branch>][&path=<folder>]`.
+  The `z2ui5_cl_ui5_view_builder` chain becomes the design, the public
+  attributes the data, `client->_event( )` the event names. Export writes
+  the chain back into that class and leaves every other line as it was;
+  new attributes go to the end of the public section, new events get a
+  `WHEN` branch in `on_event`. A view attribute the editor cannot edit
+  (`client->check_app_prev_stack( )`, a `COND #( )`, an `id`) is kept as
+  ABAP on its control and written back unchanged; the dialog after the
+  import lists it, and lists what could not be imported at all (a public
+  attribute of a type the *Data* tab has not, attributes of the View
+  element). A class that builds no view, or more than one, is refused
+  with the reason.
 - **Import XML** brings in an existing UI5 XML view. Controls the palette
   does not know are kept as they are.
+- **Open in Playground** opens the class in the
+  [abap2UI5 playground](https://abap2ui5.github.io/playground/), in a share
+  link of the playground's own format; `?playground=<url>` points it at
+  another deployment. **Open in VS Code** hands the class to the abap2UI5
+  extension (`vscode://abap2ui5.abap2ui5/open`), which opens it as an
+  unsaved `.clas.abap` and offers to run it.
 - **Save / Open** stores the design as JSON so you can continue later. The
   design is also kept in the browser between visits; what New, Open or
   Import replaced is under *Recent designs*. **Copy share link** puts the
@@ -115,6 +136,25 @@ Also in the editor:
   121 controls of sap.m, sap.ui.core, sap.ui.layout, sap.ui.unified,
   sap.ui.table, sap.f and sap.uxap. A control inserted by class name is
   whatever the canvas's UI5 says it is.
+
+## Deploying to your system
+
+The editor does not write to an SAP system, and neither does anything else
+in the abap2UI5 tool set today: the MCP server's system mode
+(`A2UI5_MCP_SYSTEM_URL`, see
+[mcp-server](https://github.com/abap2UI5/mcp-server#system-mode-operating-apps-on-a-real-sap-system))
+lists, starts and operates apps that are already on the system
+(`system_status`, `app_list`, `app_start`, `app_describe`, `app_act`), and
+its `deploy_app` writes into a local sandbox only. To get a class onto a
+system:
+
+1. *Export* the ZIP and pull it with abapGit (*New Offline* → *Import
+   ZIP*), or paste the `.clas.abap` into a new class in ADT or SE24 and
+   activate it.
+2. Optionally, check it from an MCP client with the system mode switched
+   on: `system_status` first (does the logon work), then `app_start` with
+   the class name - the agent snapshot shows the view the class built.
+   `app_act` runs events for real, as the configured user.
 
 ## What is checked, and how
 

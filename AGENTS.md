@@ -41,8 +41,13 @@ The product is the generated class. It must:
 - `defaultAgg` is UI5's default aggregation and nothing else, because
   children of the default aggregation are written without a wrapper tag.
   Where a drop should land somewhere else, use `dropAgg`.
-- Generator changes (`src/abap.js`, `src/xml.js`) need all four checks:
-  `npm run verify` (unit, linter, runtime, browser).
+- Generator changes (`src/abap.js`, `src/xml.js`, `src/clas.js`) need all
+  four checks: `npm run verify` (unit, linter, runtime, browser).
+- An imported class (`src/clas.js`) is patched, not regenerated: only the
+  view chain is rewritten, every other line stays the author's. What the
+  editor cannot represent is kept as raw ABAP on its node or listed in the
+  import report - never dropped silently. Every starter's class must
+  round-trip byte-identically (`test/clas.test.mjs`).
 - `test/builder.mjs` models `z2ui5_cl_ui5_view_builder`. When the builder's
   semantics change upstream, change the model, and let `verify:abap` decide
   who is right.
