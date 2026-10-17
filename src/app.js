@@ -22,7 +22,7 @@ import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code
 import { loadPreview, postPreview, sendPreview } from './ui/preview.js';
 import { handleDrop, copySelection, pasteSelection, addControlByName } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
-import { newDialog, importDialog, openClassDialog, openClassFromUrl, recentDialog, shareLink, openFile, saveDesign, exportZip, openInPlayground, openInVscode } from './ui/files.js';
+import { newDialog, importDialog, openClassDialog, openClassFromUrl, openClassFromPlayground, recentDialog, shareLink, openFile, saveDesign, exportZip, openInPlayground, openInVscode } from './ui/files.js';
 import { onKey } from './ui/keys.js';
 
 
@@ -238,6 +238,10 @@ function openLinkedDesign() {
 }
 openLinkedDesign();
 window.addEventListener('hashchange', openLinkedDesign);
+
+// a class the playground handed over: #playground=<its share fragment>
+openClassFromPlayground();
+window.addEventListener('hashchange', openClassFromPlayground);
 
 // for the browser tests and the curious: the state and the generators
 window.designer = { state, generateClass, generateClassSource, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };

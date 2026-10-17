@@ -28,6 +28,27 @@ export async function deflate(text) {
   return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
 }
 
+export function fromBase64Url(text) {
+  const bin = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+export async function inflate(bytes) {
+  return new TextDecoder().decode(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+}
+
+// The way back: the playground's "Open in Layout Editor" hands its app class
+// over as #playground=<the share fragment>, the format below read the other
+// way. Refuses what is not that format rather than guessing at it.
+export async function filesFromPlaygroundFragment(fragment) {
+  if (!fragment || fragment[0] !== '2') throw new Error('not a playground link of a version this editor reads');
+  const files = JSON.parse(await inflate(fromBase64Url(fragment.slice(1))));
+  if (!Array.isArray(files) || !files.length || files.some((f) => typeof f?.name !== 'string' || typeof f?.source !== 'string')) {
+    throw new Error('the link holds no files');
+  }
+  return files;
+}
+
 // the playground's fragment for one or more files: version 2
 export async function playgroundFragment(files) {
   const payload = JSON.stringify(files.map(({ name, source }) => ({ name, source })));

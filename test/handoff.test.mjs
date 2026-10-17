@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { allDesigns } from './fixtures.mjs';
 import { generateClass } from '../src/abap.js';
-import { playgroundLink, playgroundFragment, vscodeLink, PLAYGROUND_URL } from '../src/handoff.js';
+import { playgroundLink, playgroundFragment, filesFromPlaygroundFragment, vscodeLink, PLAYGROUND_URL } from '../src/handoff.js';
 
 const fromBase64Url = (text) => Uint8Array.from(atob(text.replaceAll('-', '+').replaceAll('_', '/')), (c) => c.charCodeAt(0));
 const inflate = async (bytes) => new TextDecoder().decode(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
@@ -38,4 +38,13 @@ test('the VS Code link carries the class for the extension\'s URI handler', asyn
   const params = new URL(href).searchParams;
   assert.equal(params.get('name'), 'zcl_my_app.clas.abap');
   assert.equal(await inflate(fromBase64Url(params.get('code'))), source);
+});
+
+test('a class the playground hands over (#playground=) reads back as the files it wrote', async () => {
+  const files = [{ name: 'zcl_my_app.clas.abap', source }, { name: 'zcl_helper.clas.abap', source: 'CLASS zcl_helper DEFINITION.' }];
+  assert.deepEqual(await filesFromPlaygroundFragment(await playgroundFragment(files)), files);
+  await assert.rejects(filesFromPlaygroundFragment('1abc'), /version/);
+  await assert.rejects(filesFromPlaygroundFragment(''), /version/);
+  const empty = await playgroundFragment([]);
+  await assert.rejects(filesFromPlaygroundFragment(empty), /no files/);
 });
