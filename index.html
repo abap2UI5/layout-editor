@@ -103,6 +103,11 @@
           <button data-device="820px" title="Tablet">Tablet</button>
           <button data-device="390px" title="Phone">Phone</button>
         </div>
+        <select id="zoom" aria-label="Zoom of the canvas" title="Zoom of the canvas - a large view at a glance">
+          <option value="1">100%</option>
+          <option value="0.75">75%</option>
+          <option value="0.5">50%</option>
+        </select>
         <select id="theme" aria-label="Theme">
           <option value="sap_horizon">Horizon</option>
           <option value="sap_fiori_3">Quartz Light</option>
@@ -127,6 +132,7 @@
               <button data-code="diff" id="btnDiff" hidden title="What the export changes in the class as it was opened">Changes</button>
             </div>
             <span id="codeInfo" class="muted"></span>
+            <button id="btnCopyCode" class="ghost small" title="Copy what this tab shows">Copy</button>
           </div>
           <pre id="code" class="codeblock" tabindex="0" aria-label="Generated code"></pre>
         </div>

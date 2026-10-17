@@ -65,16 +65,33 @@ function renderDiff(pre, d) {
   const before = d.abap.source.replace(/\n$/, '').split('\n');
   const after = classSource(d).source.replace(/\n$/, '').split('\n');
   const h = diffHunks(before, after);
+  // the lines compare without the end of the file: whether it ends in a
+  // newline is said on its own
+  const eol = d.abap.source.endsWith('\n') !== classSource(d).source.endsWith('\n');
+  const eolNote = eol ? ' · the file gets a newline at its end' : '';
   $('#codeInfo').textContent = h.added || h.removed
-    ? `+${h.added} −${h.removed} lines against the class as it was opened`
-    : 'the export writes the class as it was opened';
+    ? `+${h.added} −${h.removed} lines against the class as it was opened${eolNote}`
+    : eol ? 'only the end of the file changes: it gets a newline' : 'the export writes the class as it was opened';
   if (!h.added && !h.removed) {
-    pre.innerHTML = '<span class="ln skip">No change - every line stays as it was.</span>';
+    pre.innerHTML = eol ? '<span class="ln skip">Every line stays as it was - only a newline is added at the end of the file.</span>'
+      : '<span class="ln skip">No change - every line stays as it was.</span>';
     return;
   }
   pre.innerHTML = h.lines.map((l) => (l.op === '…'
     ? `<span class="ln skip">⋯ ${l.count} unchanged line${l.count === 1 ? '' : 's'}</span>`
     : `<span class="ln ${l.op === '+' ? 'add' : l.op === '-' ? 'del' : ''}" data-n="${l.op === '-' ? l.a : l.b}">${highlightAbapLine(l.text) || ' '}</span>`)).join('');
+}
+
+// what the tab shows, as text: the class, the view, or the changes as a
+// unified diff
+export function codeText() {
+  const d = state.design;
+  if (state.code === 'xml') return { text: toXml(d), what: 'XML' };
+  if (state.code === 'diff' && d.abap && d.abap.source) {
+    const h = diffHunks(d.abap.source.replace(/\n$/, '').split('\n'), classSource(d).source.replace(/\n$/, '').split('\n'));
+    return { text: h.lines.map((l) => (l.op === '…' ? `@@ ${l.count} unchanged @@` : `${l.op}${l.text}`)).join('\n'), what: 'Changes' };
+  }
+  return { text: classSource(d).source, what: 'ABAP' };
 }
 
 // mark the selected control's lines, and bring the first into view
@@ -116,7 +133,7 @@ export async function copyText(text, what) {
   } catch {
     // clipboard refused (no permission, not a secure context): show the
     // code and select it, so Ctrl+C works
-    setCode(what === 'XML' ? 'xml' : 'abap');
+    setCode(what === 'XML' ? 'xml' : what === 'Changes' ? 'diff' : 'abap');
     if (state.view === 'canvas') setView('split');
     const range = document.createRange();
     range.selectNodeContents($('#code'));

@@ -14,11 +14,11 @@ import { generateClassSource } from './clas.js';
 import { toXml } from './xml.js';
 import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection, isUi5Url, onOtherTab } from './ui/store.js';
 import { $, toast, download } from './ui/dom.js';
-import { renderInsert, renderInsertTarget } from './ui/insert.js';
+import { renderInsert, renderInsertTarget, onInsertKey } from './ui/insert.js';
 import { renderLayers, onLayersKey, clearDropMarks, renderCrumbs } from './ui/layers.js';
 import { renderInspector } from './ui/inspector.js';
 import { renderData, renderIssues } from './ui/data.js';
-import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code.js';
+import { renderCode, highlightCode, setCode, setView, copyText, codeText } from './ui/code.js';
 import { loadPreview, postPreview, sendPreview, renderEventLog } from './ui/preview.js';
 import { handleDrop, copySelection, pasteSelection, addControlByName, addControl } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
@@ -148,6 +148,7 @@ function onRailKey(e) {
 
 function wire() {
   $('#insertSearch').addEventListener('input', renderInsert);
+  $('#panel-insert').addEventListener('keydown', onInsertKey);
   $('#className').addEventListener('input', (e) => {
     const v = e.target.value.toUpperCase().replace(/\s/g, '');
     // the field shows the name the class gets, the caret stays in place
@@ -185,6 +186,7 @@ function wire() {
   $('#btnZip2').onclick = exportZip;
   $('#btnCopy').onclick = () => copyText(generateClassSource(state.design), 'ABAP');
   $('#btnCopyXml').onclick = () => copyText(toXml(state.design), 'XML');
+  $('#btnCopyCode').onclick = () => { const c = codeText(); copyText(c.text, c.what); };
   $('#btnDownloadAbap').onclick = () => download(fileName(state.design.className, 'clas.abap'), generateClassSource(state.design), 'text/plain');
   for (const b of document.querySelectorAll('.rail-btn')) b.onclick = () => showPanel(b.dataset.panel);
   $('.rail').addEventListener('keydown', onRailKey);
@@ -204,13 +206,23 @@ function wire() {
     const ln = e.target.closest('.ln[data-node]');
     if (ln && !getSelection().toString()) select(ln.dataset.node, { fromCode: true, extend: e.ctrlKey || e.metaKey || e.shiftKey });
   });
+  // a device width is the width the view gets: zoomed out, the frame on
+  // screen is that much narrower, the view inside as wide as before
   const setDevice = (w) => {
     state.prefs.device = w;
-    $('#deviceFrame').style.width = w;
+    const z = Number(state.prefs.zoom) || 1;
+    $('#deviceFrame').style.width = w.endsWith('px') ? `${parseFloat(w) * z}px` : w;
+    const f = $('#preview');
+    f.style.zoom = z === 1 ? '' : String(z);
+    f.style.width = z === 1 ? '' : `${100 / z}%`;
+    f.style.height = z === 1 ? '' : `${100 / z}%`;
     for (const b of document.querySelectorAll('[data-device]')) b.classList.toggle('active', b.dataset.device === w);
   };
   setDevice(state.prefs.device);
   for (const b of document.querySelectorAll('[data-device]')) b.onclick = () => { setDevice(b.dataset.device); savePrefs(); };
+  const zoom = $('#zoom');
+  zoom.value = String(Number(state.prefs.zoom) || 1);
+  zoom.onchange = () => { state.prefs.zoom = Number(zoom.value); setDevice(state.prefs.device); savePrefs(); };
   const theme = $('#theme');
   theme.value = state.prefs.theme;
   theme.onchange = () => { state.prefs.theme = theme.value; savePrefs(); loadPreview(); };

@@ -74,6 +74,7 @@ export function renderLayers() {
     }),
     h('span', { class: 'ltype', text: isRoot ? 'View' : displayType(node.type) }),
     bound ? h('span', { class: 'bind', title: 'bound to data', text: '●' }) : null,
+    Object.values(node.events || {}).some(Boolean) ? h('span', { class: 'evt', title: `raises ${Object.values(node.events).filter(Boolean).join(', ')}`, text: '⚡' }) : null,
     lbl ? h('span', { class: 'lmeta', text: lbl }) : null);
     wireTreeDrop(el, node, extra);
     return el;
@@ -114,6 +115,25 @@ export function renderLayers() {
   if (state.focusLayers) { state.focusLayers = false; if (sel) sel.focus(); }
 }
 
+// a letter typed in the outline: the next row whose control starts so
+// (letters typed quickly one after another are one word)
+let typed = '';
+let typedAt = 0;
+function typeahead(rows, i, key) {
+  const now = Date.now();
+  typed = now - typedAt < 700 ? typed + key.toLowerCase() : key.toLowerCase();
+  typedAt = now;
+  const text = (r) => `${r.querySelector('.ltype')?.textContent || ''}`.toLowerCase();
+  const label = (r) => `${r.querySelector('.lmeta')?.textContent || ''}`.toLowerCase();
+  // a word in progress may stay on this row; a new letter goes on
+  const from = typed.length > 1 ? i : i + 1;
+  for (let k = 0; k < rows.length; k++) {
+    const r = rows[(from + k) % rows.length];
+    if (text(r).startsWith(typed) || label(r).startsWith(typed)) return rows.indexOf(r);
+  }
+  return -1;
+}
+
 // the keys of the outline: up and down walk the visible rows, left
 // collapses or goes to the parent, right expands or goes to the first
 // child, Enter opens the properties
@@ -132,6 +152,10 @@ export function onLayersKey(e) {
   else if (e.key === 'ArrowUp') { e.preventDefault(); go(i - 1); }
   else if (e.key === 'Home') { e.preventDefault(); go(0); }
   else if (e.key === 'End') { e.preventDefault(); go(rows.length - 1); }
+  else if (e.key.length === 1 && /[\p{L}\p{N}]/u.test(e.key)) {
+    const j = typeahead(rows, i, e.key);
+    if (j >= 0) { e.preventDefault(); go(j); }
+  }
   else if (e.key === 'ArrowLeft') {
     e.preventDefault();
     if (open) { state.collapsed.add(state.selected); state.focusLayers = true; renderLayers(); }

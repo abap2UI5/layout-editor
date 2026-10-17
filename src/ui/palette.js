@@ -8,6 +8,7 @@ import { $, h, displayType, nodeLabel } from './dom.js';
 import { addControl, insertPattern, copySelection, pasteSelection, copyProperties, pasteProperties } from './edit.js';
 import { setView, copyText } from './code.js';
 import { exportZip, newDialog, importDialog, recentDialog, shareLink, insertByNameDialog, saveDesign, saveToBrowser, openFile } from './files.js';
+import { shortcutsDialog } from './keys.js';
 import { WRAPPERS, deleteSelection, duplicateSelection, moveSelection, selectParent, wrapSelection } from './actions.js';
 
 
@@ -35,6 +36,7 @@ function commands() {
   action('Show layout only', () => setView('canvas'));
   action('Show code only', () => setView('code'));
   action('Paste', pasteSelection, 'Ctrl+V');
+  action('Keyboard shortcuts', shortcutsDialog, '?');
   action('Undo', undo, 'Ctrl+Z');
   action('Redo', redo, 'Ctrl+Shift+Z');
   if (sel && sel.parent) {
@@ -64,7 +66,17 @@ export function openPalette() {
   const render = () => {
     const q = input.value.trim().toLowerCase();
     const words = q.split(/\s+/).filter(Boolean);
-    shown = all.filter((c) => words.every((w) => `${c.kind} ${c.title} ${c.detail || ''}`.toLowerCase().includes(w))).slice(0, 60);
+    // what starts with the words first, then what has them in its title,
+    // then the rest - in the order of the list within each
+    const rank = (c) => {
+      const t = c.title.toLowerCase();
+      if (!q) return 0;
+      if (t.startsWith(q) || `${c.kind} ${t}`.startsWith(q)) return 0;
+      if (words.every((w) => t.includes(w))) return 1;
+      return 2;
+    };
+    shown = all.filter((c) => words.every((w) => `${c.kind} ${c.title} ${c.detail || ''}`.toLowerCase().includes(w)))
+      .map((c, i) => ({ c, i, r: rank(c) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.c).slice(0, 60);
     active = Math.min(active, Math.max(0, shown.length - 1));
     listBox.replaceChildren(...shown.map((c, i) => h('div', {
       class: `cmdk-item${i === active ? ' active' : ''}`,

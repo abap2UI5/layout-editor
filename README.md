@@ -128,7 +128,9 @@ Also in the editor:
   its siblings, **Ctrl+C / Ctrl+X / Ctrl+V** copy, cut and paste it (also
   into another design or tab), **Alt+↑** selects the parent, **Escape**
   the view, **Ctrl+S** saves the design. In the outline the arrow keys walk
-  the tree, and the tabs of the drawer go by arrow key too.
+  the tree and a letter jumps to the next control of that name; in the
+  control search Enter inserts the first match; the tabs of the drawer go
+  by arrow key too. **?** lists every shortcut.
 - **Several controls at once**: Ctrl+click (or Shift+click) on the canvas,
   in the outline or in the code adds a control to the selection. Delete,
   duplicate, move, copy and cut act on all of them; *Wrap in…* puts
@@ -165,7 +167,11 @@ Also in the editor:
 - **Preview** mode lists the events the view raised, with what the user
   had changed in the model by then - what `on_event` would read.
 - The editor itself is light, dark or as the system (◐ in the bar at the
-  top); the canvas keeps the UI5 theme chosen for it.
+  top); the canvas keeps the UI5 theme chosen for it. The canvas zooms out
+  to 75% or 50% for a large view at a glance - the device width stays the
+  width the view gets.
+- The outline marks controls bound to data (●) and controls that raise an
+  event (⚡); *Copy* above the code copies what the tab shows.
 - The canvas can show a phone or tablet width, the Horizon, Quartz or
   Belize themes, and any UI5 version. Enter `1.71.80` to see the view on the
   oldest release abap2UI5 supports.

@@ -34,7 +34,7 @@
     /* Horizon Evening */
     --bg: #12171c; --panel: #1d232a; --panel-2: #12171c; --line: #2f3a45; --line-strong: #4e5b68; --field: #8396a8; --text: #eaecee; --muted: #a9b4be;
     --accent: #4db1ff; --accent-strong: #8cccff; --accent-soft: #1c3b5a; --emphasized: #0070f2; --focus: #8cccff; --appbar: #1d232a; --appbar-text: #eaecee;
-    --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8;
+    --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8; --ok: #6ed482; --error: #ff8888; --warn: #ffab1d; --code-hi-line: #ffab1d;
     color-scheme: dark;
   }
 }
@@ -43,7 +43,7 @@
   /* Horizon Evening */
   --bg: #12171c; --panel: #1d232a; --panel-2: #12171c; --line: #2f3a45; --line-strong: #4e5b68; --field: #8396a8; --text: #eaecee; --muted: #a9b4be;
   --accent: #4db1ff; --accent-strong: #8cccff; --accent-soft: #1c3b5a; --emphasized: #0070f2; --focus: #8cccff; --appbar: #1d232a; --appbar-text: #eaecee;
-  --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8;
+  --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8; --ok: #6ed482; --error: #ff8888; --warn: #ffab1d; --code-hi-line: #ffab1d;
   color-scheme: dark;
 }
 
@@ -355,3 +355,10 @@ table.rows .nested-rows { margin: 2px 0 2px 12px; border-left: 2px solid var(--l
 /* the text of a control, edited on the canvas */
 .inline-edit { position: fixed; z-index: 55; padding: 4px 8px; border: 2px solid var(--accent); border-radius: 6px; background: var(--panel); color: var(--text);
   box-shadow: 0 4px 16px rgba(0,0,0,.2); font-size: 14px; outline: none; }
+/* the keyboard shortcuts */
+table.keys { border-collapse: collapse; width: 100%; }
+table.keys td { padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.keys td:first-child { white-space: nowrap; width: 1%; }
+.lrow .evt { color: var(--warn); font-size: 10px; }
+.code-head #btnCopyCode { margin-left: auto; padding: 2px 10px; font-size: 12px; border-color: transparent; background: transparent; color: var(--accent); }
+.code-head #btnCopyCode:hover { background: var(--accent-soft); }

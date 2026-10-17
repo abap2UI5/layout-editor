@@ -282,7 +282,7 @@ test('an opened class shows what the export changes in it', async ({ designer: p
   await page.locator('#dlg').getByRole('button', { name: 'Open', exact: true }).click();
   await page.locator('#dlg').getByRole('button', { name: 'OK' }).click();
   await page.locator('#btnDiff').click();
-  await expect(page.locator('#code')).toContainText('No change');
+  await expect(page.locator('#code')).toContainText('Every line stays as it was');
   await page.evaluate(() => window.designer.commit((d) => { d.root.aggs.content[0].props.title = { m: 's', v: 'Changed title' }; }));
   await expect(page.locator('#codeInfo')).toContainText('+1 −1');
   await expect(page.locator('#code .ln.add')).toContainText('Changed title');
@@ -345,4 +345,71 @@ test('a list line without content is no empty container on the canvas', async ({
   const item = (await nodeIds(page, 'ObjectListItem')).at(-1);
   await waitRendered(page);
   await expect(preview(page).locator(`[id$="--${item}"]`).first()).not.toHaveClass(/dsg-empty/);
+});
+
+test('the canvas zooms out, and a double-click still edits the control under the pointer', async ({ designer: page }) => {
+  await page.locator('.ins-item[data-type="Button"]').click();
+  const id = await selected(page);
+  await page.locator('#zoom').selectOption('0.5');
+  await expect(page.locator('#preview')).toHaveCSS('zoom', '0.5');
+  await waitRendered(page);
+  // where the button is on the editor's page: the frame's box, and the
+  // button's box in the frame, zoomed (Playwright's own boxes do not know
+  // the zoom of a frame)
+  const at = await page.evaluate((x) => {
+    const f = document.querySelector('#preview');
+    const r = f.getBoundingClientRect();
+    const b = f.contentDocument.querySelector(`[id$="--${x}"]`).getBoundingClientRect();
+    return { x: r.left + b.left * 0.5, y: r.top + b.top * 0.5, w: b.width * 0.5, h: b.height * 0.5 };
+  }, id);
+  await page.mouse.dblclick(at.x + at.w / 2, at.y + at.h / 2);
+  const field = await page.locator('.inline-edit').boundingBox();
+  expect(Math.abs(field.x - at.x)).toBeLessThan(4);
+  expect(Math.abs(field.y - at.y)).toBeLessThan(4);
+  await page.keyboard.press('Escape');
+  await page.locator('#zoom').selectOption('1');
+  await expect(page.locator('#preview')).not.toHaveCSS('zoom', '0.5');
+});
+
+test('? lists the keyboard shortcuts', async ({ designer: page }) => {
+  await page.locator('#crumbs').click();
+  await page.keyboard.press('?');
+  await expect(page.locator('#dlg')).toContainText('Keyboard shortcuts');
+  await expect(page.locator('#dlg table.keys')).toContainText('Ctrl+K');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#dlg')).toBeHidden();
+});
+
+test('the keyboard finds its way: a letter in the outline, Enter in the control search', async ({ designer: page }) => {
+  await page.getByRole('tab', { name: 'Outline' }).click();
+  await page.locator('#layers .lrow.sel').focus();
+  await page.keyboard.press('s');
+  await expect(selectedType(page)).toHaveText(/^S/);
+  await page.getByRole('tab', { name: 'Controls' }).click();
+  const before = (await nodeIds(page, 'RatingIndicator')).length;
+  await page.locator('#insertSearch').fill('rating');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await nodeIds(page, 'RatingIndicator')).length).toBe(before + 1);
+  await page.locator('#insertSearch').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#insertList .ins-item').first()).toBeFocused();
+});
+
+test('the command palette puts what starts with the words first', async ({ designer: page }) => {
+  await page.keyboard.press('Control+K');
+  await page.locator('#cmdkInput').fill('button');
+  await expect(page.locator('.cmdk-item').first()).toContainText('Button');
+  await expect(page.locator('.cmdk-item').first().locator('.ck')).toHaveText(/insert|go to/);
+});
+
+test('the outline marks controls that raise events, the code tab copies what it shows', async ({ designer: page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('.ins-item[data-type="Button"]').click();
+  const id = await selected(page);
+  await page.locator('#inspector .event input').first().fill('GO');
+  await page.getByRole('tab', { name: 'Outline' }).click();
+  await expect(page.locator(`#layers .lrow[data-id="${id}"] .evt`)).toHaveAttribute('title', 'raises GO');
+  await page.locator('[data-code="xml"]').click();
+  await page.locator('#btnCopyCode').click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('<mvc:View');
 });

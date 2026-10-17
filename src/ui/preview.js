@@ -9,7 +9,7 @@ import { handleDrop } from './edit.js';
 import { onKey } from './keys.js';
 import { deleteSelection, duplicateSelection, moveSelection, selectParent } from './actions.js';
 import { openContextMenu, closeContextMenu } from './context.js';
-import { openInlineEdit } from './inline.js';
+import { openInlineEdit, closeInlineEdit } from './inline.js';
 
 
 let previewTimer = null;
@@ -19,6 +19,14 @@ function previewUrl() {
   if (state.prefs.ui5) q.set('ui5', state.prefs.ui5);
   if (state.prefs.theme) q.set('theme', state.prefs.theme);
   return `preview.html?${q}`;
+}
+
+// a point of the canvas frame (its own CSS pixels) on the editor's page:
+// the frame may be zoomed out
+export function frameToPage(x, y) {
+  const r = $('#preview').getBoundingClientRect();
+  const z = Number(state.prefs.zoom) || 1;
+  return { x: r.left + x * z, y: r.top + y * z, z };
 }
 
 export function loadPreview() {
@@ -47,13 +55,19 @@ export function postPreview(msg) {
 }
 
 // the containers without a child: the canvas gives them room to drop into
-// - layouts and lists, not a list line or a select that has no items
-const CONTAINER_CATEGORIES = ['Layout', 'Lists'];
+// - not a control whose children are its values (a list line's
+// attributes, a select's items, a column's header)
+function holdsControls(n) {
+  const c = getControl(n.type);
+  if (!c || c.category === 'Input' || c.input) return false;
+  const { name } = splitType(n.type);
+  if (/ListItem$/.test(name) && name !== 'CustomListItem') return false;
+  return !['Column', 'MenuItem', 'ObjectHeader', 'ObjectStatus'].includes(name);
+}
 function emptyContainers() {
   const out = [];
   walk(state.design.root, (n) => {
-    const c = getControl(n.type);
-    if (n.id !== 'root' && c && CONTAINER_CATEGORIES.includes(c.category) && canHaveChildren(n) && !Object.values(n.aggs || {}).some((l) => l.length)) out.push(n.id);
+    if (n.id !== 'root' && canHaveChildren(n) && holdsControls(n) && !Object.values(n.aggs || {}).some((l) => l.length)) out.push(n.id);
     return true;
   });
   return out;
@@ -193,10 +207,13 @@ window.addEventListener('message', (e) => {
     renderEventLog();
   } else if (msg.type === 'inline') {
     openInlineEdit(msg.id, msg.rect);
+  } else if (msg.type === 'scroll') {
+    // the field over a control stays over it, or goes
+    closeInlineEdit();
   } else if (msg.type === 'context') {
     // the frame's coordinates, on the editor's page
-    const r = $('#preview').getBoundingClientRect();
-    openContextMenu(r.left + msg.x, r.top + msg.y, msg.id);
+    const at = frameToPage(msg.x, msg.y);
+    openContextMenu(at.x, at.y, msg.id);
   } else if (msg.type === 'action') {
     onToolbarAction(msg.action, msg.id);
   } else if (msg.type === 'drop') {

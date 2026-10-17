@@ -760,7 +760,7 @@ export function validate(design) {
         // and needs a table to build from: offered only where neither stands
         // in its way
         const fromTable = b.m === 'f' || (attrByName.get(b.v) && attrByName.get(b.v).type === 'table');
-        const ownColumns = Object.entries(n.aggs || {}).some(([x, l]) => x !== a && l.length);
+        const ownColumns = n.type === 'Table' && (n.aggs.columns || []).length > 0;
         const fix = many ? { kind: 'template', node: n.id, agg: a, label: 'Keep the first as template' }
           : fromTable && !ownColumns ? { kind: 'template', node: n.id, agg: a, label: 'Build a template' } : undefined;
         issues.push({ level: 'warning', text: `${n.type}: a bound ${a} aggregation needs exactly one template item`, node: n.id, fix });

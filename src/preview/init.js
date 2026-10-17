@@ -62,9 +62,22 @@ sap.ui.define([
   // ids, inside the view's id space (dsg0--<node>), and a list's clones
   // carry their template's id first (dsg0--<cell>-dsg0--<list>-0)
   function nodeIdOf(el) {
+    var hit = elementOf(el);
+    return hit ? hit.id : null;
+  }
+  // the element of that node under `el`: its outermost one (a Button's
+  // inner parts carry its id too) - in a bound list the clone of the row
+  // that was hit, not the first
+  var NODE_ID = /(?:^|-)dsg\d+--(n[0-9a-z]+)/;
+  function elementOf(el) {
     while (el && el !== document.body) {
-      var m = el.id && /(?:^|-)dsg\d+--(n[0-9a-z]+)/.exec(el.id);
-      if (m) return m[1];
+      var m = el.id && NODE_ID.exec(el.id);
+      if (m) {
+        var up = el.parentElement;
+        var n;
+        while (up && up !== document.body && up.id && (n = NODE_ID.exec(up.id)) && n[1] === m[1]) { el = up; up = el.parentElement; }
+        return { id: m[1], el: el };
+      }
       el = el.parentElement;
     }
     return null;
@@ -146,7 +159,10 @@ sap.ui.define([
     tools.style.top = Math.max(2, top) + 'px';
     tools.style.left = Math.max(2, Math.min(r.left, window.innerWidth - tools.offsetWidth - 2)) + 'px';
   }
-  window.addEventListener('scroll', function () { if (tools) placeTools(); }, true);
+  window.addEventListener('scroll', function () {
+    if (tools) placeTools();
+    post({ type: 'scroll' });
+  }, true);
   window.addEventListener('resize', function () { if (tools) placeTools(); });
 
   // Every render ends - in a view on the canvas, or in an error the
@@ -313,11 +329,10 @@ sap.ui.define([
       e.stopPropagation();
       // a double-click edits the control's text, over the canvas
       if (type === 'dblclick') {
-        var hit = nodeIdOf(e.target);
-        var box = domOf(hit);
-        if (hit && box) {
-          var r = box.getBoundingClientRect();
-          post({ type: 'inline', id: hit, rect: { left: r.left, top: r.top, width: r.width, height: r.height } });
+        var hit = elementOf(e.target);
+        if (hit) {
+          var r = hit.el.getBoundingClientRect();
+          post({ type: 'inline', id: hit.id, rect: { left: r.left, top: r.top, width: r.width, height: r.height } });
         }
       }
       if (type === 'click') {
