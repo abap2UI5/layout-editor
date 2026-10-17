@@ -274,6 +274,39 @@ export function moveNode(design, id, parentId, agg, index) {
   return id;
 }
 
+// several nodes to one place, together and in the order of the view:
+// before the node that is at `index` of the target list now (the end
+// when null) - returns the id of the last, or null when the target takes
+// one of them not, or would end up inside one of them
+export function moveNodes(design, ids, parentId, agg, index) {
+  const order = [];
+  walk(design.root, (n) => { order.push(n.id); return true; });
+  const list = [...new Set(ids)].filter((id) => !ids.some((o) => o !== id && isAncestor(design.root, o, id)))
+    .map((id) => findNode(design.root, id)).filter((x) => x && x.parent)
+    .sort((a, b) => order.indexOf(a.node.id) - order.indexOf(b.node.id));
+  if (!list.length) return null;
+  if (list.some((x) => x.node.id === parentId || isAncestor(design.root, x.node.id, parentId))) return null;
+  const p = findNode(design.root, parentId);
+  if (!p) return null;
+  // a marker holds the place while the nodes leave their lists
+  const marker = { id: '\u0000' };
+  p.node.aggs[agg] = p.node.aggs[agg] || [];
+  const target = p.node.aggs[agg];
+  target.splice(index == null || index > target.length ? target.length : index, 0, marker);
+  for (const x of list) {
+    const h = findNode(design.root, x.node.id);
+    h.parent.aggs[h.agg].splice(h.index, 1);
+    if (!h.parent.aggs[h.agg].length && h.parent.aggs[h.agg] !== target) delete h.parent.aggs[h.agg];
+  }
+  const at = target.indexOf(marker);
+  target.splice(at, 1);
+  for (const [i, x] of list.entries()) {
+    if (!aggAccepts(p.node, agg, x.node.type)) throw new Error(`${p.node.type} takes no ${x.node.type}${agg ? ` in ${agg}` : ''}`);
+    target.splice(at + i, 0, x.node);
+  }
+  return list[list.length - 1].node.id;
+}
+
 export function shiftNode(design, id, delta) {
   const hit = findNode(design.root, id);
   if (!hit || !hit.parent) return null;

@@ -65,8 +65,8 @@ The product is the generated class. It must:
   field, typed by the user. Never widen the list for a link.
 - An edit on the selection (delete, duplicate, move, wrap, select the
   parent) is written once, in `src/ui/actions.js`, and works on every
-  selected control; the keys, the command palette and the canvas toolbar
-  call it. A question to the user goes through `choose( )` in
+  selected control; the keys, the command palette, the canvas toolbar and
+  the context menu (`src/ui/context.js`) call it. A question to the user goes through `choose( )` in
   `src/ui/dom.js`, never the browser's `confirm( )`.
 - The preview module (`src/preview/init.js`) runs inside UI5 1.71: ES5
   style, `sap.ui.define`, no API newer than 1.71.

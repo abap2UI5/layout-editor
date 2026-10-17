@@ -5,7 +5,7 @@ import { walk, findNode } from '../model.js';
 import { generateClassSource } from '../clas.js';
 import { state, select, undo, redo, selectedIds } from './store.js';
 import { $, h, displayType, nodeLabel } from './dom.js';
-import { addControl, insertPattern, copySelection, pasteSelection } from './edit.js';
+import { addControl, insertPattern, copySelection, pasteSelection, copyProperties, pasteProperties } from './edit.js';
 import { setView, copyText } from './code.js';
 import { exportZip, newDialog, importDialog, recentDialog, shareLink, insertByNameDialog, saveDesign, saveToBrowser, openFile } from './files.js';
 import { WRAPPERS, deleteSelection, duplicateSelection, moveSelection, selectParent, wrapSelection } from './actions.js';
@@ -47,6 +47,8 @@ function commands() {
     action(`Move ${what} up`, () => moveSelection(-1), 'Ctrl+↑');
     action(`Move ${what} down`, () => moveSelection(1), 'Ctrl+↓');
     action('Select parent', () => selectParent(), 'Alt+↑');
+    action('Copy properties', copyProperties, 'to set them on another control');
+    if (state.propClipboard) action(`Paste properties onto ${what}`, pasteProperties, `of ${displayType(state.propClipboard.type)}`);
     for (const w of WRAPPERS) action(`Wrap ${what} in ${w}`, () => wrapSelection(w));
   }
   return list;

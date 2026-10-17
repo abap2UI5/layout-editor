@@ -134,7 +134,26 @@ export function flushPersist() {
   if (persistTimer === null) return;
   clearTimeout(persistTimer);
   persistTimer = null;
-  try { localStorage.setItem(STORE_KEY, snapshot()); } catch { /* quota or private mode */ }
+  try {
+    localStorage.setItem(STORE_KEY, snapshot());
+    storeFailed = false;
+  } catch {
+    // quota or private mode: said once, not on every keystroke
+    if (!storeFailed) toastError('This browser does not keep the design (its storage is full or off) - save it as a file to keep it.');
+    storeFailed = true;
+  }
+}
+let storeFailed = false;
+
+// another tab of the editor saved its design over this one's: say so -
+// the next edit here would overwrite it in turn
+const otherTab = [];
+export function onOtherTab(fn) { otherTab.push(fn); }
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORE_KEY || !e.newValue || e.newValue === snapshot()) return;
+    for (const fn of otherTab) fn(e.newValue);
+  });
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', flushPersist);

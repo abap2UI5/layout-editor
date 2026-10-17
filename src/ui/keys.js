@@ -4,6 +4,7 @@ import { openPalette } from './palette.js';
 import { copySelection, pasteSelection } from './edit.js';
 import { saveDesign } from './files.js';
 import { deleteSelection, duplicateSelection, moveSelection, selectParent } from './actions.js';
+import { openContextMenuAtSelection } from './context.js';
 
 
 export function onKey(e) {
@@ -27,5 +28,6 @@ export function onKey(e) {
   // Ctrl+↑ / Ctrl+↓ move the selection among its siblings
   if (ctrl && !e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && any) { e.preventDefault(); moveSelection(e.key === 'ArrowUp' ? -1 : 1); return; }
   if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); selectParent(); return; }
+  if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && any) { e.preventDefault(); openContextMenuAtSelection(); return; }
   if (e.key === 'Escape') select(state.also.length ? state.selected : 'root');
 }

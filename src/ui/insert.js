@@ -1,6 +1,6 @@
 // The Controls panel: building blocks and the palette, by category, to
 // drag or click.
-import { CONTROLS, CATEGORIES, DESCRIPTIONS, RUNTIME } from '../catalog.js';
+import { CONTROLS, CATEGORIES, DESCRIPTIONS, RUNTIME, getControl } from '../catalog.js';
 import { PATTERNS } from '../patterns.js';
 import { canHaveChildren, findNode } from '../model.js';
 import { state } from './store.js';
@@ -15,6 +15,23 @@ export function renderInsert() {
   const box = $('#insertList');
   box.replaceChildren();
   const match = (...texts) => !q || texts.some((t) => t && t.toLowerCase().includes(q));
+
+  const item = (type, glyph, cls) => h('div', {
+    class: `ins-item${cls ? ` ${cls}` : ''}`,
+    draggable: 'true',
+    // the copy under Recently used is not the control's entry of the palette
+    [cls === 'recent' ? 'data-recent' : 'data-type']: type,
+    title: `${RUNTIME[type] ? RUNTIME[type].className : type} - drag onto the canvas or the outline, or click to insert at the selection`,
+    ondragstart: (e) => { e.dataTransfer.setData('text/plain', `dsg:new:${type}`); e.dataTransfer.effectAllowed = 'copy'; },
+    onclick: () => addControl(type),
+  }, h('span', { class: 'ig', text: glyph }), h('span', { class: 'in', text: displayType(type) }), h('span', { class: 'id', text: DESCRIPTIONS[type] || (RUNTIME[type] ? RUNTIME[type].className : '') }));
+
+  // the controls inserted last - only without a search, which finds them anyway
+  const recent = q ? [] : (state.prefs.recentTypes || []).filter((t) => getControl(t));
+  if (recent.length) {
+    box.append(h('div', { class: 'ins-group recent' }, h('h3', { text: 'Recently used' }),
+      recent.map((t) => item(t, CONTROLS[t] ? GLYPHS[CONTROLS[t].category] : '⚙', 'recent'))));
+  }
 
   const pats = PATTERNS.filter((p) => match(p.title, p.text));
   if (pats.length) {
@@ -33,26 +50,12 @@ export function renderInsert() {
     if (!items.length) continue;
     box.append(h('div', { class: 'ins-group' },
       h('h3', { text: cat === 'Parts' ? 'Parts - inside their parent' : cat }),
-      items.map((type) => h('div', {
-        class: 'ins-item',
-        draggable: 'true',
-        'data-type': type,
-        title: `${type} - drag onto the canvas or the outline, or click to insert at the selection`,
-        ondragstart: (e) => { e.dataTransfer.setData('text/plain', `dsg:new:${type}`); e.dataTransfer.effectAllowed = 'copy'; },
-        onclick: () => addControl(type),
-      }, h('span', { class: 'ig', text: GLYPHS[cat] }), h('span', { class: 'in', text: displayType(type) }), h('span', { class: 'id', text: DESCRIPTIONS[type] || '' })))));
+      items.map((type) => item(type, GLYPHS[cat]))));
   }
   const runtime = Object.keys(RUNTIME).filter((k) => match(k, RUNTIME[k].className));
   if (runtime.length) {
     box.append(h('div', { class: 'ins-group' }, h('h3', { text: 'From the UI5 runtime - not checked against 1.71' }),
-      runtime.map((type) => h('div', {
-        class: 'ins-item runtime',
-        draggable: 'true',
-        'data-type': type,
-        title: `${RUNTIME[type].className} - drag onto the canvas or the outline, or click to insert at the selection`,
-        ondragstart: (e) => { e.dataTransfer.setData('text/plain', `dsg:new:${type}`); e.dataTransfer.effectAllowed = 'copy'; },
-        onclick: () => addControl(type),
-      }, h('span', { class: 'ig', text: '⚙' }), h('span', { class: 'in', text: displayType(type) }), h('span', { class: 'id', text: RUNTIME[type].className })))));
+      runtime.map((type) => item(type, '⚙', 'runtime'))));
   }
   if (!box.childElementCount) box.append(h('div', { class: 'empty', text: 'Nothing matches.' }));
   // any control UI5 has, by its class name

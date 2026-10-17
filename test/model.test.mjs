@@ -477,3 +477,22 @@ test('a check that can be fixed says how - and the fix is data, not code', () =>
   assert.equal(fix(/Tree: its items/).kind, 'nodesTable');
   assert.doesNotThrow(() => JSON.stringify(issues));
 });
+
+test('several nodes move together, in the order of the view, before the node at the index', async () => {
+  const { moveNodes } = await import('../src/model.js');
+  const d = createDesign();
+  const p = page(d);
+  p.aggs.content = [];
+  const [a, b, c, e] = ['Button', 'Text', 'Input', 'Title'].map((t) => { const n = createNode(t); insertNode(d, n, p.id); return n; });
+  const box = createNode('VBox');
+  insertNode(d, box, p.id);
+  // c and a, clicked in that order, into the VBox
+  assert.equal(moveNodes(d, [c.id, a.id], box.id, 'items', null), c.id);
+  assert.deepEqual(box.aggs.items.map((n) => n.id), [a.id, c.id]);
+  assert.deepEqual(p.aggs.content.map((n) => n.id), [b.id, e.id, box.id]);
+  // back, before e - an index of the list as it is before the move
+  assert.equal(moveNodes(d, [a.id, c.id], p.id, 'content', 1), c.id);
+  assert.deepEqual(p.aggs.content.map((n) => n.id), [b.id, a.id, c.id, e.id, box.id]);
+  // never into one of the moved
+  assert.equal(moveNodes(d, [box.id, b.id], box.id, 'items', null), null);
+});

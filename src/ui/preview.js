@@ -1,6 +1,6 @@
 // The canvas: the preview frame (preview.html, src/preview/init.js) gets
 // the view and the model, reports what is clicked, dropped and typed.
-import { previewModel, walk, typeFor } from '../model.js';
+import { previewModel, walk, typeFor, canHaveChildren } from '../model.js';
 import { toXml, namespaceUri } from '../xml.js';
 import { getControl, registerControl, runtimeDef, parseClassName, splitType } from '../catalog.js';
 import { state, select, labelOfSelection, emitChange } from './store.js';
@@ -8,6 +8,7 @@ import { $, h } from './dom.js';
 import { handleDrop } from './edit.js';
 import { onKey } from './keys.js';
 import { deleteSelection, duplicateSelection, moveSelection, selectParent } from './actions.js';
+import { openContextMenu, closeContextMenu } from './context.js';
 
 
 let previewTimer = null;
@@ -43,10 +44,20 @@ export function postPreview(msg) {
   f.contentWindow.postMessage(Object.assign({ target: 'dsg-preview' }, msg), '*');
 }
 
+// the containers without a child: the canvas gives them room to drop into
+function emptyContainers() {
+  const out = [];
+  walk(state.design.root, (n) => {
+    if (n.id !== 'root' && canHaveChildren(n) && !Object.values(n.aggs || {}).some((l) => l.length)) out.push(n.id);
+    return true;
+  });
+  return out;
+}
+
 export function sendPreview(now) {
   clearTimeout(previewTimer);
   const send = () => postPreview({
-    type: 'render', xml: toXml(state.design, { preview: true }), model: previewModel(state.design), selected: state.selected, also: state.also, mode: state.mode, label: labelOfSelection(),
+    type: 'render', xml: toXml(state.design, { preview: true }), model: previewModel(state.design), selected: state.selected, also: state.also, mode: state.mode, label: labelOfSelection(), empty: emptyContainers(),
   });
   if (now) send(); else previewTimer = setTimeout(send, 120);
 }
@@ -160,6 +171,7 @@ window.addEventListener('message', (e) => {
     registerControl(d.type, runtimeDef(msg.meta));
     d.resolve(d.type);
   } else if (msg.type === 'select') {
+    closeContextMenu();
     select(msg.id, { extend: !!msg.extend });
   } else if (msg.type === 'defaults') {
     const a = asking.get(msg.key);
@@ -171,6 +183,10 @@ window.addEventListener('message', (e) => {
     eventLog.push({ name: msg.name, changes: changesOf(msg.model) });
     if (eventLog.length > 20) eventLog.shift();
     renderEventLog();
+  } else if (msg.type === 'context') {
+    // the frame's coordinates, on the editor's page
+    const r = $('#preview').getBoundingClientRect();
+    openContextMenu(r.left + msg.x, r.top + msg.y, msg.id);
   } else if (msg.type === 'action') {
     onToolbarAction(msg.action, msg.id);
   } else if (msg.type === 'drop') {

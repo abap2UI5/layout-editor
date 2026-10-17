@@ -113,7 +113,9 @@ Also in the editor:
   extension (`vscode://abap2ui5.abap2ui5/open`), which opens it as an
   unsaved `.clas.abap` and offers to run it.
 - **Save / Open** stores the design as JSON so you can continue later. The
-  design is also kept in the browser between visits. *Save in browser*
+  design is also kept in the browser between visits (when the browser
+  refuses to keep it, the editor says so; when another tab of the editor
+  saves over it, too, with a button to load that one). *Save in browser*
   keeps it there under its class name, next to others; *Designs in this
   browser* lists those, and what New, Open or Import replaced. **Copy share
   link** puts the whole design into a URL - open it anywhere, the editor
@@ -128,7 +130,15 @@ Also in the editor:
 - **Several controls at once**: Ctrl+click (or Shift+click) on the canvas,
   in the outline or in the code adds a control to the selection. Delete,
   duplicate, move, copy and cut act on all of them; *Wrap in…* puts
-  controls side by side into a new VBox, HBox, FlexBox or Panel.
+  controls side by side into a new VBox, HBox, FlexBox or Panel. Selected
+  rows of the outline drag together.
+- A **right-click** on a control - on the canvas or in the outline, or
+  Shift+F10 - opens its context menu: move, copy, cut, paste, duplicate,
+  wrap, delete, and *Copy properties* / *Paste properties*, which set the
+  properties of one control on others that have them.
+- *Controls* lists the controls inserted last first, under *Recently
+  used*. An empty container gets room and a dashed frame on the canvas, so
+  there is something to drop into.
 - The **outline filter** shows the controls whose type or text matches, and
   the way down to them.
 - A drop on the canvas lands before, into or after the control under the
@@ -271,7 +281,7 @@ runtime. Run it when the palette gains a control.
 | `src/xml.js` | Design → XML view (preview, export), and XML view → design (import) |
 | `src/app.js` | The editor UI: wires the panels and renders them on every change |
 | `src/ui/store.js` | The state, commit( ) with undo and the browser store, selection |
-| `src/ui/*.js` | One module per panel: insert, layers, inspector, data, code, preview, palette, files, keys, edit (drop and clipboard), actions (the edits on the selection, for keys, palette and canvas toolbar) |
+| `src/ui/*.js` | One module per panel: insert, layers, inspector, data, code, preview, palette, files, keys, edit (drop and clipboard), actions (the edits on the selection, for keys, palette, canvas toolbar and context menu), context (the context menu) |
 | `src/preview/init.js` | The preview frame (a UI5 module) |
 | `tools/` | Dev server, metadata dump, class generation, runtime verification |
 | `test/` | Unit tests, fixtures, the builder model, browser tests |

@@ -8,11 +8,11 @@
 // design document (model.js) in src/ui/store.js; every edit goes through
 // commit( ), which records undo, saves to localStorage and tells this
 // module, which renders the panels (src/ui/*.js).
-import { validate, checkClassName } from './model.js';
+import { validate, checkClassName, normalizeDesign } from './model.js';
 import { generateClass, fileName } from './abap.js';
 import { generateClassSource } from './clas.js';
 import { toXml } from './xml.js';
-import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection, isUi5Url } from './ui/store.js';
+import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection, isUi5Url, onOtherTab } from './ui/store.js';
 import { $, toast, download } from './ui/dom.js';
 import { renderInsert, renderInsertTarget } from './ui/insert.js';
 import { renderLayers, onLayersKey, clearDropMarks, renderCrumbs } from './ui/layers.js';
@@ -20,7 +20,7 @@ import { renderInspector } from './ui/inspector.js';
 import { renderData, renderIssues } from './ui/data.js';
 import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code.js';
 import { loadPreview, postPreview, sendPreview, renderEventLog } from './ui/preview.js';
-import { handleDrop, copySelection, pasteSelection, addControlByName } from './ui/edit.js';
+import { handleDrop, copySelection, pasteSelection, addControlByName, addControl } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
 import { newDialog, importDialog, openClassDialog, openClassFromUrl, recentDialog, shareLink, openFile, saveDesign, saveToBrowser, exportZip, openInPlayground, openInVscode } from './ui/files.js';
 import { onKey } from './ui/keys.js';
@@ -229,6 +229,11 @@ function wire() {
 // ------------------------------------------------------------- start
 
 on('change', scheduleRender);
+// two tabs of the editor share one browser store: the last edit wins
+onOtherTab((json) => toast('Another tab of the editor saved its design over this one - your next edit here wins', {
+  label: 'Load theirs',
+  run: () => { try { replaceDesign(normalizeDesign(JSON.parse(json))); } catch { /* not a design */ } },
+}));
 on('panel', renderPanel);
 on('select', (opts) => {
   if (state.panel === 'layers') renderLayers();
@@ -266,4 +271,4 @@ openLinkedDesign();
 window.addEventListener('hashchange', openLinkedDesign);
 
 // for the browser tests and the curious: the state and the generators
-window.designer = { state, generateClass, generateClassSource, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };
+window.designer = { state, generateClass, generateClassSource, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName, addControl };

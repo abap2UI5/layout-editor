@@ -29,6 +29,7 @@ sap.ui.define([
   var mode = 'design';
   var selected = null;
   var also = [];
+  var empty = [];
   var selectedLabel = '';
   var tools = null;
   var lastXml = null;
@@ -81,7 +82,20 @@ sap.ui.define([
     if (el) el.classList.add(cls);
   }
 
+  // an empty container takes no room, so nothing could be dropped into
+  // it: in design mode it gets some, with a dashed frame
+  function markEmpty() {
+    var old = document.querySelectorAll('.dsg-empty');
+    for (var i = 0; i < old.length; i++) old[i].classList.remove('dsg-empty');
+    if (mode !== 'design') return;
+    for (var j = 0; j < empty.length; j++) {
+      var el = domOf(empty[j]);
+      if (el) el.classList.add('dsg-empty');
+    }
+  }
+
   function highlight(scroll) {
+    markEmpty();
     var el = domOf(selected);
     mark('dsg-sel', el);
     // the rest of a selection of several controls
@@ -272,6 +286,7 @@ sap.ui.define([
       mode = msg.mode || mode;
       selected = msg.selected || null;
       also = msg.also || [];
+      empty = msg.empty || [];
       selectedLabel = msg.label || '';
       render(msg);
     } else if (msg.type === 'defaults') {
@@ -284,6 +299,7 @@ sap.ui.define([
     } else if (msg.type === 'mode') {
       mode = msg.mode;
       mark('dsg-hover', null);
+      markEmpty();
       placeTools();
     }
   });
@@ -303,6 +319,16 @@ sap.ui.define([
       }
     }, true);
   });
+
+  // the context menu is the designer's, for the control under the pointer
+  document.addEventListener('contextmenu', function (e) {
+    if (mode !== 'design') return;
+    var id = nodeIdOf(e.target);
+    if (!id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    post({ type: 'context', id: id, x: e.clientX, y: e.clientY });
+  }, true);
 
   document.addEventListener('mouseover', function (e) {
     if (mode !== 'design' || (tools && tools.contains(e.target))) return;

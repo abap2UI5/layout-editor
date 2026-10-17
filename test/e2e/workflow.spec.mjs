@@ -191,3 +191,84 @@ test('a design saved in this browser opens again from the list', async ({ design
   await page.locator('#dlg .starter', { hasText: 'ZCL_KEPT' }).click();
   await expect(page.locator('#className')).toHaveValue('ZCL_KEPT');
 });
+
+test('the context menu of the outline wraps, the one of the canvas deletes', async ({ designer: page }) => {
+  const sw = (await nodeIds(page, 'Switch'))[0];
+  await page.getByRole('tab', { name: 'Outline' }).click();
+  await page.evaluate((id) => window.designer.select(id), sw);
+  await page.locator(`#layers .lrow[data-id="${sw}"]`).click({ button: 'right' });
+  const menu = page.locator('.menu.ctx');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem').first()).toBeFocused();
+  await menu.getByRole('menuitem', { name: 'Panel' }).click();
+  await expect(menu).toBeHidden();
+  expect(await page.evaluate((id) => {
+    const walk = (n, parent) => { if (n.id === id) return parent && parent.type; for (const l of Object.values(n.aggs || {})) for (const c of l) { const r = walk(c, n); if (r) return r; } return null; };
+    return walk(window.designer.state.design.root, null);
+  }, sw)).toBe('Panel');
+  await waitRendered(page);
+  await preview(page).locator('[id*="--n"][role="switch"]').first().click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'Delete' }).click();
+  await expect.poll(() => nodeIds(page, 'Switch')).toEqual([]);
+  // and by key: Shift+F10 opens it at the selection, Escape closes it
+  await page.locator('#layers .lrow.sel').focus();
+  await page.keyboard.press('Shift+F10');
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+});
+
+test('selected rows of the outline drag together', async ({ designer: page }) => {
+  const ids = await page.evaluate(() => {
+    const form = window.designer.state.design.root.aggs.content[0].aggs.content.find((n) => n.type === 'form:SimpleForm');
+    return form.aggs.content.slice(0, 2).map((n) => n.id);
+  });
+  await page.evaluate(() => window.designer.addControl('VBox', 'root'));
+  const box = (await nodeIds(page, 'VBox')).at(-1);
+  await page.getByRole('tab', { name: 'Outline' }).click();
+  await page.evaluate((x) => { window.designer.select(x[0]); window.designer.select(x[1], { extend: true }); }, ids);
+  await page.locator(`#layers .lrow[data-id="${ids[1]}"]`).dragTo(page.locator(`#layers .lrow[data-id="${box}"]`));
+  await expect.poll(() => page.evaluate((id) => {
+    const walk = (n) => { if (n.id === id) return n; for (const l of Object.values(n.aggs || {})) for (const c of l) { const r = walk(c); if (r) return r; } return null; };
+    return (walk(window.designer.state.design.root).aggs.items || []).map((n) => n.id);
+  }, box)).toEqual(ids);
+});
+
+test('the controls inserted last come first, the properties of one go onto another', async ({ designer: page }) => {
+  await page.locator('.ins-item[data-type="Button"]').click();
+  await page.locator('.ins-item[data-type="Title"]').click();
+  await expect(page.locator('.ins-group.recent .ins-item')).toHaveText([/Title/, /Button/]);
+  // a Button with a type, its properties onto a new Button
+  await page.locator('.ins-group.recent [data-recent="Button"]').click();
+  await prop(page, 'type').locator('.val select').selectOption('Emphasized');
+  await page.keyboard.press('Control+K');
+  await page.locator('#cmdkInput').fill('copy properties');
+  await page.keyboard.press('Enter');
+  await page.locator('.ins-group.recent [data-recent="Button"]').click();
+  await page.keyboard.press('Control+K');
+  await page.locator('#cmdkInput').fill('paste properties');
+  await page.keyboard.press('Enter');
+  await expect(prop(page, 'type').locator('.val select')).toHaveValue('Emphasized');
+});
+
+test('an empty container has room on the canvas to drop into', async ({ designer: page }) => {
+  await page.evaluate(() => window.designer.addControl('VBox', 'root'));
+  const box = (await nodeIds(page, 'VBox')).at(-1);
+  const el = preview(page).locator(`[id$="--${box}"]`);
+  await expect(el).toHaveClass(/dsg-empty/);
+  expect((await el.boundingBox()).height).toBeGreaterThan(30);
+  await page.locator('[data-mode="interact"]').click();
+  await expect(el).not.toHaveClass(/dsg-empty/);
+});
+
+test('a design saved by another tab is announced, and can be loaded', async ({ designer: page, context }) => {
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await waitRendered(other);
+  await other.evaluate(() => window.designer.commit((d) => { d.className = 'ZCL_FROM_THE_OTHER_TAB'; }));
+  await expect(page.locator('#toast')).toContainText('Another tab of the editor');
+  await page.locator('#toast').getByRole('button', { name: 'Load theirs' }).click();
+  await expect(page.locator('#className')).toHaveValue('ZCL_FROM_THE_OTHER_TAB');
+  await other.close();
+});

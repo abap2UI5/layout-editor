@@ -5,6 +5,7 @@ import { canHaveChildren, aggNames, findNode, walk } from '../model.js';
 import { state, select, ancestors } from './store.js';
 import { $, h, displayType, nodeLabel } from './dom.js';
 import { handleDrop } from './edit.js';
+import { openContextMenu } from './context.js';
 
 
 // the nodes a filter of the outline shows: those whose type or label
@@ -48,7 +49,15 @@ export function renderLayers() {
       'data-id': node.id,
       // Ctrl or Shift: the control joins the selection, or leaves it
       onclick: (e) => { e.stopPropagation(); select(node.id, { extend: e.ctrlKey || e.metaKey || e.shiftKey }); },
-      ondragstart: (e) => { e.stopPropagation(); e.dataTransfer.setData('text/plain', `dsg:move:${node.id}`); e.dataTransfer.effectAllowed = 'move'; },
+      // a selected row drags the whole selection along
+      ondragstart: (e) => {
+        e.stopPropagation();
+        const all = [...state.also, state.selected];
+        const ids = all.length > 1 && all.includes(node.id) ? all : [node.id];
+        e.dataTransfer.setData('text/plain', `dsg:move:${ids.join(',')}`);
+        e.dataTransfer.effectAllowed = 'move';
+      },
+      oncontextmenu: (e) => { if (isRoot) return; e.preventDefault(); e.stopPropagation(); openContextMenu(e.clientX, e.clientY, node.id); },
     },
     h('button', {
       class: 'caret',
