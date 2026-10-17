@@ -47,6 +47,16 @@ function wireMenu(button, menu) {
 }
 
 
+// the editor's own appearance: as the system, light or dark - the canvas
+// keeps the UI5 theme chosen for it
+const APPEARANCE = { '': 'as the system', light: 'light', dark: 'dark' };
+function applyAppearance() {
+  const a = state.prefs.appearance || '';
+  if (a) document.documentElement.dataset.theme = a; else delete document.documentElement.dataset.theme;
+  $('#btnTheme').title = `Appearance of the editor: ${APPEARANCE[a]} - click for ${APPEARANCE[{ '': 'light', light: 'dark', dark: '' }[a]]}`;
+  $('#btnTheme').textContent = { '': '◐', light: '☀', dark: '☾' }[a];
+}
+
 function applyWidths() {
   const ws = $('.workspace');
   for (const [key, prop] of [['drawerW', '--drawer-w'], ['inspectorW', '--inspector-w']]) {
@@ -163,6 +173,12 @@ function wire() {
   $('#btnRecent').onclick = recentDialog;
   $('#btnShare').onclick = shareLink;
   $('#btnUndo').onclick = undo;
+  $('#btnTheme').onclick = () => {
+    state.prefs.appearance = { '': 'light', light: 'dark', dark: '' }[state.prefs.appearance || ''];
+    savePrefs();
+    applyAppearance();
+  };
+  applyAppearance();
   $('#btnRedo').onclick = redo;
   $('#btnCmd').onclick = openPalette;
   $('#btnZip').onclick = exportZip;

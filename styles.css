@@ -38,6 +38,14 @@
     color-scheme: dark;
   }
 }
+/* chosen in the app bar, whatever the system says */
+:root[data-theme="dark"] {
+  /* Horizon Evening */
+  --bg: #12171c; --panel: #1d232a; --panel-2: #12171c; --line: #2f3a45; --line-strong: #4e5b68; --field: #8396a8; --text: #eaecee; --muted: #a9b4be;
+  --accent: #4db1ff; --accent-strong: #8cccff; --accent-soft: #1c3b5a; --emphasized: #0070f2; --focus: #8cccff; --appbar: #1d232a; --appbar-text: #eaecee;
+  --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8;
+  color-scheme: dark;
+}
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -340,3 +348,10 @@ table.rows .nested-rows { margin: 2px 0 2px 12px; border-left: 2px solid var(--l
 .menu.ctx .ctx-row button { padding: 5px 8px; }
 /* the controls inserted last */
 .ins-group.recent .ins-item { background: var(--panel); }
+/* the Changes of an opened class */
+.codeblock .ln.add { background: color-mix(in srgb, var(--ok) 13%, transparent); box-shadow: inset 3px 0 0 var(--ok); }
+.codeblock .ln.del { background: color-mix(in srgb, var(--error) 11%, transparent); box-shadow: inset 3px 0 0 var(--error); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--error) 50%, transparent); }
+.codeblock .ln.skip { color: var(--muted); font-style: italic; padding-top: 4px; padding-bottom: 4px; }
+/* the text of a control, edited on the canvas */
+.inline-edit { position: fixed; z-index: 55; padding: 4px 8px; border: 2px solid var(--accent); border-radius: 6px; background: var(--panel); color: var(--text);
+  box-shadow: 0 4px 16px rgba(0,0,0,.2); font-size: 14px; outline: none; }

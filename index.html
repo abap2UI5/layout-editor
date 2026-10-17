@@ -37,6 +37,7 @@
           <button id="btnRecent" role="menuitem" title="The designs saved in this browser, and those New, Open or Import replaced">Designs in this browser…</button>
         </div>
       </div>
+      <button id="btnTheme" class="ghost icon" title="Appearance of the editor: as the system" aria-label="Appearance of the editor">◐</button>
       <button id="btnUndo" class="ghost icon" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
       <button id="btnRedo" class="ghost icon" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
       <div class="menu-wrap split">
@@ -123,6 +124,7 @@
             <div class="seg small" role="group" aria-label="Code">
               <button data-code="abap" class="active">ABAP class</button>
               <button data-code="xml">XML view</button>
+              <button data-code="diff" id="btnDiff" hidden title="What the export changes in the class as it was opened">Changes</button>
             </div>
             <span id="codeInfo" class="muted"></span>
           </div>

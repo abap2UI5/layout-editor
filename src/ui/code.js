@@ -5,6 +5,7 @@ import { $, toast } from './dom.js';
 import { fileName } from '../abap.js';
 import { classSource } from '../clas.js';
 import { toXml } from '../xml.js';
+import { diffHunks } from '../diff.js';
 
 
 const ABAP_KW = /\b(CLASS|DEFINITION|PUBLIC|PROTECTED|PRIVATE|SECTION|INTERFACES|TYPES|BEGIN|OF|END|TYPE|DATA|STANDARD|TABLE|WITH|EMPTY|KEY|REF|TO|METHODS|ENDCLASS|IMPLEMENTATION|METHOD|ENDMETHOD|IF|ELSEIF|ELSE|ENDIF|CASE|WHEN|ENDCASE|VALUE|LENGTH|DECIMALS|ME)\b/g;
@@ -26,11 +27,19 @@ let codeCache = { key: null };
 export function renderCode() {
   const d = state.design;
   const pre = $('#code');
+  // Changes exist for a class that was opened, and only for it
+  const opened = !!(d.abap && d.abap.source);
+  $('#btnDiff').hidden = !opened;
+  if (state.code === 'diff' && !opened) { setCode('abap'); return; }
   const key = `${state.code}:${state.rev}`;
   if (codeCache.key === key) { highlightCode(false); return; }
   codeCache = { key };
   let lines;
   let nodeIds;
+  if (state.code === 'diff') {
+    renderDiff(pre, d);
+    return;
+  }
   if (state.code === 'abap') {
     const map = classSource(d);
     lines = map.source.replace(/\n$/, '').split('\n');
@@ -49,6 +58,23 @@ export function renderCode() {
     return `<span class="ln" data-n="${i + 1}"${n}>${hl(l) || ' '}</span>`;
   }).join('');
   highlightCode(false);
+}
+
+// the class as it was opened against the class the export writes
+function renderDiff(pre, d) {
+  const before = d.abap.source.replace(/\n$/, '').split('\n');
+  const after = classSource(d).source.replace(/\n$/, '').split('\n');
+  const h = diffHunks(before, after);
+  $('#codeInfo').textContent = h.added || h.removed
+    ? `+${h.added} −${h.removed} lines against the class as it was opened`
+    : 'the export writes the class as it was opened';
+  if (!h.added && !h.removed) {
+    pre.innerHTML = '<span class="ln skip">No change - every line stays as it was.</span>';
+    return;
+  }
+  pre.innerHTML = h.lines.map((l) => (l.op === '…'
+    ? `<span class="ln skip">⋯ ${l.count} unchanged line${l.count === 1 ? '' : 's'}</span>`
+    : `<span class="ln ${l.op === '+' ? 'add' : l.op === '-' ? 'del' : ''}" data-n="${l.op === '-' ? l.a : l.b}">${highlightAbapLine(l.text) || ' '}</span>`)).join('');
 }
 
 // mark the selected control's lines, and bring the first into view

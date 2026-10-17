@@ -272,3 +272,53 @@ test('a design saved by another tab is announced, and can be loaded', async ({ d
   await expect(page.locator('#className')).toHaveValue('ZCL_FROM_THE_OTHER_TAB');
   await other.close();
 });
+
+test('an opened class shows what the export changes in it', async ({ designer: page }) => {
+  await expect(page.locator('#btnDiff')).toBeHidden();
+  const original = await abapOf(page);
+  await page.locator('#btnFile').click();
+  await page.locator('#btnOpenClass').click();
+  await page.locator('#dlg textarea').fill(original);
+  await page.locator('#dlg').getByRole('button', { name: 'Open', exact: true }).click();
+  await page.locator('#dlg').getByRole('button', { name: 'OK' }).click();
+  await page.locator('#btnDiff').click();
+  await expect(page.locator('#code')).toContainText('No change');
+  await page.evaluate(() => window.designer.commit((d) => { d.root.aggs.content[0].props.title = { m: 's', v: 'Changed title' }; }));
+  await expect(page.locator('#codeInfo')).toContainText('+1 −1');
+  await expect(page.locator('#code .ln.add')).toContainText('Changed title');
+  await expect(page.locator('#code .ln.del')).toHaveCount(1);
+});
+
+test('a double-click on the canvas edits the text of a control there', async ({ designer: page }) => {
+  await page.locator('.ins-item[data-type="Button"]').click();
+  const id = await selected(page);
+  await waitRendered(page);
+  await preview(page).locator(`[id$="--${id}"]`).dblclick();
+  const field = page.locator('.inline-edit');
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue('Button');
+  await field.fill('Ship it');
+  await page.keyboard.press('Enter');
+  await expect(field).toHaveCount(0);
+  await expect(preview(page).getByText('Ship it')).toBeVisible();
+  // Escape takes the edit back
+  await preview(page).locator(`[id$="--${id}"]`).dblclick();
+  await page.locator('.inline-edit').fill('Not this');
+  await page.keyboard.press('Escape');
+  await expect.poll(() => page.evaluate((x) => {
+    const walk = (n) => { if (n.id === x) return n; for (const l of Object.values(n.aggs || {})) for (const c of l) { const r = walk(c); if (r) return r; } return null; };
+    return walk(window.designer.state.design.root).props.text.v;
+  }, id)).toBe('Ship it');
+});
+
+test('the editor is light, dark or as the system, and keeps the choice', async ({ designer: page }) => {
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme || '');
+  expect(await theme()).toBe('');
+  await page.locator('#btnTheme').click();
+  expect(await theme()).toBe('light');
+  await page.locator('#btnTheme').click();
+  expect(await theme()).toBe('dark');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(18, 23, 28)');
+  // kept with the preferences (a reload here would start from a cleared store)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('abap2ui5-designer:prefs')).appearance)).toBe('dark');
+});

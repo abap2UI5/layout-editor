@@ -97,7 +97,9 @@ Also in the editor:
   attributes the data, `client->_event( )` the event names. Export writes
   the chain back into that class and leaves every other line as it was;
   new attributes go to the end of the public section, new events get a
-  `WHEN` branch in `on_event`. A view attribute the editor cannot edit
+  `WHEN` branch in `on_event`. The *Changes* tab next to the class shows,
+  line by line, what the export changes in the class as it was opened. A
+  view attribute the editor cannot edit
   (`client->check_app_prev_stack( )`, a `COND #( )`, an `id`) is kept as
   ABAP on its control and written back unchanged; the dialog after the
   import lists it, and lists what could not be imported at all (a public
@@ -136,6 +138,9 @@ Also in the editor:
   Shift+F10 - opens its context menu: move, copy, cut, paste, duplicate,
   wrap, delete, and *Copy properties* / *Paste properties*, which set the
   properties of one control on others that have them.
+- A **double-click** on a control on the canvas edits its text right
+  there (text, title, header text, …): Enter keeps it, Escape takes it
+  back.
 - *Controls* lists the controls inserted last first, under *Recently
   used*. An empty container gets room and a dashed frame on the canvas, so
   there is something to drop into.
@@ -159,6 +164,8 @@ Also in the editor:
   fields of the same name, and a new name becomes a new field.
 - **Preview** mode lists the events the view raised, with what the user
   had changed in the model by then - what `on_event` would read.
+- The editor itself is light, dark or as the system (◐ in the bar at the
+  top); the canvas keeps the UI5 theme chosen for it.
 - The canvas can show a phone or tablet width, the Horizon, Quartz or
   Belize themes, and any UI5 version. Enter `1.71.80` to see the view on the
   oldest release abap2UI5 supports.
@@ -279,9 +286,10 @@ runtime. Run it when the palette gains a control.
 | `src/model.js` | The design document and every edit on it |
 | `src/abap.js` | Design → the ABAP class and its abapGit files |
 | `src/xml.js` | Design → XML view (preview, export), and XML view → design (import) |
+| `src/diff.js` | The line diff of the *Changes* tab |
 | `src/app.js` | The editor UI: wires the panels and renders them on every change |
 | `src/ui/store.js` | The state, commit( ) with undo and the browser store, selection |
-| `src/ui/*.js` | One module per panel: insert, layers, inspector, data, code, preview, palette, files, keys, edit (drop and clipboard), actions (the edits on the selection, for keys, palette, canvas toolbar and context menu), context (the context menu) |
+| `src/ui/*.js` | One module per panel: insert, layers, inspector, data, code, preview, palette, files, keys, edit (drop and clipboard), actions (the edits on the selection, for keys, palette, canvas toolbar and context menu), context (the context menu), inline (a text edited on the canvas) |
 | `src/preview/init.js` | The preview frame (a UI5 module) |
 | `tools/` | Dev server, metadata dump, class generation, runtime verification |
 | `test/` | Unit tests, fixtures, the builder model, browser tests |

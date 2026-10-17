@@ -311,6 +311,15 @@ sap.ui.define([
       if (errorBox.contains(e.target) || (tools && tools.contains(e.target))) return;
       e.preventDefault();
       e.stopPropagation();
+      // a double-click edits the control's text, over the canvas
+      if (type === 'dblclick') {
+        var hit = nodeIdOf(e.target);
+        var box = domOf(hit);
+        if (hit && box) {
+          var r = box.getBoundingClientRect();
+          post({ type: 'inline', id: hit, rect: { left: r.left, top: r.top, width: r.width, height: r.height } });
+        }
+      }
       if (type === 'click') {
         var id = nodeIdOf(e.target);
         var extend = !!(e.ctrlKey || e.metaKey || e.shiftKey);

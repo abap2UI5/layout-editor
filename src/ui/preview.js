@@ -9,6 +9,7 @@ import { handleDrop } from './edit.js';
 import { onKey } from './keys.js';
 import { deleteSelection, duplicateSelection, moveSelection, selectParent } from './actions.js';
 import { openContextMenu, closeContextMenu } from './context.js';
+import { openInlineEdit } from './inline.js';
 
 
 let previewTimer = null;
@@ -183,6 +184,8 @@ window.addEventListener('message', (e) => {
     eventLog.push({ name: msg.name, changes: changesOf(msg.model) });
     if (eventLog.length > 20) eventLog.shift();
     renderEventLog();
+  } else if (msg.type === 'inline') {
+    openInlineEdit(msg.id, msg.rect);
   } else if (msg.type === 'context') {
     // the frame's coordinates, on the editor's page
     const r = $('#preview').getBoundingClientRect();
