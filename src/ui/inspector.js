@@ -3,11 +3,13 @@
 import { CONTROLS, DESCRIPTIONS, getControl, splitType, NAMESPACES } from '../catalog.js';
 import {
   createNode, findNode, insertNode, aggAccepts, rowContext, bindableAggs, bindListToTable, hasOwnTemplate, unbindList,
-  attributeFits, checkAttributeName, checkEventName, checkStatic,
+  attributeFits, checkEventName, checkStatic, collectEvents,
 } from '../model.js';
-import { state, commit } from './store.js';
-import { $, h, options, toast, displayType, rememberFocus, restoreFocus } from './dom.js';
-import { newTableAttribute, offerRows } from './edit.js';
+import { state, commit, selectedIds } from './store.js';
+import { $, h, options, toast, choose, displayType, rememberFocus, restoreFocus } from './dom.js';
+import { newTableAttribute, offerRows, newAttributeFor } from './edit.js';
+import { WRAPPERS, wrapSelection, deleteSelection } from './actions.js';
+import { propertyDefaults } from './preview.js';
 
 const KINDS = { s: 'Aa', b: '@', f: '#', x: 'ƒx' };
 
@@ -43,6 +45,10 @@ export function renderInspector() {
   const node = hit.node;
   const c = getControl(node.type);
   const link = apiLink(node.type);
+  const many = selectedIds();
+  if (many.length > 1) box.append(multiBar(many));
+  // the defaults of the canvas's UI5, asked once per control class
+  const defaults = propertyDefaults(node.type, () => { if (state.selected === node.id) renderInspector(); }) || {};
   const ctx = rowContext(d, node.id);
 
   const filter = h('input', {
@@ -67,10 +73,10 @@ export function renderInspector() {
       h('div', { class: 'add-row' },
         h('select', {
           'aria-label': `Bind ${agg} to a table`,
-          onchange: (e) => {
+          onchange: async (e) => {
             const v = e.target.value;
-            const replace = !v || !hasOwnTemplate(node, agg, d)
-              || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of ${v}?\n\nCancel keeps them and only sets the binding.`);
+            const replace = !v || !hasOwnTemplate(node, agg, d) || await askReplace(node, agg, v);
+            if (replace === null) { renderInspector(); return; }
             commit((dd) => {
               if (v.startsWith('#')) bindListToTable(dd, node.id, agg, v.slice(1), replace, true);
               else if (v) bindListToTable(dd, node.id, agg, v, replace);
@@ -97,7 +103,7 @@ export function renderInspector() {
   for (const [title, test] of PROP_GROUPS) {
     const rows = defs.filter(([, def]) => test(def));
     if (!rows.length) continue;
-    box.append(group(title, h('div', {}, title === 'Content' ? h('p', { class: 'hint', text: KIND_TITLE }) : null, rows.map(([p, def]) => propRow(node, p, def, ctx)))));
+    box.append(group(title, h('div', {}, title === 'Content' ? h('p', { class: 'hint', text: KIND_TITLE }) : null, rows.map(([p, def]) => propRow(node, p, def, ctx, defaults[p])))));
   }
   // what an import brought along that the catalogue does not know: shown
   // as text, written to the class as it is, and removable
@@ -127,7 +133,9 @@ export function renderInspector() {
     if (evs.length) {
       box.append(group('Events', h('div', {},
         h('p', { class: 'hint', text: 'A name becomes client->_event( ) in the view and a WHEN branch in on_event.' }),
-        evs.map((ev) => eventRow(node, ev)))));
+        evs.map((ev) => eventRow(node, ev)),
+        // the names the design raises already: one WHEN branch for two controls
+        h('datalist', { id: 'eventNames' }, collectEvents(d).map((n) => h('option', { value: n }))))));
     }
   }
 
@@ -171,6 +179,8 @@ function eventRow(node, ev) {
     spellcheck: 'false',
     'aria-label': `Event ${ev}`,
     'data-focus': `ev-${ev}`,
+    list: 'eventNames',
+    autocomplete: 'off',
     oninput: (e) => {
       const v = e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
       // the field shows what the class gets, the caret stays where it was
@@ -206,11 +216,22 @@ function suggestEvent(node, ev) {
   return ev === 'press' ? (base || t) : `${base || t}_${ev.toUpperCase()}`;
 }
 
-function newTableFor(node, agg) {
+// Replace a template built by hand? true: replace, false: keep it and
+// only bind, null: neither (the dialog was closed)
+function askReplace(node, agg, table) {
+  return choose(`Bind the ${agg} to ${table}`, [
+    `This ${displayType(node.type)} has ${agg} of its own. Replace them with a template built from the fields of ${table}, or keep them and only set the binding?`,
+  ], [
+    { text: 'Keep, only bind', value: false },
+    { text: 'Replace with a template', value: true, primary: true },
+  ]);
+}
+
+async function newTableFor(node, agg) {
   // a template built by hand stays unless the user lets it go - as when
   // the rows are bound to a table that is there
-  const replace = !hasOwnTemplate(node, agg, state.design)
-    || confirm(`Replace the ${agg} of this ${displayType(node.type)} with a template built from the fields of the new table?\n\nCancel keeps them and only sets the binding.`);
+  const replace = !hasOwnTemplate(node, agg, state.design) || await askReplace(node, agg, 'a new table');
+  if (replace === null) return;
   commit((d) => {
     const name = newTableAttribute(d, node.type === 'Tree');
     bindListToTable(d, node.id, agg, name, replace);
@@ -219,11 +240,16 @@ function newTableFor(node, agg) {
   toast('Table attribute created - edit it on the Data tab');
 }
 
-function attrTypeFor(def) {
-  if (def.type === 'boolean') return 'bool';
-  if (def.type === 'int') return 'int';
-  if (def.type === 'float') return 'decimal';
-  return 'string';
+// several controls selected: what can be done with all of them
+function multiBar(ids) {
+  const wrap = h('select', {
+    'aria-label': 'Wrap the selection',
+    onchange: (e) => { if (e.target.value) wrapSelection(e.target.value); },
+  }, h('option', { value: '', text: 'Wrap in…' }), options(WRAPPERS, null));
+  return h('div', { class: 'multi-bar' },
+    h('b', { text: `${ids.length} controls selected` }),
+    h('span', { class: 'hint', text: 'Ctrl+click adds or removes one. The properties are those of the last.' }),
+    h('div', { class: 'add-row' }, wrap, h('button', { class: 'danger', onclick: () => deleteSelection() }, 'Delete all')));
 }
 
 // a value as the UI5 expression that says the same: a binding keeps its
@@ -236,7 +262,7 @@ function asExpression(value) {
   return value.v;
 }
 
-function propRow(node, p, def, ctx) {
+function propRow(node, p, def, ctx, dflt) {
   const d = state.design;
   const value = node.props[p];
   const m = value ? value.m : 's';
@@ -248,6 +274,7 @@ function propRow(node, p, def, ctx) {
     class: `kind k-${m}`,
     title: KIND_TITLE,
     'aria-label': `${p}: kind of value`,
+    'data-focus': `p-${p}-kind`,
     onchange: (e) => update((n) => {
       const mm = e.target.value;
       if (mm === 's') delete n.props[p];
@@ -267,8 +294,9 @@ function propRow(node, p, def, ctx) {
       const vals = def.type === 'boolean' ? ['true', 'false'] : def.values;
       editor = h('select', {
         'aria-label': p,
+        'data-focus': focusKey,
         onchange: (e) => update((n) => { if (e.target.value) n.props[p] = { m: 's', v: e.target.value }; else delete n.props[p]; }),
-      }, h('option', { value: '', text: '— default —' }), options(vals, v));
+      }, h('option', { value: '', text: dflt != null && dflt !== '' ? `— default (${dflt}) —` : '— default —' }), options(vals, v));
     } else {
       const bad = checkStatic(def, v);
       editor = h('input', {
@@ -278,7 +306,7 @@ function propRow(node, p, def, ctx) {
         'aria-label': p,
         'data-focus': focusKey,
         spellcheck: def.type === 'string' ? 'true' : 'false',
-        placeholder: def.hint || (def.type === 'cssSize' ? 'e.g. 10rem' : def.type === 'icon' ? 'sap-icon://…' : ''),
+        placeholder: dflt != null && dflt !== '' ? `default: ${dflt}` : def.hint || (def.type === 'cssSize' ? 'e.g. 10rem' : def.type === 'icon' ? 'sap-icon://…' : ''),
         oninput: (e) => {
           // a value UI5 would refuse shows as one while it is typed
           const w = checkStatic(def, e.target.value);
@@ -293,6 +321,7 @@ function propRow(node, p, def, ctx) {
     editor = h('div', { class: 'val' },
       h('select', {
         'aria-label': `${p}: attribute`,
+        'data-focus': `${focusKey}-attr`,
         onchange: (e) => update((n) => { n.props[p].v = e.target.value; }),
       }, value.v && !attrs.some((a) => a.name === value.v) ? h('option', { value: value.v, text: `${value.v} (missing)` }) : null,
       options(attrs.map((a) => a.name), value.v, Object.fromEntries(attrs.map((a) => [a.name, `${a.name} : ${a.type}`])))),
@@ -301,6 +330,7 @@ function propRow(node, p, def, ctx) {
     const fields = ctx ? ctx.fields : [];
     editor = h('select', {
       'aria-label': `${p}: field`,
+      'data-focus': `${focusKey}-field`,
       onchange: (e) => update((n) => { n.props[p].v = e.target.value; }),
     }, value.v && !fields.some((f) => f.name === value.v) ? h('option', { value: value.v, text: `${value.v} (missing)` }) : null,
     options(fields.map((f) => f.name), value.v));
@@ -319,15 +349,25 @@ function propRow(node, p, def, ctx) {
 }
 
 function newAttrFor(node, p, def) {
-  commit((d) => {
-    const base = `${splitType(node.type).name}_${p}`.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 26);
-    let name = base;
-    let i = 1;
-    while (d.attributes.some((a) => a.name === name) || checkAttributeName(name)) name = `${base}${++i}`;
-    const n = findNode(d.root, node.id).node;
-    const cur = n.props[p];
-    d.attributes.push({ name, type: attrTypeFor(def), value: cur && cur.m === 's' ? cur.v : '' });
-    n.props[p] = { m: 'b', v: name };
-  });
+  commit((d) => { newAttributeFor(d, node.id, p, def); });
   toast('Attribute created on the Data tab');
+}
+
+// a property brought into view and focused - from a line of the Checks:
+// the filter that would hide it is cleared, its group opened
+export function focusProp(p) {
+  if (state.inspector.filter || state.inspector.onlySet) {
+    state.inspector.filter = '';
+    state.inspector.onlySet = false;
+    renderInspector();
+  }
+  const row = $('#inspector').querySelector(`.prop[data-prop="${CSS.escape(p)}"]`);
+  if (!row) return;
+  const g = row.closest('details');
+  if (g) g.open = true;
+  row.scrollIntoView({ block: 'center' });
+  row.classList.add('flash');
+  setTimeout(() => row.classList.remove('flash'), 1200);
+  const ed = row.querySelector('.val input, .val select');
+  if (ed) ed.focus();
 }

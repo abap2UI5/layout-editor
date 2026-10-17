@@ -113,19 +113,42 @@ Also in the editor:
   extension (`vscode://abap2ui5.abap2ui5/open`), which opens it as an
   unsaved `.clas.abap` and offers to run it.
 - **Save / Open** stores the design as JSON so you can continue later. The
-  design is also kept in the browser between visits; what New, Open or
-  Import replaced is under *Recent designs*. **Copy share link** puts the
-  whole design into a URL - open it anywhere, the editor loads it.
-- **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z, **Delete** or **Backspace**
-  removes the selection, **Ctrl+D** duplicates it, **Ctrl+C / Ctrl+X /
-  Ctrl+V** copy, cut and paste it (also into another design or tab),
-  **Alt+↑** selects the parent, **Escape** the view, **Ctrl+S** saves the
-  design. In the outline the arrow keys walk the tree.
+  design is also kept in the browser between visits. *Save in browser*
+  keeps it there under its class name, next to others; *Designs in this
+  browser* lists those, and what New, Open or Import replaced. **Copy share
+  link** puts the whole design into a URL - open it anywhere, the editor
+  loads it (a link of more than 8 kB says so: some chats and mail cut it).
+- **Undo/redo** with Ctrl+Z and Ctrl+Shift+Z - each step brings back the
+  control that was selected. **Delete** or **Backspace** removes the
+  selection, **Ctrl+D** duplicates it, **Ctrl+↑ / Ctrl+↓** move it among
+  its siblings, **Ctrl+C / Ctrl+X / Ctrl+V** copy, cut and paste it (also
+  into another design or tab), **Alt+↑** selects the parent, **Escape**
+  the view, **Ctrl+S** saves the design. In the outline the arrow keys walk
+  the tree, and the tabs of the drawer go by arrow key too.
+- **Several controls at once**: Ctrl+click (or Shift+click) on the canvas,
+  in the outline or in the code adds a control to the selection. Delete,
+  duplicate, move, copy and cut act on all of them; *Wrap in…* puts
+  controls side by side into a new VBox, HBox, FlexBox or Panel.
+- The **outline filter** shows the controls whose type or text matches, and
+  the way down to them.
 - A drop on the canvas lands before, into or after the control under the
   pointer: the upper quarter is before, the lower after. The panels on the
   left and right can be dragged wider.
 - **Checks** lists what would break the class or the view, and inputs
-  whose entry goes nowhere.
+  whose entry goes nowhere. A click on a line selects the control and
+  focuses the property it is about; where there is one fix, a button does
+  it: create the attribute a binding names, remove an unused one, reset a
+  value UI5 would refuse, build the template of a bound list, bind an input
+  to a new attribute.
+- **Properties** show the default of the canvas's UI5 where nothing is
+  set, and an event field offers the names the design raises already - two
+  buttons, one `WHEN` branch.
+- **Data**: attributes and fields move up and down (their order is the
+  order of the declarations), and *Paste rows…* takes sample rows copied
+  from a spreadsheet or CSV - with a header line, the columns go to the
+  fields of the same name, and a new name becomes a new field.
+- **Preview** mode lists the events the view raised, with what the user
+  had changed in the model by then - what `on_event` would read.
 - The canvas can show a phone or tablet width, the Horizon, Quartz or
   Belize themes, and any UI5 version. Enter `1.71.80` to see the view on the
   oldest release abap2UI5 supports.
@@ -248,7 +271,7 @@ runtime. Run it when the palette gains a control.
 | `src/xml.js` | Design → XML view (preview, export), and XML view → design (import) |
 | `src/app.js` | The editor UI: wires the panels and renders them on every change |
 | `src/ui/store.js` | The state, commit( ) with undo and the browser store, selection |
-| `src/ui/*.js` | One module per panel: insert, layers, inspector, data, code, preview, palette, files, keys, edit (drop and clipboard) |
+| `src/ui/*.js` | One module per panel: insert, layers, inspector, data, code, preview, palette, files, keys, edit (drop and clipboard), actions (the edits on the selection, for keys, palette and canvas toolbar) |
 | `src/preview/init.js` | The preview frame (a UI5 module) |
 | `tools/` | Dev server, metadata dump, class generation, runtime verification |
 | `test/` | Unit tests, fixtures, the builder model, browser tests |

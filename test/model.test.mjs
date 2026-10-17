@@ -388,3 +388,92 @@ test('columns built by hand are a template of their own: binding the table again
     assert.equal(hasOwnTemplate(l, agg, d), true, `${type}: edited by hand`);
   }
 });
+
+test('controls side by side wrap into a new container, in their order and in their place', async () => {
+  const { wrapNodes } = await import('../src/model.js');
+  const d = createDesign();
+  const p = page(d);
+  const a = createNode('Button');
+  const b = createNode('Text');
+  const c = createNode('Input');
+  for (const n of [a, b, c]) insertNode(d, n, p.id);
+  const before = p.aggs.content.length;
+  const id = wrapNodes(d, [c.id, a.id], 'HBox');
+  const box = findNode(d.root, id);
+  assert.equal(box.node.type, 'HBox');
+  assert.deepEqual(box.node.aggs.items.map((n) => n.id), [a.id, c.id], 'in the order of the view, not of the clicks');
+  assert.equal(p.aggs.content.length, before - 1);
+  assert.equal(p.aggs.content.indexOf(box.node), before - 3, 'where the first of them was');
+  assert.equal(findNode(d.root, b.id).parent.id, p.id);
+});
+
+test('a wrap refuses what does not sit side by side, or what the wrapper does not take', async () => {
+  const { wrapNodes } = await import('../src/model.js');
+  const d = createDesign();
+  const p = page(d);
+  const box = createNode('VBox');
+  insertNode(d, box, p.id);
+  const inner = createNode('Button');
+  insertNode(d, inner, box.id);
+  const outer = createNode('Button');
+  insertNode(d, outer, p.id);
+  assert.throws(() => wrapNodes(d, [inner.id, outer.id], 'HBox'), /side by side/);
+  const bar = createNode('IconTabBar');
+  insertNode(d, bar, p.id);
+  const tab = Object.values(bar.aggs).flat().find((n) => n.type === 'IconTabFilter');
+  assert.throws(() => wrapNodes(d, [tab.id], 'VBox'), /takes no/, 'a tab is a part of its bar, no VBox takes it');
+  assert.ok(findNode(d.root, tab.id), 'a refused wrap leaves the design as it was - commit( ) rolls back what it did');
+});
+
+test('moveItem swaps an entry with its neighbour, and refuses the ends', async () => {
+  const { moveItem } = await import('../src/model.js');
+  const list = ['a', 'b', 'c'];
+  assert.equal(moveItem(list, 0, -1), false);
+  assert.equal(moveItem(list, 2, 1), false);
+  assert.equal(moveItem(list, 1, -1), true);
+  assert.deepEqual(list, ['b', 'a', 'c']);
+});
+
+test('the order of the attributes is the order of their declarations', async () => {
+  const { moveItem } = await import('../src/model.js');
+  const d = createDesign();
+  d.attributes = [{ name: 'first', type: 'string', value: '' }, { name: 'second', type: 'string', value: '' }];
+  moveItem(d.attributes, 1, -1);
+  const src = generateClass(d);
+  assert.ok(src.indexOf('DATA second') < src.indexOf('DATA first'));
+});
+
+test('sample rows pasted from a spreadsheet or CSV', async () => {
+  const { parseSampleRows } = await import('../src/model.js');
+  const fields = [{ name: 'TITLE', type: 'string' }, { name: 'DONE', type: 'bool' }, { name: 'KIDS', type: 'table', fields: [] }];
+  // a spreadsheet: tabs, a header that names a field the table has not
+  let r = parseSampleRows('Title\tDone\tCity name\nFirst\tX\tBerlin\nSecond\t\tParis\n', fields, true);
+  assert.deepEqual(r.added, [{ name: 'CITY_NAME', type: 'string' }]);
+  assert.deepEqual(r.rows, [{ TITLE: 'First', DONE: true, CITY_NAME: 'Berlin' }, { TITLE: 'Second', DONE: false, CITY_NAME: 'Paris' }]);
+  // CSV without a header: the scalar fields in their order, the rest counted
+  r = parseSampleRows('"A, quoted";true;extra\r\nB;0\r\n', fields, false);
+  assert.deepEqual(r.rows, [{ TITLE: 'A, quoted', DONE: true }, { TITLE: 'B', DONE: false }]);
+  assert.equal(r.ignored, 1);
+  assert.deepEqual(r.added, []);
+  // a header that names a table field leaves that column out
+  r = parseSampleRows('KIDS,TITLE\nx,y', fields, true);
+  assert.deepEqual(r.rows, [{ TITLE: 'y' }]);
+  assert.deepEqual(parseSampleRows('  \n', fields, true).rows, []);
+});
+
+test('a check that can be fixed says how - and the fix is data, not code', () => {
+  const d = createDesign();
+  d.attributes = [{ name: 'unused', type: 'string', value: '' }];
+  const input = createNode('Input');
+  input.props.value = { m: 'b', v: 'missing_name' };
+  insertNode(d, input, page(d).id);
+  const tree = createNode('Tree');
+  insertNode(d, tree, page(d).id);
+  const issues = validate(d);
+  const fix = (re) => issues.find((i) => re.test(i.text))?.fix;
+  assert.deepEqual(fix(/is bound to missing_name/), { kind: 'createAttribute', name: 'missing_name', type: 'string', label: 'Create missing_name' });
+  assert.equal(issues.find((i) => /is bound to missing_name/.test(i.text)).prop, 'value');
+  assert.equal(fix(/unused is public/).kind, 'removeAttribute');
+  assert.equal(fix(/Tree: its items/).kind, 'nodesTable');
+  assert.doesNotThrow(() => JSON.stringify(issues));
+});

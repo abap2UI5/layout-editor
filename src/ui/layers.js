@@ -1,34 +1,53 @@
 // The Outline: the tree of the view, with drag and drop and the keys, and
 // the breadcrumbs below the canvas.
 import { getControl } from '../catalog.js';
-import { canHaveChildren, aggNames, findNode } from '../model.js';
+import { canHaveChildren, aggNames, findNode, walk } from '../model.js';
 import { state, select, ancestors } from './store.js';
 import { $, h, displayType, nodeLabel } from './dom.js';
 import { handleDrop } from './edit.js';
 
 
+// the nodes a filter of the outline shows: those whose type or label
+// match, and the way down to them - null without a filter
+function filtered() {
+  const q = (state.layersFilter || '').trim().toLowerCase();
+  if (!q) return null;
+  const show = new Set(['root']);
+  walk(state.design.root, (n) => {
+    if (n.id !== 'root' && `${n.type} ${nodeLabel(n)}`.toLowerCase().includes(q)) {
+      show.add(n.id);
+      for (const a of ancestors(n.id)) show.add(a.id);
+    }
+    return true;
+  });
+  return show;
+}
+
 export function renderLayers() {
   const box = $('#layers');
   const scrollTop = box.scrollTop;
   box.replaceChildren();
+  const show = filtered();
 
   const row = (node, depth, extra) => {
     const isRoot = node.id === 'root';
     const kids = canHaveChildren(node) && aggNames(node).some((a) => (node.aggs[a] || []).length);
-    const collapsed = state.collapsed.has(node.id);
+    const collapsed = !show && state.collapsed.has(node.id);
+    const also = state.also.includes(node.id);
     const bound = Object.values(node.props || {}).some((v) => v && (v.m === 'b' || v.m === 'f'));
     const lbl = isRoot ? '' : nodeLabel(node);
     const el = h('div', {
-      class: `lrow${state.selected === node.id ? ' sel' : ''}`,
+      class: `lrow${state.selected === node.id ? ' sel' : ''}${also ? ' sel also' : ''}`,
       role: 'treeitem',
       tabindex: state.selected === node.id ? '0' : '-1',
-      'aria-selected': state.selected === node.id ? 'true' : 'false',
+      'aria-selected': state.selected === node.id || also ? 'true' : 'false',
       'aria-expanded': kids ? String(!collapsed) : null,
       'aria-level': String(depth + 1),
       style: `padding-left:${4 + depth * 14}px`,
       draggable: isRoot ? null : 'true',
       'data-id': node.id,
-      onclick: (e) => { e.stopPropagation(); select(node.id); },
+      // Ctrl or Shift: the control joins the selection, or leaves it
+      onclick: (e) => { e.stopPropagation(); select(node.id, { extend: e.ctrlKey || e.metaKey || e.shiftKey }); },
       ondragstart: (e) => { e.stopPropagation(); e.dataTransfer.setData('text/plain', `dsg:move:${node.id}`); e.dataTransfer.effectAllowed = 'move'; },
     },
     h('button', {
@@ -39,6 +58,7 @@ export function renderLayers() {
       onclick: (e) => {
         e.stopPropagation();
         if (!kids) return;
+        if (show) return;
         if (collapsed) state.collapsed.delete(node.id); else state.collapsed.add(node.id);
         renderLayers();
       },
@@ -51,14 +71,17 @@ export function renderLayers() {
   };
 
   const out = (node, depth, parent, agg, index) => {
+    if (show && !show.has(node.id)) return;
     box.append(row(node, depth, { parent, agg, index }));
-    if (state.collapsed.has(node.id)) return;
+    if (!show && state.collapsed.has(node.id)) return;
     const c = getControl(node.type);
     const aggRows = node.type !== 'mvc:View' && c && c.aggs && Object.keys(c.aggs).length > 1;
     for (const a of aggNames(node)) {
       const kids = node.aggs[a] || [];
       // an empty aggregation shows only on the selected control - enough to
-      // drop into, without a tree full of empty slots
+      // drop into, without a tree full of empty slots; under a filter only
+      // what holds a match
+      if (show && !kids.some((k) => show.has(k.id))) continue;
       if (!kids.length && (!aggRows || state.selected !== node.id)) continue;
       let childDepth = depth + 1;
       if (aggRows || (!c && a)) {
@@ -74,6 +97,7 @@ export function renderLayers() {
     }
   };
   out(state.design.root, 0, null, null, 0);
+  if (show && show.size === 1) box.append(h('div', { class: 'empty', text: 'No control matches.' }));
   box.scrollTop = scrollTop;
   const sel = box.querySelector('.lrow.sel');
   if (sel && !state.layersNoScroll) sel.scrollIntoView({ block: 'nearest' });
@@ -84,6 +108,8 @@ export function renderLayers() {
 // collapses or goes to the parent, right expands or goes to the first
 // child, Enter opens the properties
 export function onLayersKey(e) {
+  // Ctrl, Alt and Meta with an arrow are the editor's (move, parent)
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   const rows = [...$('#layers').querySelectorAll('.lrow[data-id]')];
   const i = rows.findIndex((r) => r.dataset.id === state.selected);
   if (i < 0) return;

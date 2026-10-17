@@ -1,8 +1,14 @@
 // The Data panel: the attributes of the class with their sample values,
 // and the Checks panel.
-import { walk, rowContext, attributeUsage, renameAttribute, validate, checkAttributeName, checkFieldName, SCALAR_TYPES, ATTRIBUTE_TYPES } from '../model.js';
+import {
+  walk, findNode, rowContext, attributeUsage, renameAttribute, validate, checkAttributeName, checkFieldName, ATTRIBUTE_TYPES,
+  moveItem, parseSampleRows, bindListToTable,
+} from '../model.js';
+import { getControl } from '../catalog.js';
 import { state, commit, select } from './store.js';
-import { $, h, options, toast, rememberFocus, restoreFocus } from './dom.js';
+import { $, h, options, toast, choose, dialog, rememberFocus, restoreFocus } from './dom.js';
+import { newTableAttribute, newAttributeFor } from './edit.js';
+import { focusProp } from './inspector.js';
 
 
 export function renderData() {
@@ -59,12 +65,17 @@ function attrCard(a, idx) {
     class: 'icon danger',
     title: uses ? `Delete - ${uses} binding(s) use it` : 'Delete',
     'aria-label': 'Delete attribute',
-    onclick: () => {
-      if (uses && !confirm(`${a.name} is bound ${uses} time(s). Delete it anyway? The bindings stay and show up under Checks.`)) return;
+    onclick: async () => {
+      if (uses && !await choose(`Delete ${a.name}?`, `${a.name} is bound ${uses} time(s). The bindings stay and show up under Checks.`, [
+        { text: 'Cancel', value: false }, { text: 'Delete', value: true, primary: true },
+      ])) return;
       commit((dd) => { dd.attributes.splice(idx, 1); });
     },
   }, '✕');
-  const card = h('div', { class: 'attr' }, h('div', { class: 'attr-head' }, nameIn, typeSel, del));
+  // the order of the attributes is the order of their declarations
+  const last = d.attributes.length - 1;
+  const card = h('div', { class: 'attr' }, h('div', { class: 'attr-head' }, nameIn, typeSel,
+    moveButtons('attribute', idx, last, (delta) => commit((dd) => { moveItem(dd.attributes, idx, delta); })), del));
   if (uses) card.append(h('div', { class: 'uses', text: `bound ${uses}×` }));
   if (a.type !== 'table') {
     card.append(h('div', { class: 'avalue' }, h('span', { class: 'hint', style: 'margin:0', text: 'Value' }), scalarInput(a.type, a.value, (v) => upd((at) => { at.value = v; }, `a${idx}-v`), `a${idx}-v`)));
@@ -104,6 +115,7 @@ function attrCard(a, idx) {
               }
             }),
           }, options(ATTRIBUTE_TYPES, f.type)),
+          moveButtons('field', fi, fieldList.length - 1, (delta) => commit((dd) => { moveItem(fieldsAt(dd.attributes[idx], fieldPath), fi, delta); })),
           h('button', { class: 'icon danger', 'aria-label': 'Delete field', title: 'Delete field', onclick: () => commit((dd) => { fieldsAt(dd.attributes[idx], fieldPath).splice(fi, 1); }) }, '✕')));
         if (f.type === 'table') box.append(fieldsEditor(f.fields || [], [...fieldPath, f.name]));
       });
@@ -136,9 +148,47 @@ function attrCard(a, idx) {
     };
     card.append(h('div', { class: 'hint', style: 'margin:8px 0 0', text: 'Sample rows - they seed model_init and the canvas' }),
       h('div', { class: 'rows-wrap' }, rowsTable(a.fields, a.rows, [])),
-      h('button', { style: 'margin-top:6px', onclick: () => commit((dd) => { (dd.attributes[idx].rows = dd.attributes[idx].rows || []).push({}); }) }, '+ Row'));
+      h('div', { class: 'add-row', style: 'margin-top:6px' },
+        h('button', { onclick: () => commit((dd) => { (dd.attributes[idx].rows = dd.attributes[idx].rows || []).push({}); }) }, '+ Row'),
+        h('button', { title: 'Rows copied from a spreadsheet, or CSV', onclick: () => pasteRowsDialog(idx) }, 'Paste rows…')));
   }
   return card;
+}
+
+// ↑ and ↓ of an entry of a list
+function moveButtons(what, i, last, move) {
+  return h('span', { class: 'move' },
+    h('button', { class: 'icon', title: `Move ${what} up`, 'aria-label': `Move ${what} up`, disabled: i === 0 ? 'disabled' : null, onclick: () => move(-1) }, '↑'),
+    h('button', { class: 'icon', title: `Move ${what} down`, 'aria-label': `Move ${what} down`, disabled: i === last ? 'disabled' : null, onclick: () => move(1) }, '↓'));
+}
+
+// rows from a spreadsheet or a CSV, into the sample rows of a table
+function pasteRowsDialog(idx) {
+  const at = state.design.attributes[idx];
+  const ta = h('textarea', { placeholder: at.fields.filter((f) => f.type !== 'table').map((f) => f.name).join('\t'), spellcheck: 'false', 'aria-label': 'Rows' });
+  const head = h('input', { type: 'checkbox', checked: true });
+  const mode = h('select', { 'aria-label': 'Replace or append' }, options(['replace', 'append'], 'replace', { replace: 'Replace the rows', append: 'Append to the rows' }));
+  dialog(`Paste rows into ${at.name}`, h('div', {},
+    h('p', { class: 'hint', text: 'Copy cells from a spreadsheet, or paste CSV. With a header line, the columns go to the fields of the same name, and a name the table has not becomes a new field; without one, they fill the fields in their order.' }),
+    ta,
+    h('div', { class: 'add-row' }, h('label', {}, head, ' First line names the fields'), mode)), [
+    { text: 'Cancel', action: () => true },
+    {
+      text: 'Paste', primary: true,
+      action: () => {
+        const r = parseSampleRows(ta.value, at.fields, head.checked);
+        if (!r.rows.length) { toast('No rows in the text'); return false; }
+        commit((d) => {
+          const t = d.attributes[idx];
+          t.fields.push(...r.added);
+          t.rows = mode.value === 'append' ? [...(t.rows || []), ...r.rows] : r.rows;
+        });
+        toast(`${r.rows.length} row(s) pasted${r.added.length ? `, new field(s) ${r.added.map((f) => f.name).join(', ')}` : ''}${r.ignored ? ` - ${r.ignored} cell(s) had no field` : ''}`);
+        return true;
+      },
+    },
+  ]);
+  ta.focus();
 }
 
 // every row at the depth of a list of fields: the rows of the table, or
@@ -186,21 +236,70 @@ function scalarInput(type, value, onValue, focusKey) {
 }
 
 
+// A quick fix from the Checks: what validate( ) proposes, done
+function applyFix(fix) {
+  if (fix.kind === 'createAttribute') {
+    commit((d) => {
+      if (d.attributes.some((a) => a.name === fix.name)) return;
+      d.attributes.push(fix.type === 'table'
+        ? { name: fix.name, type: 'table', fields: [{ name: 'TEXT', type: 'string' }], rows: [{ TEXT: 'Row 1' }] }
+        : { name: fix.name, type: fix.type, value: fix.type === 'bool' ? false : '' });
+    });
+  } else if (fix.kind === 'removeAttribute') {
+    commit((d) => { d.attributes = d.attributes.filter((a) => a.name !== fix.name); });
+  } else if (fix.kind === 'resetProp') {
+    commit((d) => { delete findNode(d.root, fix.node).node.props[fix.prop]; });
+  } else if (fix.kind === 'template') {
+    commit((d) => {
+      const n = findNode(d.root, fix.node).node;
+      const items = n.aggs[fix.agg] || [];
+      const b = n.props[fix.agg];
+      // more than one: the first is the template; none: built from the fields
+      if (items.length > 1) n.aggs[fix.agg] = items.slice(0, 1);
+      else bindListToTable(d, n.id, fix.agg, b.v, true, b.m === 'f');
+      return n.id;
+    });
+  } else if (fix.kind === 'nodesTable') {
+    commit((d) => {
+      bindListToTable(d, fix.node, fix.agg, newTableAttribute(d, true));
+      return fix.node;
+    });
+  } else if (fix.kind === 'bindNew') {
+    commit((d) => {
+      const n = findNode(d.root, fix.node).node;
+      const c = getControl(n.type);
+      newAttributeFor(d, n.id, fix.prop, c && c.props && c.props[fix.prop]);
+      return n.id;
+    });
+  }
+}
+
 export function renderIssues() {
   const issues = validate(state.design);
-  const box = $('#issuesPanel');
-  box.replaceChildren();
   const errors = issues.filter((i) => i.level === 'error').length;
   const warns = issues.filter((i) => i.level === 'warning').length;
   const badge = $('#issueCount');
   badge.textContent = String(errors || warns);
   badge.classList.toggle('hidden', !(errors || warns));
   badge.classList.toggle('warn', !errors);
+  $('#btnZip').title = errors ? `${errors} problem(s) - the class may not activate. See Checks.` : "The class with its abapGit files - abapGit: New Offline, Import ZIP";
+  // the list itself only while the tab is open
+  if (state.panel !== 'issues') return issues;
+  const box = $('#issuesPanel');
+  box.replaceChildren();
   if (!issues.length) box.append(h('div', { class: 'empty', text: 'All clear - the class is ready to export.' }));
   for (const i of issues) {
-    box.append(h('div', { class: `issue ${i.level}`, onclick: () => { if (i.node) select(i.node); } },
-      h('span', { class: 'lvl', text: i.level === 'error' ? '✕' : i.level === 'warning' ? '!' : 'i' }), h('span', { text: i.text })));
+    box.append(h('div', {
+      class: `issue ${i.level}${i.node ? ' at' : ''}`,
+      onclick: () => {
+        if (!i.node) return;
+        select(i.node);
+        // the property the line is about, in view and focused
+        if (i.prop) focusProp(i.prop);
+      },
+    },
+    h('span', { class: 'lvl', text: i.level === 'error' ? '✕' : i.level === 'warning' ? '!' : 'i' }), h('span', { class: 'itext', text: i.text }),
+    i.fix ? h('button', { class: 'fix', onclick: (e) => { e.stopPropagation(); applyFix(i.fix); } }, i.fix.label) : null));
   }
-  $('#btnZip').title = errors ? `${errors} problem(s) - the class may not activate. See Checks.` : "The class with its abapGit files - abapGit: New Offline, Import ZIP";
   return issues;
 }

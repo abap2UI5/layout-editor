@@ -1,8 +1,12 @@
 // Edits that start from the UI: inserting a control or a building block
 // at the selection or at a drop, moving by drop, and the clipboard.
-import { createNode, clone, walk, findNode, newId, aggAccepts, insertNode, dropTarget, removeNode, moveNode, bindableAggs, bindListToTable } from '../model.js';
+import {
+  createNode, clone, walk, findNode, newId, aggAccepts, insertNode, dropTarget, removeNode, moveNode, bindableAggs, bindListToTable,
+  isAncestor, attrTypeFor, checkAttributeName,
+} from '../model.js';
+import { splitType } from '../catalog.js';
 import { PATTERNS } from '../patterns.js';
-import { state, commit, ancestors } from './store.js';
+import { state, commit, ancestors, selectedIds, selectMany } from './store.js';
 import { toast, displayType } from './dom.js';
 import { describeControl } from './preview.js';
 import { renderInsert } from './insert.js';
@@ -151,19 +155,50 @@ export function handleDrop(data, onId, place, zone) {
 }
 
 
-// the selection as text: a design node in JSON, with a marker so a paste
-// knows it - the system clipboard carries it between designs and tabs, the
-// editor's own copy covers a browser that refuses to read the clipboard
+// a new attribute for property `p` of a node, named after both, typed
+// after the property, with its value as the start - the property is bound
+// to it; returns the name
+export function newAttributeFor(d, nodeId, p, def) {
+  const n = findNode(d.root, nodeId).node;
+  const base = `${splitType(n.type).name}_${p}`.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 26);
+  let name = base;
+  let i = 1;
+  while (d.attributes.some((a) => a.name === name) || checkAttributeName(name)) name = `${base}${++i}`;
+  const cur = n.props[p];
+  const type = attrTypeFor(def);
+  d.attributes.push({ name, type, value: cur && cur.m === 's' ? (type === 'bool' ? cur.v === 'true' : cur.v) : type === 'bool' ? false : '' });
+  n.props[p] = { m: 'b', v: name };
+  return name;
+}
+
+
+// the selection as text: design nodes in JSON, with a marker so a paste
+// knows them - the system clipboard carries them between designs and tabs,
+// the editor's own copy covers a browser that refuses to read the clipboard
 const CLIP_MARK = 'abap2ui5-designer:node';
 
 export function copySelection(cut) {
-  const hit = findNode(state.design.root, state.selected);
-  if (!hit || !hit.parent) return;
-  const text = JSON.stringify({ [CLIP_MARK]: 1, node: hit.node });
+  const root = state.design.root;
+  const ids = selectedIds().filter((id) => !selectedIds().some((o) => o !== id && isAncestor(root, o, id)));
+  const hits = ids.map((id) => findNode(root, id)).filter((x) => x && x.parent);
+  if (!hits.length) return;
+  // in the order of the view, whatever the order of the clicks
+  const order = [];
+  walk(root, (n) => { order.push(n.id); return true; });
+  hits.sort((a, b) => order.indexOf(a.node.id) - order.indexOf(b.node.id));
+  const nodes = hits.map((x) => x.node);
+  const text = JSON.stringify(nodes.length === 1 ? { [CLIP_MARK]: 1, node: nodes[0] } : { [CLIP_MARK]: 1, nodes });
   state.clipboard = text;
   try { navigator.clipboard.writeText(text).catch(() => {}); } catch { /* no clipboard */ }
-  if (cut) commit((d) => removeNode(d, hit.node.id));
-  toast(`${displayType(hit.node.type)} ${cut ? 'cut' : 'copied'}`);
+  if (cut) {
+    commit((d) => {
+      let next;
+      for (const n of nodes) next = removeNode(d, n.id) || next;
+      return next && findNode(d.root, next) ? next : 'root';
+    });
+  }
+  const what = nodes.length === 1 ? displayType(nodes[0].type) : `${nodes.length} controls`;
+  toast(`${what} ${cut ? 'cut' : 'copied'}`);
 }
 
 export async function pasteSelection() {
@@ -177,19 +212,33 @@ export async function pasteSelection() {
 }
 
 function pasteNodes(onId, place, text = state.clipboard) {
-  let node;
+  let nodes;
   try {
     const parsed = JSON.parse(text);
-    node = parsed && parsed[CLIP_MARK] ? parsed.node : null;
-  } catch { node = null; }
-  if (!node) { toast('Nothing to paste'); return; }
-  const fresh = clone(node);
-  walk(fresh, (n) => { n.id = newId(); return true; });
-  commit((d) => {
-    const t = place || dropTarget(d, onId || 'root', fresh.type);
-    if (!t) { toast(`${displayType(fresh.type)} does not fit here`); return undefined; }
-    const p = findNode(d.root, t.parentId);
-    if (!p || !aggAccepts(p.node, t.agg, fresh.type)) { toast(`${displayType(fresh.type)} does not fit here`); return undefined; }
-    return insertNode(d, fresh, t.parentId, t.agg, t.index);
+    nodes = parsed && parsed[CLIP_MARK] ? parsed.nodes || (parsed.node ? [parsed.node] : null) : null;
+  } catch { nodes = null; }
+  if (!nodes || !nodes.length) { toast('Nothing to paste'); return; }
+  const fresh = nodes.map((node) => {
+    const f = clone(node);
+    walk(f, (n) => { n.id = newId(); return true; });
+    return f;
   });
+  const ids = [];
+  commit((d) => {
+    const t = place || dropTarget(d, onId || 'root', fresh[0].type);
+    if (!t) { toast(`${displayType(fresh[0].type)} does not fit here`); return undefined; }
+    const p = findNode(d.root, t.parentId);
+    if (!p || !aggAccepts(p.node, t.agg, fresh[0].type)) { toast(`${displayType(fresh[0].type)} does not fit here`); return undefined; }
+    let index = t.index;
+    for (const f of fresh) {
+      if (!p || !aggAccepts(p.node, t.agg, f.type)) {
+        // nothing of a paste that does not fit as a whole
+        throw new Error(`${displayType(f.type)} does not fit here`);
+      }
+      ids.push(insertNode(d, f, t.parentId, t.agg, index));
+      if (index != null) index += 1;
+    }
+    return ids[ids.length - 1];
+  });
+  if (ids.length > 1 && findNode(state.design.root, ids[0])) selectMany(ids);
 }

@@ -31,9 +31,10 @@
           <button id="btnNew" role="menuitem">New from template…</button>
           <button id="btnOpen" role="menuitem">Open design (.json)…</button>
           <button id="btnSave" role="menuitem" title="Ctrl+S">Save design (.json)</button>
+          <button id="btnSaveBrowser" role="menuitem" title="Keep the design in this browser, under its class name">Save in browser</button>
           <button id="btnOpenClass" role="menuitem" title="An abap2UI5 app class - its view, data and events become the design, the rest of the class is kept">Open ABAP class…</button>
           <button id="btnImport" role="menuitem">Import UI5 XML view…</button>
-          <button id="btnRecent" role="menuitem">Recent designs…</button>
+          <button id="btnRecent" role="menuitem" title="The designs saved in this browser, and those New, Open or Import replaced">Designs in this browser…</button>
         </div>
       </div>
       <button id="btnUndo" class="ghost icon" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
@@ -70,7 +71,10 @@
         <div id="insertList" class="scroll"></div>
       </section>
       <section class="panel hidden" id="panel-layers" role="tabpanel">
-        <div id="layers" class="scroll tree" role="tree" aria-label="Outline"></div>
+        <div class="panel-head">
+          <input id="layersFilter" type="search" placeholder="Filter the outline" aria-label="Filter the outline">
+        </div>
+        <div id="layers" class="scroll tree" role="tree" aria-label="Outline" aria-multiselectable="true"></div>
       </section>
       <section class="panel hidden" id="panel-data" role="tabpanel">
         <div id="dataPanel" class="scroll pad"></div>
@@ -112,6 +116,7 @@
           <div class="device-frame" id="deviceFrame">
             <iframe id="preview" title="Preview"></iframe>
           </div>
+          <div id="eventLog" class="event-log hidden" aria-live="polite" aria-label="Events of the preview"></div>
         </div>
         <div class="code-pane" id="codePane">
           <div class="code-head">

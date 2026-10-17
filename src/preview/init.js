@@ -28,14 +28,19 @@ sap.ui.define([
   var rendering = false;
   var mode = 'design';
   var selected = null;
+  var also = [];
   var selectedLabel = '';
   var tools = null;
   var lastXml = null;
 
   var PreviewController = Controller.extend('designer.PreviewController', {
     // every event of the view lands here: a toast, as on_event's would
+    // - and the designer learns of it, with the model as the user left it
     onEvent: function (name) {
       MessageToast.show('Event ' + name + ' - handled in on_event');
+      var data = null;
+      try { data = view && view.getModel() ? JSON.parse(JSON.stringify(view.getModel().getData())) : null; } catch (e) { data = null; }
+      post({ type: 'event', name: name, model: data });
     },
   });
 
@@ -79,6 +84,13 @@ sap.ui.define([
   function highlight(scroll) {
     var el = domOf(selected);
     mark('dsg-sel', el);
+    // the rest of a selection of several controls
+    var old = document.querySelectorAll('.dsg-also');
+    for (var i = 0; i < old.length; i++) old[i].classList.remove('dsg-also');
+    for (var j = 0; j < also.length; j++) {
+      var a = domOf(also[j]);
+      if (a) a.classList.add('dsg-also');
+    }
     if (el && scroll && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
     placeTools();
   }
@@ -230,6 +242,24 @@ sap.ui.define([
     });
   }
 
+  // the default values of a control class's properties, as text: what a
+  // property is when the view does not set it
+  function defaults(msg) {
+    sap.ui.require([msg.module], function (C) {
+      var out = {};
+      try {
+        var all = C.getMetadata().getAllProperties();
+        Object.keys(all).forEach(function (n) {
+          var v = all[n].defaultValue;
+          if (v !== null && v !== undefined && typeof v !== 'object') out[n] = String(v);
+        });
+      } catch (err) { /* no metadata - no defaults */ }
+      post({ type: 'defaults', key: msg.key, defaults: out });
+    }, function () {
+      post({ type: 'defaults', key: msg.key, defaults: {} });
+    });
+  }
+
   window.addEventListener('message', function (e) {
     var msg = e.data || {};
     if (msg.target !== 'dsg-preview') return;
@@ -241,10 +271,14 @@ sap.ui.define([
     } else if (msg.type === 'render') {
       mode = msg.mode || mode;
       selected = msg.selected || null;
+      also = msg.also || [];
       selectedLabel = msg.label || '';
       render(msg);
+    } else if (msg.type === 'defaults') {
+      defaults(msg);
     } else if (msg.type === 'select') {
       selected = msg.selected;
+      also = msg.also || [];
       selectedLabel = msg.label || '';
       highlight(true);
     } else if (msg.type === 'mode') {
@@ -263,8 +297,9 @@ sap.ui.define([
       e.stopPropagation();
       if (type === 'click') {
         var id = nodeIdOf(e.target);
-        if (id) { selected = id; highlight(false); }
-        post({ type: 'select', id: id || 'root' });
+        var extend = !!(e.ctrlKey || e.metaKey || e.shiftKey);
+        if (id && !extend) { selected = id; also = []; highlight(false); }
+        post({ type: 'select', id: id || 'root', extend: extend });
       }
     }, true);
   });

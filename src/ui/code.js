@@ -54,7 +54,8 @@ export function renderCode() {
 // mark the selected control's lines, and bring the first into view
 export function highlightCode(scroll) {
   const pre = $('#code');
-  for (const el of pre.querySelectorAll('.ln.hi')) el.classList.remove('hi');
+  for (const el of pre.querySelectorAll('.ln.hi, .ln.hi-also')) el.classList.remove('hi', 'hi-also');
+  for (const id of state.also) for (const el of pre.querySelectorAll(`.ln[data-node="${CSS.escape(id)}"]`)) el.classList.add('hi-also');
   const lines = pre.querySelectorAll(`.ln[data-node="${CSS.escape(state.selected)}"]`);
   lines.forEach((el) => el.classList.add('hi'));
   if (scroll && lines[0] && state.view !== 'canvas') {
@@ -75,13 +76,17 @@ export function setView(view) {
   savePrefs();
   for (const b of document.querySelectorAll('[data-view]')) b.classList.toggle('active', b.dataset.view === view);
   $('#stageBody').className = `stage-body view-${view}`;
+  // the class is not built while it is hidden - it is now
+  if (view !== 'canvas') renderCode();
   highlightCode(true);
 }
 
+// true when the text is in the clipboard
 export async function copyText(text, what) {
   try {
     await navigator.clipboard.writeText(text);
     toast(`${what} copied`);
+    return true;
   } catch {
     // clipboard refused (no permission, not a secure context): show the
     // code and select it, so Ctrl+C works
@@ -93,5 +98,6 @@ export async function copyText(text, what) {
     sel.removeAllRanges();
     sel.addRange(range);
     toast('Press Ctrl+C to copy the selection');
+    return false;
   }
 }

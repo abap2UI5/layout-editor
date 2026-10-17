@@ -12,17 +12,17 @@ import { validate, checkClassName } from './model.js';
 import { generateClass, fileName } from './abap.js';
 import { generateClassSource } from './clas.js';
 import { toXml } from './xml.js';
-import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection } from './ui/store.js';
+import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection, isUi5Url } from './ui/store.js';
 import { $, toast, download } from './ui/dom.js';
 import { renderInsert, renderInsertTarget } from './ui/insert.js';
 import { renderLayers, onLayersKey, clearDropMarks, renderCrumbs } from './ui/layers.js';
 import { renderInspector } from './ui/inspector.js';
 import { renderData, renderIssues } from './ui/data.js';
 import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code.js';
-import { loadPreview, postPreview, sendPreview } from './ui/preview.js';
+import { loadPreview, postPreview, sendPreview, renderEventLog } from './ui/preview.js';
 import { handleDrop, copySelection, pasteSelection, addControlByName } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
-import { newDialog, importDialog, openClassDialog, openClassFromUrl, recentDialog, shareLink, openFile, saveDesign, exportZip, openInPlayground, openInVscode } from './ui/files.js';
+import { newDialog, importDialog, openClassDialog, openClassFromUrl, recentDialog, shareLink, openFile, saveDesign, saveToBrowser, exportZip, openInPlayground, openInVscode } from './ui/files.js';
 import { onKey } from './ui/keys.js';
 
 
@@ -98,22 +98,43 @@ function renderAll(opts = {}) {
   cn.classList.toggle('invalid', !!checkClassName(d.className));
   if (document.activeElement !== $('#description')) $('#description').value = d.description || '';
   $('#abapRelease').value = d.release || '';
-  renderLayers();
+  // what is not on screen renders when it comes on screen (renderPanel,
+  // setView) - the outline, the data and the class of a large design are
+  // the cost of every keystroke otherwise
+  if (state.panel === 'layers') renderLayers();
   // keep the input being typed into: re-rendering its panel would drop it
   if (!opts.keepFocus || !$('#inspector').contains(document.activeElement)) renderInspector();
-  if (!opts.keepFocus || !$('#dataPanel').contains(document.activeElement)) renderData();
+  if (state.panel === 'data' && (!opts.keepFocus || !$('#dataPanel').contains(document.activeElement))) renderData();
   renderIssues();
   renderCrumbs();
   renderInsertTarget();
-  renderCode();
+  if (state.view !== 'canvas') renderCode();
   sendPreview();
   $('#btnUndo').disabled = !state.undo.length;
   $('#btnRedo').disabled = !state.redo.length;
 }
 
 
-// a UI5 of your own for the canvas: the folder that holds resources/
-const isUi5Url = (v) => /^(https?:\/\/|\.{0,2}\/)[^"'<>\s]*$/.test(v);
+// the tab of the drawer that just opened shows the design as it is now
+function renderPanel() {
+  if (state.panel === 'layers') renderLayers();
+  else if (state.panel === 'data') renderData();
+  else if (state.panel === 'issues') renderIssues();
+}
+
+// the tabs of the drawer: arrow keys go from tab to tab, Home and End to
+// the first and the last, as a tablist does
+function onRailKey(e) {
+  const tabs = [...document.querySelectorAll('.rail-btn')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  const next = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  const t = tabs[(next + tabs.length) % tabs.length];
+  showPanel(t.dataset.panel);
+  t.focus();
+}
 
 function wire() {
   $('#insertSearch').addEventListener('input', renderInsert);
@@ -137,6 +158,7 @@ function wire() {
   $('#btnPlayground').onclick = openInPlayground;
   $('#btnVscode').onclick = openInVscode;
   $('#btnSave').onclick = saveDesign;
+  $('#btnSaveBrowser').onclick = saveToBrowser;
   $('#btnImport').onclick = importDialog;
   $('#btnRecent').onclick = recentDialog;
   $('#btnShare').onclick = shareLink;
@@ -149,6 +171,8 @@ function wire() {
   $('#btnCopyXml').onclick = () => copyText(toXml(state.design), 'XML');
   $('#btnDownloadAbap').onclick = () => download(fileName(state.design.className, 'clas.abap'), generateClassSource(state.design), 'text/plain');
   for (const b of document.querySelectorAll('.rail-btn')) b.onclick = () => showPanel(b.dataset.panel);
+  $('.rail').addEventListener('keydown', onRailKey);
+  $('#layersFilter').addEventListener('input', (e) => { state.layersFilter = e.target.value; renderLayers(); });
   for (const b of document.querySelectorAll('[data-view]')) b.onclick = () => setView(b.dataset.view);
   for (const b of document.querySelectorAll('[data-code]')) b.onclick = () => setCode(b.dataset.code);
   for (const b of document.querySelectorAll('[data-mode]')) {
@@ -156,12 +180,13 @@ function wire() {
       state.mode = b.dataset.mode;
       for (const x of document.querySelectorAll('[data-mode]')) x.classList.toggle('active', x === b);
       postPreview({ type: 'mode', mode: state.mode });
+      renderEventLog();
     };
   }
   // a click on a line of the class selects the control it writes
   $('#code').addEventListener('click', (e) => {
     const ln = e.target.closest('.ln[data-node]');
-    if (ln && !getSelection().toString()) select(ln.dataset.node, { fromCode: true });
+    if (ln && !getSelection().toString()) select(ln.dataset.node, { fromCode: true, extend: e.ctrlKey || e.metaKey || e.shiftKey });
   });
   const setDevice = (w) => {
     state.prefs.device = w;
@@ -204,13 +229,14 @@ function wire() {
 // ------------------------------------------------------------- start
 
 on('change', scheduleRender);
+on('panel', renderPanel);
 on('select', (opts) => {
-  renderLayers();
+  if (state.panel === 'layers') renderLayers();
   renderInspector();
   renderCrumbs();
   renderInsertTarget();
   highlightCode(!opts.fromCode);
-  postPreview({ type: 'select', selected: state.selected, label: labelOfSelection() });
+  postPreview({ type: 'select', selected: state.selected, also: state.also, label: labelOfSelection() });
 });
 
 loadPrefs();
