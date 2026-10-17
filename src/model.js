@@ -756,7 +756,14 @@ export function validate(design) {
       const def = getControl(n.type).aggs[a];
       if (b && (b.m === 'b' || b.m === 'f') && !def.noTemplate && (n.aggs[a] || []).length !== 1) {
         const many = (n.aggs[a] || []).length > 1;
-        issues.push({ level: 'warning', text: `${n.type}: a bound ${a} aggregation needs exactly one template item`, node: n.id, fix: { kind: 'template', node: n.id, agg: a, label: many ? 'Keep the first as template' : 'Build a template' } });
+        // a template built from the fields replaces columns built by hand,
+        // and needs a table to build from: offered only where neither stands
+        // in its way
+        const fromTable = b.m === 'f' || (attrByName.get(b.v) && attrByName.get(b.v).type === 'table');
+        const ownColumns = Object.entries(n.aggs || {}).some(([x, l]) => x !== a && l.length);
+        const fix = many ? { kind: 'template', node: n.id, agg: a, label: 'Keep the first as template' }
+          : fromTable && !ownColumns ? { kind: 'template', node: n.id, agg: a, label: 'Build a template' } : undefined;
+        issues.push({ level: 'warning', text: `${n.type}: a bound ${a} aggregation needs exactly one template item`, node: n.id, fix });
       }
       if (n.type === 'Tree' && !(b && (b.m === 'b' || b.m === 'f' || b.m === 'x'))) {
         issues.push({ level: 'error', text: 'Tree: its items have to be bound to a table - UI5 fails on static tree items', node: n.id, fix: { kind: 'nodesTable', node: n.id, agg: a, label: 'Create nodes table' } });

@@ -23,8 +23,9 @@ function previewUrl() {
 
 export function loadPreview() {
   state.previewReady = false;
-  // another UI5 may have other defaults
+  // another UI5 may have other defaults; what the old one was asked is gone
   defaultsOf.clear();
+  asking.clear();
   previewStatus(`Loading UI5${state.prefs.ui5 ? ` ${state.prefs.ui5}` : ''}…`);
   $('#preview').src = previewUrl();
 }
@@ -46,10 +47,13 @@ export function postPreview(msg) {
 }
 
 // the containers without a child: the canvas gives them room to drop into
+// - layouts and lists, not a list line or a select that has no items
+const CONTAINER_CATEGORIES = ['Layout', 'Lists'];
 function emptyContainers() {
   const out = [];
   walk(state.design.root, (n) => {
-    if (n.id !== 'root' && canHaveChildren(n) && !Object.values(n.aggs || {}).some((l) => l.length)) out.push(n.id);
+    const c = getControl(n.type);
+    if (n.id !== 'root' && c && CONTAINER_CATEGORIES.includes(c.category) && canHaveChildren(n) && !Object.values(n.aggs || {}).some((l) => l.length)) out.push(n.id);
     return true;
   });
   return out;
@@ -100,14 +104,17 @@ const asking = new Map();
 let defaultsSeq = 0;
 export function propertyDefaults(type, then) {
   if (defaultsOf.has(type)) return defaultsOf.get(type);
-  if (!state.previewReady || [...asking.values()].some((a) => a.type === type)) return null;
+  if (!state.previewReady) return null;
+  // asked already: this caller waits for the same answer
+  const pending = [...asking.values()].find((a) => a.type === type);
+  if (pending) { if (then) pending.then.push(then); return null; }
   const { ns, name } = splitType(type);
   const lib = namespaceUri(state.design, ns);
   if (!lib || type === 'mvc:View') return null;
   const parsed = parseClassName(`${lib}.${name}`);
   if (!parsed) return null;
   const key = `f${++defaultsSeq}`;
-  asking.set(key, { type, then });
+  asking.set(key, { type, then: then ? [then] : [] });
   postPreview({ type: 'defaults', key, module: parsed.module });
   setTimeout(() => asking.delete(key), 15000);
   return null;
@@ -179,7 +186,7 @@ window.addEventListener('message', (e) => {
     if (!a) return;
     asking.delete(msg.key);
     defaultsOf.set(a.type, msg.defaults || {});
-    if (a.then) a.then();
+    for (const fn of a.then) fn();
   } else if (msg.type === 'event') {
     eventLog.push({ name: msg.name, changes: changesOf(msg.model) });
     if (eventLog.length > 20) eventLog.shift();

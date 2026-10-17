@@ -322,3 +322,27 @@ test('the editor is light, dark or as the system, and keeps the choice', async (
   // kept with the preferences (a reload here would start from a cleared store)
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('abap2ui5-designer:prefs')).appearance)).toBe('dark');
 });
+
+test('a wrap that cannot be done says why, never that it was done', async ({ designer: page }) => {
+  await page.evaluate(() => { window.designer.addControl('VBox', 'root'); });
+  const outer = (await nodeIds(page, 'VBox')).at(-1);
+  await page.evaluate((id) => window.designer.addControl('VBox', id), outer);
+  const inner = (await nodeIds(page, 'VBox')).at(-1);
+  // a VBox inside another and a Switch elsewhere: not side by side
+  const sw = (await nodeIds(page, 'Switch'))[0];
+  await page.evaluate((x) => { window.designer.select(x[0]); window.designer.select(x[1], { extend: true }); }, [inner, sw]);
+  await page.keyboard.press('Control+K');
+  await page.locator('#cmdkInput').fill('wrap in panel');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#toast.error')).toContainText('side by side');
+  await expect(page.locator('#toast')).not.toContainText('Wrapped');
+});
+
+test('a list line without content is no empty container on the canvas', async ({ designer: page }) => {
+  await page.locator('.ins-item[data-type="List"]').click();
+  const list = await selected(page);
+  await page.evaluate((id) => window.designer.addControl('ObjectListItem', id), list);
+  const item = (await nodeIds(page, 'ObjectListItem')).at(-1);
+  await waitRendered(page);
+  await expect(preview(page).locator(`[id$="--${item}"]`).first()).not.toHaveClass(/dsg-empty/);
+});

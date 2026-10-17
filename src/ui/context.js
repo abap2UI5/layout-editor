@@ -54,6 +54,8 @@ export function openContextMenu(x, y, id) {
   const items = () => [...menu.querySelectorAll('button')];
   items()[0].focus();
   menu.addEventListener('keydown', (e) => {
+    // the menu has the keys: Delete here is no Delete of the selection
+    e.stopPropagation();
     const list = items();
     const i = list.indexOf(document.activeElement);
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeContextMenu(); return; }

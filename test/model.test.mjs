@@ -496,3 +496,18 @@ test('several nodes move together, in the order of the view, before the node at 
   // never into one of the moved
   assert.equal(moveNodes(d, [box.id, b.id], box.id, 'items', null), null);
 });
+
+test('"Build a template" is offered only where it replaces nothing built by hand and has a table to build from', () => {
+  const d = createDesign();
+  d.attributes = [table('t_items', ['TITLE'], [])];
+  const t = createNode('Table');
+  insertNode(d, t, page(d).id);
+  bindListToTable(d, t.id, 'items', 't_items');
+  const fixOf = () => validate(d).find((i) => /exactly one template/.test(i.text))?.fix;
+  t.aggs.items = [];
+  assert.equal(fixOf(), undefined, 'the columns of the table are its own');
+  delete t.aggs.columns;
+  assert.equal(fixOf().label, 'Build a template');
+  t.props.items.v = 'missing';
+  assert.equal(fixOf(), undefined, 'no table to build from');
+});

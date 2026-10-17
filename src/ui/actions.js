@@ -69,7 +69,9 @@ export function selectParent(id = state.selected) {
 export function wrapSelection(type, ids = selectedIds()) {
   const list = topmost(ids.filter((id) => id !== 'root'));
   if (!list.length) { toast('Select the controls to wrap first'); return; }
+  // a wrap that failed has said why (commit( ) shows the error) - and
+  // changed nothing
+  const rev = state.rev;
   commit((d) => wrapNodes(d, list, type));
-  const hit = findNode(state.design.root, state.selected);
-  if (hit && hit.node.type === type) toast(`Wrapped in ${displayType(type)}`);
+  if (state.rev !== rev) toast(`Wrapped in ${displayType(type)}`);
 }

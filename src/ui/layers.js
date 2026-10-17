@@ -108,7 +108,8 @@ export function renderLayers() {
   out(state.design.root, 0, null, null, 0);
   if (show && show.size === 1) box.append(h('div', { class: 'empty', text: 'No control matches.' }));
   box.scrollTop = scrollTop;
-  const sel = box.querySelector('.lrow.sel');
+  // the row of the control the properties show, not another selected one
+  const sel = box.querySelector('.lrow.sel:not(.also)');
   if (sel && !state.layersNoScroll) sel.scrollIntoView({ block: 'nearest' });
   if (state.focusLayers) { state.focusLayers = false; if (sel) sel.focus(); }
 }
@@ -124,7 +125,9 @@ export function onLayersKey(e) {
   if (i < 0) return;
   const go = (j) => { if (rows[j]) { state.focusLayers = true; select(rows[j].dataset.id); } };
   const node = findNode(state.design.root, state.selected);
-  const open = node && rows[i].getAttribute('aria-expanded') === 'true';
+  // under a filter every branch shows open: the arrows only walk
+  const filtering = !!(state.layersFilter || '').trim();
+  const open = node && !filtering && rows[i].getAttribute('aria-expanded') === 'true';
   if (e.key === 'ArrowDown') { e.preventDefault(); go(i + 1); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); go(i - 1); }
   else if (e.key === 'Home') { e.preventDefault(); go(0); }
@@ -135,8 +138,8 @@ export function onLayersKey(e) {
     else if (node && node.parent) go(rows.findIndex((r) => r.dataset.id === node.parent.id));
   } else if (e.key === 'ArrowRight') {
     e.preventDefault();
-    if (rows[i].getAttribute('aria-expanded') === 'false') { state.collapsed.delete(state.selected); state.focusLayers = true; renderLayers(); }
-    else if (open) go(i + 1);
+    if (!filtering && rows[i].getAttribute('aria-expanded') === 'false') { state.collapsed.delete(state.selected); state.focusLayers = true; renderLayers(); }
+    else if (open || (filtering && rows[i].hasAttribute('aria-expanded'))) go(i + 1);
   } else if (e.key === 'Enter') {
     e.preventDefault();
     const first = $('#inspector').querySelector('input, select');

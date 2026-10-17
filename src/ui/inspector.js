@@ -48,7 +48,11 @@ export function renderInspector() {
   const many = selectedIds();
   if (many.length > 1) box.append(multiBar(many));
   // the defaults of the canvas's UI5, asked once per control class
-  const defaults = propertyDefaults(node.type, () => { if (state.selected === node.id) renderInspector(); }) || {};
+  const defaults = propertyDefaults(node.type, () => {
+    // whichever control of that type is selected by the time they come
+    const now = findNode(state.design.root, state.selected);
+    if (now && now.node.type === node.type) renderInspector();
+  }) || {};
   const ctx = rowContext(d, node.id);
 
   const filter = h('input', {
