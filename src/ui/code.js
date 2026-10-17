@@ -5,6 +5,7 @@ import { $, toast } from './dom.js';
 import { fileName } from '../abap.js';
 import { classSource } from '../clas.js';
 import { toXml } from '../xml.js';
+import { diffHunks } from '../diff.js';
 
 
 const ABAP_KW = /\b(CLASS|DEFINITION|PUBLIC|PROTECTED|PRIVATE|SECTION|INTERFACES|TYPES|BEGIN|OF|END|TYPE|DATA|STANDARD|TABLE|WITH|EMPTY|KEY|REF|TO|METHODS|ENDCLASS|IMPLEMENTATION|METHOD|ENDMETHOD|IF|ELSEIF|ELSE|ENDIF|CASE|WHEN|ENDCASE|VALUE|LENGTH|DECIMALS|ME)\b/g;
@@ -26,11 +27,19 @@ let codeCache = { key: null };
 export function renderCode() {
   const d = state.design;
   const pre = $('#code');
+  // Changes exist for a class that was opened, and only for it
+  const opened = !!(d.abap && d.abap.source);
+  $('#btnDiff').hidden = !opened;
+  if (state.code === 'diff' && !opened) { setCode('abap'); return; }
   const key = `${state.code}:${state.rev}`;
   if (codeCache.key === key) { highlightCode(false); return; }
   codeCache = { key };
   let lines;
   let nodeIds;
+  if (state.code === 'diff') {
+    renderDiff(pre, d);
+    return;
+  }
   if (state.code === 'abap') {
     const map = classSource(d);
     lines = map.source.replace(/\n$/, '').split('\n');
@@ -51,10 +60,45 @@ export function renderCode() {
   highlightCode(false);
 }
 
+// the class as it was opened against the class the export writes
+function renderDiff(pre, d) {
+  const before = d.abap.source.replace(/\n$/, '').split('\n');
+  const after = classSource(d).source.replace(/\n$/, '').split('\n');
+  const h = diffHunks(before, after);
+  // the lines compare without the end of the file: whether it ends in a
+  // newline is said on its own
+  const eol = d.abap.source.endsWith('\n') !== classSource(d).source.endsWith('\n');
+  const eolNote = eol ? ' · the file gets a newline at its end' : '';
+  $('#codeInfo').textContent = h.added || h.removed
+    ? `+${h.added} −${h.removed} lines against the class as it was opened${eolNote}`
+    : eol ? 'only the end of the file changes: it gets a newline' : 'the export writes the class as it was opened';
+  if (!h.added && !h.removed) {
+    pre.innerHTML = eol ? '<span class="ln skip">Every line stays as it was - only a newline is added at the end of the file.</span>'
+      : '<span class="ln skip">No change - every line stays as it was.</span>';
+    return;
+  }
+  pre.innerHTML = h.lines.map((l) => (l.op === '…'
+    ? `<span class="ln skip">⋯ ${l.count} unchanged line${l.count === 1 ? '' : 's'}</span>`
+    : `<span class="ln ${l.op === '+' ? 'add' : l.op === '-' ? 'del' : ''}" data-n="${l.op === '-' ? l.a : l.b}">${highlightAbapLine(l.text) || ' '}</span>`)).join('');
+}
+
+// what the tab shows, as text: the class, the view, or the changes as a
+// unified diff
+export function codeText() {
+  const d = state.design;
+  if (state.code === 'xml') return { text: toXml(d), what: 'XML' };
+  if (state.code === 'diff' && d.abap && d.abap.source) {
+    const h = diffHunks(d.abap.source.replace(/\n$/, '').split('\n'), classSource(d).source.replace(/\n$/, '').split('\n'));
+    return { text: h.lines.map((l) => (l.op === '…' ? `@@ ${l.count} unchanged @@` : `${l.op}${l.text}`)).join('\n'), what: 'Changes' };
+  }
+  return { text: classSource(d).source, what: 'ABAP' };
+}
+
 // mark the selected control's lines, and bring the first into view
 export function highlightCode(scroll) {
   const pre = $('#code');
-  for (const el of pre.querySelectorAll('.ln.hi')) el.classList.remove('hi');
+  for (const el of pre.querySelectorAll('.ln.hi, .ln.hi-also')) el.classList.remove('hi', 'hi-also');
+  for (const id of state.also) for (const el of pre.querySelectorAll(`.ln[data-node="${CSS.escape(id)}"]`)) el.classList.add('hi-also');
   const lines = pre.querySelectorAll(`.ln[data-node="${CSS.escape(state.selected)}"]`);
   lines.forEach((el) => el.classList.add('hi'));
   if (scroll && lines[0] && state.view !== 'canvas') {
@@ -75,17 +119,21 @@ export function setView(view) {
   savePrefs();
   for (const b of document.querySelectorAll('[data-view]')) b.classList.toggle('active', b.dataset.view === view);
   $('#stageBody').className = `stage-body view-${view}`;
+  // the class is not built while it is hidden - it is now
+  if (view !== 'canvas') renderCode();
   highlightCode(true);
 }
 
+// true when the text is in the clipboard
 export async function copyText(text, what) {
   try {
     await navigator.clipboard.writeText(text);
     toast(`${what} copied`);
+    return true;
   } catch {
     // clipboard refused (no permission, not a secure context): show the
     // code and select it, so Ctrl+C works
-    setCode(what === 'XML' ? 'xml' : 'abap');
+    setCode(what === 'XML' ? 'xml' : what === 'Changes' ? 'diff' : 'abap');
     if (state.view === 'canvas') setView('split');
     const range = document.createRange();
     range.selectNodeContents($('#code'));
@@ -93,5 +141,6 @@ export async function copyText(text, what) {
     sel.removeAllRanges();
     sel.addRange(range);
     toast('Press Ctrl+C to copy the selection');
+    return false;
   }
 }

@@ -274,6 +274,39 @@ export function moveNode(design, id, parentId, agg, index) {
   return id;
 }
 
+// several nodes to one place, together and in the order of the view:
+// before the node that is at `index` of the target list now (the end
+// when null) - returns the id of the last, or null when the target takes
+// one of them not, or would end up inside one of them
+export function moveNodes(design, ids, parentId, agg, index) {
+  const order = [];
+  walk(design.root, (n) => { order.push(n.id); return true; });
+  const list = [...new Set(ids)].filter((id) => !ids.some((o) => o !== id && isAncestor(design.root, o, id)))
+    .map((id) => findNode(design.root, id)).filter((x) => x && x.parent)
+    .sort((a, b) => order.indexOf(a.node.id) - order.indexOf(b.node.id));
+  if (!list.length) return null;
+  if (list.some((x) => x.node.id === parentId || isAncestor(design.root, x.node.id, parentId))) return null;
+  const p = findNode(design.root, parentId);
+  if (!p) return null;
+  // a marker holds the place while the nodes leave their lists
+  const marker = { id: '\u0000' };
+  p.node.aggs[agg] = p.node.aggs[agg] || [];
+  const target = p.node.aggs[agg];
+  target.splice(index == null || index > target.length ? target.length : index, 0, marker);
+  for (const x of list) {
+    const h = findNode(design.root, x.node.id);
+    h.parent.aggs[h.agg].splice(h.index, 1);
+    if (!h.parent.aggs[h.agg].length && h.parent.aggs[h.agg] !== target) delete h.parent.aggs[h.agg];
+  }
+  const at = target.indexOf(marker);
+  target.splice(at, 1);
+  for (const [i, x] of list.entries()) {
+    if (!aggAccepts(p.node, agg, x.node.type)) throw new Error(`${p.node.type} takes no ${x.node.type}${agg ? ` in ${agg}` : ''}`);
+    target.splice(at + i, 0, x.node);
+  }
+  return list[list.length - 1].node.id;
+}
+
 export function shiftNode(design, id, delta) {
   const hit = findNode(design.root, id);
   if (!hit || !hit.parent) return null;
@@ -294,6 +327,93 @@ export function duplicateNode(design, id) {
   if (c && c.aggs && c.aggs[hit.agg] && c.aggs[hit.agg].single) return null;
   list.splice(hit.index + 1, 0, copy);
   return copy.id;
+}
+
+// the controls `ids`, side by side in one parent, into a new control of
+// `type` in their place - returns its id; throws when they do not sit in
+// one aggregation of one parent, or the parent or the wrapper refuses
+export function wrapNodes(design, ids, type) {
+  const hits = [...new Set(ids)].map((id) => findNode(design.root, id)).filter((x) => x && x.parent);
+  if (!hits.length) throw new Error('Nothing to wrap');
+  const { parent, agg } = hits[0];
+  if (hits.some((x) => x.parent.id !== parent.id || x.agg !== agg)) throw new Error('Only controls side by side in one parent can be wrapped together');
+  hits.sort((a, b) => a.index - b.index);
+  const wrapper = createNode(type);
+  wrapper.aggs = {};
+  const into = defaultAggFor(type, hits[0].node.type);
+  if (!into || hits.some((x) => !accepts(type, into, x.node.type))) throw new Error(`${type} takes no ${hits.find((x) => !into || !accepts(type, into, x.node.type)).node.type}`);
+  const list = parent.aggs[agg];
+  for (const x of [...hits].reverse()) list.splice(x.index, 1);
+  if (!aggAccepts(parent, agg, type)) throw new Error(`${parent.type} takes no ${type}${agg ? ` in ${agg}` : ''}`);
+  list.splice(hits[0].index, 0, wrapper);
+  wrapper.aggs[into] = hits.map((x) => x.node);
+  return wrapper.id;
+}
+
+// an entry of a list one place up (-1) or down (+1): attributes, fields
+export function moveItem(list, index, delta) {
+  const j = index + delta;
+  if (!list || j < 0 || j >= list.length) return false;
+  [list[index], list[j]] = [list[j], list[index]];
+  return true;
+}
+
+// Sample rows pasted as text - from a spreadsheet (tab separated) or CSV
+// (`;` or `,`, "quoted" cells). `header`: the first line names the
+// fields; a name the table has not becomes a new string field. Without a
+// header the columns fill the scalar fields in their order, and what is
+// left over is counted in `ignored`. Returns { rows, added, ignored }.
+export function parseSampleRows(text, fields, header) {
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  if (!lines.length) return { rows: [], added: [], ignored: 0 };
+  const sep = lines.some((l) => l.includes('\t')) ? '\t' : lines[0].includes(';') ? ';' : ',';
+  const cells = (line) => {
+    if (sep === '\t') return line.split('\t');
+    const out = [];
+    let cur = '';
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (quoted) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') quoted = false; else cur += ch;
+      } else if (ch === '"' && !cur.trim()) { quoted = true; cur = ''; } else if (ch === sep) { out.push(cur); cur = ''; } else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  };
+  const scalar = fields.filter((f) => f.type !== 'table');
+  const added = [];
+  let columns;
+  let body = lines;
+  if (header) {
+    body = lines.slice(1);
+    columns = cells(lines[0]).map((raw) => {
+      let name = raw.trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+      if (!name) return null;
+      if (!/^[A-Z]/.test(name)) name = `F_${name}`;
+      name = name.slice(0, 30);
+      const known = fields.find((f) => f.name === name) || added.find((f) => f.name === name);
+      if (known) return known.type === 'table' ? null : known;
+      const f = { name, type: 'string' };
+      added.push(f);
+      return f;
+    });
+  } else {
+    columns = scalar;
+  }
+  let ignored = 0;
+  const rows = body.filter((l) => l.trim()).map((l) => {
+    const row = {};
+    cells(l).forEach((v, i) => {
+      const f = columns[i];
+      if (!f) { if (v.trim()) ignored += 1; return; }
+      const t = v.trim();
+      row[f.name] = f.type === 'bool' ? /^(x|true|1|yes|ja)$/i.test(t) : t;
+    });
+    return row;
+  });
+  return { rows, added, ignored };
 }
 
 // ------------------------------------------------------------- data binding
@@ -579,7 +699,7 @@ export function validate(design) {
   }
   const attrByName = new Map(design.attributes.map((a) => [a.name, a]));
   for (const a of design.attributes) {
-    if (!attributeUsage(design, a.name)) issues.push({ level: 'warning', text: `Attribute ${a.name} is public, but nothing binds it - bind it or remove it` });
+    if (!attributeUsage(design, a.name)) issues.push({ level: 'warning', text: `Attribute ${a.name} is public, but nothing binds it - bind it or remove it`, fix: { kind: 'removeAttribute', name: a.name, label: 'Remove' } });
     const rowValues = (fields, rows, where) => (rows || []).flatMap((r) => fields.flatMap((f) => (f.type === 'table'
       ? rowValues(f.fields || [], r[f.name], `${where}-${f.name}`)
       : [[f.type, r[f.name], `${where}-${f.name}`]])));
@@ -598,9 +718,16 @@ export function validate(design) {
         const w = checkStatic(pd, v.v);
         // a number or an enum value UI5 cannot parse fails the view; a size
         // or a flag it logs and replaces by the default
-        if (w) issues.push({ level: ['int', 'float', 'enum'].includes(pd.type) ? 'error' : 'warning', text: `${n.type}.${p}: ${w}`, node: n.id });
+        if (w) issues.push({ level: ['int', 'float', 'enum'].includes(pd.type) ? 'error' : 'warning', text: `${n.type}.${p}: ${w}`, node: n.id, prop: p, fix: { kind: 'resetProp', node: n.id, prop: p, label: 'Reset to default' } });
       }
-      if (v.m === 'b' && !names.has(v.v)) issues.push({ level: 'error', text: `${n.type}.${p} is bound to ${v.v}, which is not an attribute`, node: n.id });
+      if (v.m === 'b' && !names.has(v.v)) {
+        const isAgg = bindableAggs(n).includes(p);
+        const pd = nodeDef && nodeDef.props && nodeDef.props[p];
+        issues.push({
+          level: 'error', text: `${n.type}.${p} is bound to ${v.v}, which is not an attribute`, node: n.id, prop: p,
+          fix: v.v && !checkAttributeName(v.v) ? { kind: 'createAttribute', name: v.v, type: isAgg ? 'table' : attrTypeFor(pd), label: `Create ${v.v}` } : undefined,
+        });
+      }
       else if (v.m === 'b') {
         const attr = attrByName.get(v.v);
         const isAgg = bindableAggs(n).includes(p);
@@ -628,10 +755,18 @@ export function validate(design) {
       const b = n.props[a];
       const def = getControl(n.type).aggs[a];
       if (b && (b.m === 'b' || b.m === 'f') && !def.noTemplate && (n.aggs[a] || []).length !== 1) {
-        issues.push({ level: 'warning', text: `${n.type}: a bound ${a} aggregation needs exactly one template item`, node: n.id });
+        const many = (n.aggs[a] || []).length > 1;
+        // a template built from the fields replaces columns built by hand,
+        // and needs a table to build from: offered only where neither stands
+        // in its way
+        const fromTable = b.m === 'f' || (attrByName.get(b.v) && attrByName.get(b.v).type === 'table');
+        const ownColumns = n.type === 'Table' && (n.aggs.columns || []).length > 0;
+        const fix = many ? { kind: 'template', node: n.id, agg: a, label: 'Keep the first as template' }
+          : fromTable && !ownColumns ? { kind: 'template', node: n.id, agg: a, label: 'Build a template' } : undefined;
+        issues.push({ level: 'warning', text: `${n.type}: a bound ${a} aggregation needs exactly one template item`, node: n.id, fix });
       }
       if (n.type === 'Tree' && !(b && (b.m === 'b' || b.m === 'f' || b.m === 'x'))) {
-        issues.push({ level: 'error', text: 'Tree: its items have to be bound to a table - UI5 fails on static tree items', node: n.id });
+        issues.push({ level: 'error', text: 'Tree: its items have to be bound to a table - UI5 fails on static tree items', node: n.id, fix: { kind: 'nodesTable', node: n.id, agg: a, label: 'Create nodes table' } });
       }
       if (b && b.arr) {
         const ctx = b.m === 'b' ? attrByName.get(b.v) : null;
@@ -642,7 +777,7 @@ export function validate(design) {
     if (c && c.input && !rowContext(design, n.id)) {
       const v = n.props[c.input];
       const wired = (v && (v.m === 'b' || v.m === 'x')) || Object.values(n.events || {}).some(Boolean);
-      if (!wired) issues.push({ level: 'info', text: `${n.type}: what the user enters goes nowhere - bind ${c.input} to an attribute (or name an event)`, node: n.id });
+      if (!wired) issues.push({ level: 'info', text: `${n.type}: what the user enters goes nowhere - bind ${c.input} to an attribute (or name an event)`, node: n.id, prop: c.input, fix: { kind: 'bindNew', node: n.id, prop: c.input, label: 'Bind to a new attribute' } });
     }
     if (parent && !CONTROLS[n.type] && n.type !== 'mvc:View') {
       issues.push({ level: 'info', text: `${n.type} is not in the palette - not checked against UI5 1.71`, node: n.id });
@@ -689,6 +824,14 @@ export function checkStatic(def, v) {
 
 // Does an attribute of `attrType` fit a property of `def`? A boolean takes
 // a flag, a number a number, text takes anything that prints
+// the attribute type a property binds best: a flag, a number, a text
+export function attrTypeFor(def) {
+  if (def && def.type === 'boolean') return 'bool';
+  if (def && def.type === 'int') return 'int';
+  if (def && def.type === 'float') return 'decimal';
+  return 'string';
+}
+
 export function attributeFits(def, attrType) {
   if (attrType === 'table') return false;
   if (def.type === 'boolean') return attrType === 'bool';

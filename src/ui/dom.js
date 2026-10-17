@@ -34,10 +34,23 @@ let toastTimer = null;
 export function toast(text, action) {
   const t = $('#toast');
   t.replaceChildren(text);
+  t.classList.remove('error');
+  t.setAttribute('role', 'status');
   if (action) t.append(h('button', { class: 'toast-action', onclick: () => { t.classList.remove('show'); action.run(); } }, action.label));
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), action ? 6000 : 2200);
+}
+
+// what went wrong stays until it is read: closed by its button, or
+// replaced by the next message
+export function toastError(text) {
+  const t = $('#toast');
+  t.replaceChildren(h('span', { text }), h('button', { class: 'toast-close', 'aria-label': 'Close', title: 'Close', onclick: () => t.classList.remove('show') }, '✕'));
+  t.classList.add('show', 'error');
+  t.setAttribute('role', 'alert');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 20000);
 }
 
 export function download(name, data, type) {
@@ -56,6 +69,24 @@ export function dialog(title, body, buttons) {
   dlg.replaceChildren(h('header', { text: title }), h('div', { class: 'body' }, body),
     h('footer', {}, buttons.map((b) => h('button', { class: b.primary ? 'primary' : '', onclick: () => { if (b.action() !== false) dlg.close(); } }, b.text))));
   dlg.showModal();
+}
+
+// A question in the editor's own dialog instead of the browser's
+// confirm( ): resolves with the `value` of the button pressed, or null
+// when the dialog is closed (Escape) - buttons: [{ text, value, primary }]
+export function choose(title, text, buttons) {
+  return new Promise((resolve) => {
+    const dlg = $('#dlg');
+    let answer = null;
+    const body = h('div', {}, (Array.isArray(text) ? text : [text]).map((t) => (t instanceof Node ? t : h('p', { text: t }))));
+    dlg.replaceChildren(h('header', { text: title }), h('div', { class: 'body' }, body),
+      h('footer', {}, buttons.map((b) => h('button', { class: b.primary ? 'primary' : b.danger ? 'danger' : '', 'data-value': String(b.value), onclick: () => { answer = b.value; dlg.close(); } }, b.text))));
+    dlg.addEventListener('close', () => resolve(answer), { once: true });
+    // asked from inside a dialog: the question takes its place
+    if (!dlg.open) dlg.showModal();
+    const primary = dlg.querySelector('footer .primary');
+    if (primary) primary.focus();
+  });
 }
 
 export function rememberFocus(box) {

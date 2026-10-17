@@ -28,14 +28,20 @@ sap.ui.define([
   var rendering = false;
   var mode = 'design';
   var selected = null;
+  var also = [];
+  var empty = [];
   var selectedLabel = '';
   var tools = null;
   var lastXml = null;
 
   var PreviewController = Controller.extend('designer.PreviewController', {
     // every event of the view lands here: a toast, as on_event's would
+    // - and the designer learns of it, with the model as the user left it
     onEvent: function (name) {
       MessageToast.show('Event ' + name + ' - handled in on_event');
+      var data = null;
+      try { data = view && view.getModel() ? JSON.parse(JSON.stringify(view.getModel().getData())) : null; } catch (e) { data = null; }
+      post({ type: 'event', name: name, model: data });
     },
   });
 
@@ -56,9 +62,22 @@ sap.ui.define([
   // ids, inside the view's id space (dsg0--<node>), and a list's clones
   // carry their template's id first (dsg0--<cell>-dsg0--<list>-0)
   function nodeIdOf(el) {
+    var hit = elementOf(el);
+    return hit ? hit.id : null;
+  }
+  // the element of that node under `el`: its outermost one (a Button's
+  // inner parts carry its id too) - in a bound list the clone of the row
+  // that was hit, not the first
+  var NODE_ID = /(?:^|-)dsg\d+--(n[0-9a-z]+)/;
+  function elementOf(el) {
     while (el && el !== document.body) {
-      var m = el.id && /(?:^|-)dsg\d+--(n[0-9a-z]+)/.exec(el.id);
-      if (m) return m[1];
+      var m = el.id && NODE_ID.exec(el.id);
+      if (m) {
+        var up = el.parentElement;
+        var n;
+        while (up && up !== document.body && up.id && (n = NODE_ID.exec(up.id)) && n[1] === m[1]) { el = up; up = el.parentElement; }
+        return { id: m[1], el: el };
+      }
       el = el.parentElement;
     }
     return null;
@@ -76,9 +95,29 @@ sap.ui.define([
     if (el) el.classList.add(cls);
   }
 
+  // an empty container takes no room, so nothing could be dropped into
+  // it: in design mode it gets some, with a dashed frame
+  function markEmpty() {
+    var old = document.querySelectorAll('.dsg-empty');
+    for (var i = 0; i < old.length; i++) old[i].classList.remove('dsg-empty');
+    if (mode !== 'design') return;
+    for (var j = 0; j < empty.length; j++) {
+      var el = domOf(empty[j]);
+      if (el) el.classList.add('dsg-empty');
+    }
+  }
+
   function highlight(scroll) {
+    markEmpty();
     var el = domOf(selected);
     mark('dsg-sel', el);
+    // the rest of a selection of several controls
+    var old = document.querySelectorAll('.dsg-also');
+    for (var i = 0; i < old.length; i++) old[i].classList.remove('dsg-also');
+    for (var j = 0; j < also.length; j++) {
+      var a = domOf(also[j]);
+      if (a) a.classList.add('dsg-also');
+    }
     if (el && scroll && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
     placeTools();
   }
@@ -120,7 +159,10 @@ sap.ui.define([
     tools.style.top = Math.max(2, top) + 'px';
     tools.style.left = Math.max(2, Math.min(r.left, window.innerWidth - tools.offsetWidth - 2)) + 'px';
   }
-  window.addEventListener('scroll', function () { if (tools) placeTools(); }, true);
+  window.addEventListener('scroll', function () {
+    if (tools) placeTools();
+    post({ type: 'scroll' });
+  }, true);
   window.addEventListener('resize', function () { if (tools) placeTools(); });
 
   // Every render ends - in a view on the canvas, or in an error the
@@ -230,6 +272,24 @@ sap.ui.define([
     });
   }
 
+  // the default values of a control class's properties, as text: what a
+  // property is when the view does not set it
+  function defaults(msg) {
+    sap.ui.require([msg.module], function (C) {
+      var out = {};
+      try {
+        var all = C.getMetadata().getAllProperties();
+        Object.keys(all).forEach(function (n) {
+          var v = all[n].defaultValue;
+          if (v !== null && v !== undefined && typeof v !== 'object') out[n] = String(v);
+        });
+      } catch (err) { /* no metadata - no defaults */ }
+      post({ type: 'defaults', key: msg.key, defaults: out });
+    }, function () {
+      post({ type: 'defaults', key: msg.key, defaults: {} });
+    });
+  }
+
   window.addEventListener('message', function (e) {
     var msg = e.data || {};
     if (msg.target !== 'dsg-preview') return;
@@ -241,15 +301,21 @@ sap.ui.define([
     } else if (msg.type === 'render') {
       mode = msg.mode || mode;
       selected = msg.selected || null;
+      also = msg.also || [];
+      empty = msg.empty || [];
       selectedLabel = msg.label || '';
       render(msg);
+    } else if (msg.type === 'defaults') {
+      defaults(msg);
     } else if (msg.type === 'select') {
       selected = msg.selected;
+      also = msg.also || [];
       selectedLabel = msg.label || '';
       highlight(true);
     } else if (msg.type === 'mode') {
       mode = msg.mode;
       mark('dsg-hover', null);
+      markEmpty();
       placeTools();
     }
   });
@@ -261,13 +327,32 @@ sap.ui.define([
       if (errorBox.contains(e.target) || (tools && tools.contains(e.target))) return;
       e.preventDefault();
       e.stopPropagation();
+      // a double-click edits the control's text, over the canvas
+      if (type === 'dblclick') {
+        var hit = elementOf(e.target);
+        if (hit) {
+          var r = hit.el.getBoundingClientRect();
+          post({ type: 'inline', id: hit.id, rect: { left: r.left, top: r.top, width: r.width, height: r.height } });
+        }
+      }
       if (type === 'click') {
         var id = nodeIdOf(e.target);
-        if (id) { selected = id; highlight(false); }
-        post({ type: 'select', id: id || 'root' });
+        var extend = !!(e.ctrlKey || e.metaKey || e.shiftKey);
+        if (id && !extend) { selected = id; also = []; highlight(false); }
+        post({ type: 'select', id: id || 'root', extend: extend });
       }
     }, true);
   });
+
+  // the context menu is the designer's, for the control under the pointer
+  document.addEventListener('contextmenu', function (e) {
+    if (mode !== 'design') return;
+    var id = nodeIdOf(e.target);
+    if (!id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    post({ type: 'context', id: id, x: e.clientX, y: e.clientY });
+  }, true);
 
   document.addEventListener('mouseover', function (e) {
     if (mode !== 'design' || (tools && tools.contains(e.target))) return;

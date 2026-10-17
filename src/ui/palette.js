@@ -1,13 +1,15 @@
 // The command palette (Ctrl+K): insert, jump to or run anything.
 import { CONTROLS, DESCRIPTIONS } from '../catalog.js';
 import { PATTERNS } from '../patterns.js';
-import { walk, findNode, removeNode, duplicateNode } from '../model.js';
+import { walk, findNode } from '../model.js';
 import { generateClassSource } from '../clas.js';
-import { state, select, commit, undo, redo } from './store.js';
-import { $, h, toast, displayType, nodeLabel } from './dom.js';
-import { addControl, insertPattern, copySelection, pasteSelection } from './edit.js';
+import { state, select, undo, redo, selectedIds } from './store.js';
+import { $, h, displayType, nodeLabel } from './dom.js';
+import { addControl, insertPattern, copySelection, pasteSelection, copyProperties, pasteProperties } from './edit.js';
 import { setView, copyText } from './code.js';
-import { exportZip, newDialog, importDialog, recentDialog, shareLink, insertByNameDialog, saveDesign, openFile } from './files.js';
+import { exportZip, newDialog, importDialog, recentDialog, shareLink, insertByNameDialog, saveDesign, saveToBrowser, openFile } from './files.js';
+import { shortcutsDialog } from './keys.js';
+import { WRAPPERS, deleteSelection, duplicateSelection, moveSelection, selectParent, wrapSelection } from './actions.js';
 
 
 function commands() {
@@ -26,21 +28,30 @@ function commands() {
   action('New from template', newDialog);
   action('Import UI5 XML view', importDialog);
   action('Save design', saveDesign);
+  action('Save design in this browser', saveToBrowser, 'under its class name');
   action('Open design, view or class', () => openFile('.json,.xml,.abap'));
-  action('Recent designs', recentDialog);
+  action('Designs in this browser', recentDialog, 'saved and recent');
   action('Insert any UI5 control by class name', insertByNameDialog, 'e.g. sap.m.Wizard');
   action('Copy share link', shareLink, 'the design in a URL');
   action('Show layout only', () => setView('canvas'));
   action('Show code only', () => setView('code'));
   action('Paste', pasteSelection, 'Ctrl+V');
+  action('Keyboard shortcuts', shortcutsDialog, '?');
   action('Undo', undo, 'Ctrl+Z');
   action('Redo', redo, 'Ctrl+Shift+Z');
   if (sel && sel.parent) {
-    action('Delete selection', () => commit((d) => removeNode(d, state.selected)), 'Del');
-    action('Duplicate selection', () => commit((d) => duplicateNode(d, state.selected) || toast('It cannot be duplicated: its slot takes one control')), 'Ctrl+D');
-    action('Copy selection', () => copySelection(false), 'Ctrl+C');
-    action('Cut selection', () => copySelection(true), 'Ctrl+X');
-    action('Select parent', () => select(sel.parent.id), 'Alt+↑');
+    const n = selectedIds().length;
+    const what = n > 1 ? `${n} selected controls` : 'selection';
+    action(`Delete ${what}`, () => deleteSelection(), 'Del');
+    action(`Duplicate ${what}`, () => duplicateSelection(), 'Ctrl+D');
+    action(`Copy ${what}`, () => copySelection(false), 'Ctrl+C');
+    action(`Cut ${what}`, () => copySelection(true), 'Ctrl+X');
+    action(`Move ${what} up`, () => moveSelection(-1), 'Ctrl+↑');
+    action(`Move ${what} down`, () => moveSelection(1), 'Ctrl+↓');
+    action('Select parent', () => selectParent(), 'Alt+↑');
+    action('Copy properties', copyProperties, 'to set them on another control');
+    if (state.propClipboard) action(`Paste properties onto ${what}`, pasteProperties, `of ${displayType(state.propClipboard.type)}`);
+    for (const w of WRAPPERS) action(`Wrap ${what} in ${w}`, () => wrapSelection(w));
   }
   return list;
 }
@@ -55,7 +66,17 @@ export function openPalette() {
   const render = () => {
     const q = input.value.trim().toLowerCase();
     const words = q.split(/\s+/).filter(Boolean);
-    shown = all.filter((c) => words.every((w) => `${c.kind} ${c.title} ${c.detail || ''}`.toLowerCase().includes(w))).slice(0, 60);
+    // what starts with the words first, then what has them in its title,
+    // then the rest - in the order of the list within each
+    const rank = (c) => {
+      const t = c.title.toLowerCase();
+      if (!q) return 0;
+      if (t.startsWith(q) || `${c.kind} ${t}`.startsWith(q)) return 0;
+      if (words.every((w) => t.includes(w))) return 1;
+      return 2;
+    };
+    shown = all.filter((c) => words.every((w) => `${c.kind} ${c.title} ${c.detail || ''}`.toLowerCase().includes(w)))
+      .map((c, i) => ({ c, i, r: rank(c) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.c).slice(0, 60);
     active = Math.min(active, Math.max(0, shown.length - 1));
     listBox.replaceChildren(...shown.map((c, i) => h('div', {
       class: `cmdk-item${i === active ? ' active' : ''}`,

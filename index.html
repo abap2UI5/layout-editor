@@ -31,11 +31,13 @@
           <button id="btnNew" role="menuitem">New from template…</button>
           <button id="btnOpen" role="menuitem">Open design (.json)…</button>
           <button id="btnSave" role="menuitem" title="Ctrl+S">Save design (.json)</button>
+          <button id="btnSaveBrowser" role="menuitem" title="Keep the design in this browser, under its class name">Save in browser</button>
           <button id="btnOpenClass" role="menuitem" title="An abap2UI5 app class - its view, data and events become the design, the rest of the class is kept">Open ABAP class…</button>
           <button id="btnImport" role="menuitem">Import UI5 XML view…</button>
-          <button id="btnRecent" role="menuitem">Recent designs…</button>
+          <button id="btnRecent" role="menuitem" title="The designs saved in this browser, and those New, Open or Import replaced">Designs in this browser…</button>
         </div>
       </div>
+      <button id="btnTheme" class="ghost icon" title="Appearance of the editor: as the system" aria-label="Appearance of the editor">◐</button>
       <button id="btnUndo" class="ghost icon" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
       <button id="btnRedo" class="ghost icon" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
       <div class="menu-wrap split">
@@ -70,7 +72,10 @@
         <div id="insertList" class="scroll"></div>
       </section>
       <section class="panel hidden" id="panel-layers" role="tabpanel">
-        <div id="layers" class="scroll tree" role="tree" aria-label="Outline"></div>
+        <div class="panel-head">
+          <input id="layersFilter" type="search" placeholder="Filter the outline" aria-label="Filter the outline">
+        </div>
+        <div id="layers" class="scroll tree" role="tree" aria-label="Outline" aria-multiselectable="true"></div>
       </section>
       <section class="panel hidden" id="panel-data" role="tabpanel">
         <div id="dataPanel" class="scroll pad"></div>
@@ -98,6 +103,11 @@
           <button data-device="820px" title="Tablet">Tablet</button>
           <button data-device="390px" title="Phone">Phone</button>
         </div>
+        <select id="zoom" aria-label="Zoom of the canvas" title="Zoom of the canvas - a large view at a glance">
+          <option value="1">100%</option>
+          <option value="0.75">75%</option>
+          <option value="0.5">50%</option>
+        </select>
         <select id="theme" aria-label="Theme">
           <option value="sap_horizon">Horizon</option>
           <option value="sap_fiori_3">Quartz Light</option>
@@ -112,14 +122,17 @@
           <div class="device-frame" id="deviceFrame">
             <iframe id="preview" title="Preview"></iframe>
           </div>
+          <div id="eventLog" class="event-log hidden" aria-live="polite" aria-label="Events of the preview"></div>
         </div>
         <div class="code-pane" id="codePane">
           <div class="code-head">
             <div class="seg small" role="group" aria-label="Code">
               <button data-code="abap" class="active">ABAP class</button>
               <button data-code="xml">XML view</button>
+              <button data-code="diff" id="btnDiff" hidden title="What the export changes in the class as it was opened">Changes</button>
             </div>
             <span id="codeInfo" class="muted"></span>
+            <button id="btnCopyCode" class="ghost small" title="Copy what this tab shows">Copy</button>
           </div>
           <pre id="code" class="codeblock" tabindex="0" aria-label="Generated code"></pre>
         </div>

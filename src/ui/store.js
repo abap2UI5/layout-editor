@@ -7,11 +7,12 @@
 import { findNode, normalizeDesign } from '../model.js';
 import { STARTERS } from '../starters.js';
 import { toBase64Url } from '../handoff.js';
-import { $, displayType, toast } from './dom.js';
+import { $, displayType, toastError } from './dom.js';
 
-const listeners = { change: [], select: [] };
+const listeners = { change: [], select: [], panel: [] };
 // on('change', fn(opts)) after every edit, on('select', fn(opts)) after
-// every change of selection
+// every change of selection, on('panel', fn( )) when another tab of the
+// drawer opens
 export function on(event, fn) {
   listeners[event].push(fn);
 }
@@ -33,6 +34,9 @@ const PREFS_KEY = 'abap2ui5-designer:prefs';
 export const state = {
   design: null,
   selected: 'root',
+  // the other selected controls, when Ctrl or Shift extends the selection
+  // - `selected` is the one the properties show
+  also: [],
   undo: [],
   redo: [],
   panel: 'insert',
@@ -57,6 +61,11 @@ export function isLinkableUi5(v) {
     return hostname === location.hostname || TRUSTED_UI5_HOSTS.includes(hostname);
   } catch { return false; }
 }
+
+// a UI5 of your own for the canvas, as typed: the folder that holds
+// resources/ - an http(s) URL or a path on this server (preview.html
+// checks the same shape, and the hosts above, in its own script)
+export const isUi5Url = (v) => /^(https?:\/\/|\.{0,2}\/)[^"'<>\s]*$/.test(v);
 
 export function loadPrefs() {
   try { Object.assign(state.prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch { /* defaults */ }
@@ -104,16 +113,68 @@ export async function designFromLink(hash) {
   return normalizeDesign(JSON.parse(json));
 }
 
-// `json`: the design as text when the caller has it already
-function persist(json) {
-  try { localStorage.setItem(STORE_KEY, json || JSON.stringify(state.design)); } catch { /* quota or private mode */ }
+// the design as text, kept per revision: a commit needs the text of the
+// design before it for undo, and that is the text of the last commit
+let snap = { rev: -1, json: '' };
+function snapshot() {
+  if (snap.rev !== state.rev) snap = { rev: state.rev, json: JSON.stringify(state.design) };
+  return snap.json;
+}
+
+// the browser store: typing into a field (`later`) writes it once the
+// burst is over, and at the latest when the page goes away - every other
+// edit at once
+let persistTimer = null;
+function persist(later) {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(flushPersist, 250);
+  if (!later) flushPersist();
+}
+export function flushPersist() {
+  if (persistTimer === null) return;
+  clearTimeout(persistTimer);
+  persistTimer = null;
+  try {
+    localStorage.setItem(STORE_KEY, snapshot());
+    storeFailed = false;
+  } catch {
+    // quota or private mode: said once, not on every keystroke
+    if (!storeFailed) toastError('This browser does not keep the design (its storage is full or off) - save it as a file to keep it.');
+    storeFailed = true;
+  }
+}
+let storeFailed = false;
+
+// another tab of the editor saved its design over this one's: say so -
+// the next edit here would overwrite it in turn
+const otherTab = [];
+export function onOtherTab(fn) { otherTab.push(fn); }
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORE_KEY || !e.newValue || e.newValue === snapshot()) return;
+    for (const fn of otherTab) fn(e.newValue);
+  });
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushPersist);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPersist(); });
+}
+
+// an undo step: the design and what was selected in it
+const step = () => ({ json: snapshot(), selected: state.selected });
+
+// the extra selection keeps only controls that are still there
+function pruneSelection() {
+  if (!findNode(state.design.root, state.selected)) state.selected = 'root';
+  state.also = state.also.filter((id) => id !== state.selected && id !== 'root' && findNode(state.design.root, id));
 }
 
 // Every change: snapshot for undo, apply, then re-render. `fn` may return
 // the id to select next. Typing into one field merges into one undo step
 // (`mergeKey`) and keeps the focus where it is (`keepFocus`).
 export function commit(fn, opts = {}) {
-  const before = JSON.stringify(state.design);
+  const before = snapshot();
+  const selectedBefore = state.selected;
   let next;
   try {
     next = fn(state.design);
@@ -121,7 +182,7 @@ export function commit(fn, opts = {}) {
     // an edit that fails half way leaves nothing behind: the design is
     // the one before it, and the panels never saw the half
     state.design = JSON.parse(before);
-    toast(err.message);
+    toastError(err.message);
     return;
   }
   const after = JSON.stringify(state.design);
@@ -130,36 +191,42 @@ export function commit(fn, opts = {}) {
     return;
   }
   if (!opts.mergeKey || state.lastMergeKey !== opts.mergeKey) {
-    state.undo.push(before);
+    state.undo.push({ json: before, selected: selectedBefore });
     if (state.undo.length > 200) state.undo.shift();
   }
   state.lastMergeKey = opts.mergeKey || null;
   state.redo = [];
-  if (typeof next === 'string') state.selected = next;
-  if (!findNode(state.design.root, state.selected)) state.selected = 'root';
+  if (typeof next === 'string') { state.selected = next; state.also = []; }
   state.rev += 1;
-  persist(after);
+  snap = { rev: state.rev, json: after };
+  pruneSelection();
+  persist(!!opts.mergeKey);
   emit('change', opts);
 }
 
-function restore(json) {
-  state.design = JSON.parse(json);
+function restore(entry) {
+  state.design = JSON.parse(entry.json);
   state.lastMergeKey = null;
-  if (!findNode(state.design.root, state.selected)) state.selected = 'root';
+  // the control that was selected when the step was taken
+  if (entry.selected) state.selected = entry.selected;
+  state.also = [];
   state.rev += 1;
-  persist(json);
+  snap = { rev: state.rev, json: entry.json };
+  pruneSelection();
+  persist();
   emit('change', {});
+  emit('select', {});
 }
 
 export function undo() {
   if (!state.undo.length) return;
-  state.redo.push(JSON.stringify(state.design));
+  state.redo.push(step());
   restore(state.undo.pop());
 }
 
 export function redo() {
   if (!state.redo.length) return;
-  state.undo.push(JSON.stringify(state.design));
+  state.undo.push(step());
   restore(state.redo.pop());
 }
 
@@ -179,10 +246,11 @@ function rememberRecent(d) {
 
 export function replaceDesign(d) {
   rememberRecent(state.design);
-  state.undo.push(JSON.stringify(state.design));
+  state.undo.push(step());
   state.redo = [];
   state.design = d;
   state.selected = d.root.aggs.content && d.root.aggs.content[0] ? d.root.aggs.content[0].id : 'root';
+  state.also = [];
   // typing into the new design is a step of its own, never merged into
   // the replacement
   state.lastMergeKey = null;
@@ -192,14 +260,66 @@ export function replaceDesign(d) {
   emit('change', {});
 }
 
+// The designs kept in this browser under their class name - a library
+// next to the one design that is open
+const LIBRARY_KEY = 'abap2ui5-designer:library';
+export function libraryDesigns() {
+  try { return JSON.parse(localStorage.getItem(LIBRARY_KEY) || '[]'); } catch { return []; }
+}
+function writeLibrary(list) {
+  localStorage.setItem(LIBRARY_KEY, JSON.stringify(list));
+}
+// true when a design of that class name was there and is replaced
+export function saveToLibrary(d) {
+  const list = libraryDesigns();
+  const had = list.some((r) => r.className === d.className);
+  const rest = list.filter((r) => r.className !== d.className);
+  rest.unshift({ className: d.className, description: d.description || '', at: Date.now(), json: JSON.stringify(d) });
+  writeLibrary(rest);
+  return had;
+}
+export function removeFromLibrary(className) {
+  writeLibrary(libraryDesigns().filter((r) => r.className !== className));
+}
+
+// `opts.extend`: Ctrl or Shift held - the control joins the selection,
+// or leaves it when it is in it already
 export function select(id, opts = {}) {
   if (!findNode(state.design.root, id)) id = 'root';
-  state.selected = id;
+  if (opts.extend && id !== 'root' && state.selected !== 'root') {
+    const all = selectedIds();
+    if (all.includes(id)) {
+      const rest = all.filter((x) => x !== id);
+      if (rest.length) { state.selected = rest[rest.length - 1]; state.also = rest.slice(0, -1); }
+    } else {
+      state.also = all;
+      state.selected = id;
+    }
+  } else {
+    state.selected = id;
+    state.also = [];
+  }
   // typing after a change of selection is a new undo step
   state.lastMergeKey = null;
   // a selected node is never hidden in a collapsed branch
-  for (const a of ancestors(id)) state.collapsed.delete(a.id);
+  for (const x of selectedIds()) for (const a of ancestors(x)) state.collapsed.delete(a.id);
   emit('select', opts);
+}
+
+// several controls at once, the last one shown in the properties
+export function selectMany(ids) {
+  const ok = ids.filter((id) => id !== 'root' && findNode(state.design.root, id));
+  if (!ok.length) { select('root'); return; }
+  state.selected = ok[ok.length - 1];
+  state.also = ok.slice(0, -1);
+  state.lastMergeKey = null;
+  for (const x of ok) for (const a of ancestors(x)) state.collapsed.delete(a.id);
+  emit('select', {});
+}
+
+// every selected control, the one the properties show last
+export function selectedIds() {
+  return state.selected === 'root' ? [] : [...state.also, state.selected];
 }
 
 export function ancestors(id) {
@@ -228,4 +348,5 @@ export function showPanel(panel) {
     b.tabIndex = on ? 0 : -1;
   }
   for (const p of ['insert', 'layers', 'data', 'issues']) $(`#panel-${p}`).classList.toggle('hidden', p !== panel);
+  emit('panel');
 }
