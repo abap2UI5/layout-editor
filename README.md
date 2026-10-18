@@ -93,6 +93,9 @@ Also in the editor:
   a `.clas.abap` file, or link it with `?src=<raw URL>` (the playground's
   parameter; raw.githubusercontent.com, a github.com file page, or a gist)
   or `?class=<name>&repo=<owner/repo>[&ref=<branch>][&path=<folder>]`.
+  The playground's **Open in Layout Editor** hands its app class over as
+  `#playground=<its share fragment>`, the format **Open in Playground**
+  writes, read the other way; the first file is the class.
   The `z2ui5_cl_ui5_view_builder` chain becomes the design, the public
   attributes the data, `client->_event( )` the event names. Export writes
   the chain back into that class and leaves every other line as it was;

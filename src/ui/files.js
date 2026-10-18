@@ -5,7 +5,7 @@ import { clone, walk, normalizeDesign, validate, checkAttributeName } from '../m
 import { copyText } from './code.js';
 import { fileName } from '../abap.js';
 import { fromClass, classReport, classFiles, generateClassSource, sourceUrl, repoClassUrl } from '../clas.js';
-import { playgroundLink, vscodeLink, PLAYGROUND_URL } from '../handoff.js';
+import { playgroundLink, vscodeLink, filesFromPlaygroundFragment, PLAYGROUND_URL } from '../handoff.js';
 import { zip } from '../zip.js';
 import { state, commit, replaceDesign, showPanel, recentDesigns, designToLink, libraryDesigns, saveToLibrary, removeFromLibrary } from './store.js';
 import { $, h, toast, toastError, download, dialog, choose } from './dom.js';
@@ -218,6 +218,21 @@ export function openClassFromUrl(params) {
   const q = params.toString();
   history.replaceState(null, '', `${location.pathname}${q ? `?${q}` : ''}${location.hash}`);
   fetchClass(url);
+}
+
+// #playground=<fragment>: a class the playground handed over (its "Open in
+// Layout Editor"). The first file is the app; it replaces the design the way
+// Open ABAP class does, and the address is cleaned either way.
+export async function openClassFromPlayground() {
+  if (!location.hash.startsWith('#playground=')) return;
+  const fragment = location.hash.slice('#playground='.length);
+  history.replaceState(null, '', location.pathname + location.search);
+  try {
+    const [app] = await filesFromPlaygroundFragment(fragment);
+    importClassText(app.source);
+  } catch (err) {
+    toast(`Cannot open the class from the playground: ${err.message}`);
+  }
 }
 
 async function fetchClass(raw) {
