@@ -8,21 +8,21 @@
 // design document (model.js) in src/ui/store.js; every edit goes through
 // commit( ), which records undo, saves to localStorage and tells this
 // module, which renders the panels (src/ui/*.js).
-import { validate, checkClassName } from './model.js';
+import { validate, checkClassName, normalizeDesign } from './model.js';
 import { generateClass, fileName } from './abap.js';
 import { generateClassSource } from './clas.js';
 import { toXml } from './xml.js';
-import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection } from './ui/store.js';
+import { state, on, loadPrefs, savePrefs, loadDesign, designFromLink, replaceDesign, commit, undo, redo, select, showPanel, labelOfSelection, isUi5Url, onOtherTab } from './ui/store.js';
 import { $, toast, download } from './ui/dom.js';
-import { renderInsert, renderInsertTarget } from './ui/insert.js';
+import { renderInsert, renderInsertTarget, onInsertKey } from './ui/insert.js';
 import { renderLayers, onLayersKey, clearDropMarks, renderCrumbs } from './ui/layers.js';
 import { renderInspector } from './ui/inspector.js';
 import { renderData, renderIssues } from './ui/data.js';
-import { renderCode, highlightCode, setCode, setView, copyText } from './ui/code.js';
-import { loadPreview, postPreview, sendPreview } from './ui/preview.js';
-import { handleDrop, copySelection, pasteSelection, addControlByName } from './ui/edit.js';
+import { renderCode, highlightCode, setCode, setView, copyText, codeText } from './ui/code.js';
+import { loadPreview, postPreview, sendPreview, renderEventLog } from './ui/preview.js';
+import { handleDrop, copySelection, pasteSelection, addControlByName, addControl } from './ui/edit.js';
 import { openPalette } from './ui/palette.js';
-import { newDialog, importDialog, openClassDialog, openClassFromUrl, openClassFromPlayground, recentDialog, shareLink, openFile, saveDesign, exportZip, openInPlayground, openInVscode } from './ui/files.js';
+import { newDialog, importDialog, openClassDialog, openClassFromUrl, openClassFromPlayground, recentDialog, shareLink, openFile, saveDesign, saveToBrowser, exportZip, openInPlayground, openInVscode } from './ui/files.js';
 import { onKey } from './ui/keys.js';
 
 
@@ -46,6 +46,16 @@ function wireMenu(button, menu) {
   button.addEventListener('keydown', onEscape);
 }
 
+
+// the editor's own appearance: as the system, light or dark - the canvas
+// keeps the UI5 theme chosen for it
+const APPEARANCE = { '': 'as the system', light: 'light', dark: 'dark' };
+function applyAppearance() {
+  const a = state.prefs.appearance || '';
+  if (a) document.documentElement.dataset.theme = a; else delete document.documentElement.dataset.theme;
+  $('#btnTheme').title = `Appearance of the editor: ${APPEARANCE[a]} - click for ${APPEARANCE[{ '': 'light', light: 'dark', dark: '' }[a]]}`;
+  $('#btnTheme').textContent = { '': '◐', light: '☀', dark: '☾' }[a];
+}
 
 function applyWidths() {
   const ws = $('.workspace');
@@ -98,25 +108,47 @@ function renderAll(opts = {}) {
   cn.classList.toggle('invalid', !!checkClassName(d.className));
   if (document.activeElement !== $('#description')) $('#description').value = d.description || '';
   $('#abapRelease').value = d.release || '';
-  renderLayers();
+  // what is not on screen renders when it comes on screen (renderPanel,
+  // setView) - the outline, the data and the class of a large design are
+  // the cost of every keystroke otherwise
+  if (state.panel === 'layers') renderLayers();
   // keep the input being typed into: re-rendering its panel would drop it
   if (!opts.keepFocus || !$('#inspector').contains(document.activeElement)) renderInspector();
-  if (!opts.keepFocus || !$('#dataPanel').contains(document.activeElement)) renderData();
+  if (state.panel === 'data' && (!opts.keepFocus || !$('#dataPanel').contains(document.activeElement))) renderData();
   renderIssues();
   renderCrumbs();
   renderInsertTarget();
-  renderCode();
+  if (state.view !== 'canvas') renderCode();
   sendPreview();
   $('#btnUndo').disabled = !state.undo.length;
   $('#btnRedo').disabled = !state.redo.length;
 }
 
 
-// a UI5 of your own for the canvas: the folder that holds resources/
-const isUi5Url = (v) => /^(https?:\/\/|\.{0,2}\/)[^"'<>\s]*$/.test(v);
+// the tab of the drawer that just opened shows the design as it is now
+function renderPanel() {
+  if (state.panel === 'layers') renderLayers();
+  else if (state.panel === 'data') renderData();
+  else if (state.panel === 'issues') renderIssues();
+}
+
+// the tabs of the drawer: arrow keys go from tab to tab, Home and End to
+// the first and the last, as a tablist does
+function onRailKey(e) {
+  const tabs = [...document.querySelectorAll('.rail-btn')];
+  const i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  const next = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  const t = tabs[(next + tabs.length) % tabs.length];
+  showPanel(t.dataset.panel);
+  t.focus();
+}
 
 function wire() {
   $('#insertSearch').addEventListener('input', renderInsert);
+  $('#panel-insert').addEventListener('keydown', onInsertKey);
   $('#className').addEventListener('input', (e) => {
     const v = e.target.value.toUpperCase().replace(/\s/g, '');
     // the field shows the name the class gets, the caret stays in place
@@ -137,18 +169,28 @@ function wire() {
   $('#btnPlayground').onclick = openInPlayground;
   $('#btnVscode').onclick = openInVscode;
   $('#btnSave').onclick = saveDesign;
+  $('#btnSaveBrowser').onclick = saveToBrowser;
   $('#btnImport').onclick = importDialog;
   $('#btnRecent').onclick = recentDialog;
   $('#btnShare').onclick = shareLink;
   $('#btnUndo').onclick = undo;
+  $('#btnTheme').onclick = () => {
+    state.prefs.appearance = { '': 'light', light: 'dark', dark: '' }[state.prefs.appearance || ''];
+    savePrefs();
+    applyAppearance();
+  };
+  applyAppearance();
   $('#btnRedo').onclick = redo;
   $('#btnCmd').onclick = openPalette;
   $('#btnZip').onclick = exportZip;
   $('#btnZip2').onclick = exportZip;
   $('#btnCopy').onclick = () => copyText(generateClassSource(state.design), 'ABAP');
   $('#btnCopyXml').onclick = () => copyText(toXml(state.design), 'XML');
+  $('#btnCopyCode').onclick = () => { const c = codeText(); copyText(c.text, c.what); };
   $('#btnDownloadAbap').onclick = () => download(fileName(state.design.className, 'clas.abap'), generateClassSource(state.design), 'text/plain');
   for (const b of document.querySelectorAll('.rail-btn')) b.onclick = () => showPanel(b.dataset.panel);
+  $('.rail').addEventListener('keydown', onRailKey);
+  $('#layersFilter').addEventListener('input', (e) => { state.layersFilter = e.target.value; renderLayers(); });
   for (const b of document.querySelectorAll('[data-view]')) b.onclick = () => setView(b.dataset.view);
   for (const b of document.querySelectorAll('[data-code]')) b.onclick = () => setCode(b.dataset.code);
   for (const b of document.querySelectorAll('[data-mode]')) {
@@ -156,20 +198,31 @@ function wire() {
       state.mode = b.dataset.mode;
       for (const x of document.querySelectorAll('[data-mode]')) x.classList.toggle('active', x === b);
       postPreview({ type: 'mode', mode: state.mode });
+      renderEventLog();
     };
   }
   // a click on a line of the class selects the control it writes
   $('#code').addEventListener('click', (e) => {
     const ln = e.target.closest('.ln[data-node]');
-    if (ln && !getSelection().toString()) select(ln.dataset.node, { fromCode: true });
+    if (ln && !getSelection().toString()) select(ln.dataset.node, { fromCode: true, extend: e.ctrlKey || e.metaKey || e.shiftKey });
   });
+  // a device width is the width the view gets: zoomed out, the frame on
+  // screen is that much narrower, the view inside as wide as before
   const setDevice = (w) => {
     state.prefs.device = w;
-    $('#deviceFrame').style.width = w;
+    const z = Number(state.prefs.zoom) || 1;
+    $('#deviceFrame').style.width = w.endsWith('px') ? `${parseFloat(w) * z}px` : w;
+    const f = $('#preview');
+    f.style.zoom = z === 1 ? '' : String(z);
+    f.style.width = z === 1 ? '' : `${100 / z}%`;
+    f.style.height = z === 1 ? '' : `${100 / z}%`;
     for (const b of document.querySelectorAll('[data-device]')) b.classList.toggle('active', b.dataset.device === w);
   };
   setDevice(state.prefs.device);
   for (const b of document.querySelectorAll('[data-device]')) b.onclick = () => { setDevice(b.dataset.device); savePrefs(); };
+  const zoom = $('#zoom');
+  zoom.value = String(Number(state.prefs.zoom) || 1);
+  zoom.onchange = () => { state.prefs.zoom = Number(zoom.value); setDevice(state.prefs.device); savePrefs(); };
   const theme = $('#theme');
   theme.value = state.prefs.theme;
   theme.onchange = () => { state.prefs.theme = theme.value; savePrefs(); loadPreview(); };
@@ -204,13 +257,19 @@ function wire() {
 // ------------------------------------------------------------- start
 
 on('change', scheduleRender);
+// two tabs of the editor share one browser store: the last edit wins
+onOtherTab((json) => toast('Another tab of the editor saved its design over this one - your next edit here wins', {
+  label: 'Load theirs',
+  run: () => { try { replaceDesign(normalizeDesign(JSON.parse(json))); } catch { /* not a design */ } },
+}));
+on('panel', renderPanel);
 on('select', (opts) => {
-  renderLayers();
+  if (state.panel === 'layers') renderLayers();
   renderInspector();
   renderCrumbs();
   renderInsertTarget();
   highlightCode(!opts.fromCode);
-  postPreview({ type: 'select', selected: state.selected, label: labelOfSelection() });
+  postPreview({ type: 'select', selected: state.selected, also: state.also, label: labelOfSelection() });
 });
 
 loadPrefs();
@@ -244,4 +303,4 @@ openClassFromPlayground();
 window.addEventListener('hashchange', openClassFromPlayground);
 
 // for the browser tests and the curious: the state and the generators
-window.designer = { state, generateClass, generateClassSource, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName };
+window.designer = { state, generateClass, generateClassSource, toXml, validate, select, commit, handleDrop, openPalette, copySelection, pasteSelection, addControlByName, addControl };

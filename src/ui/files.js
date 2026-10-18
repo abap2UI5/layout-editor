@@ -7,8 +7,8 @@ import { fileName } from '../abap.js';
 import { fromClass, classReport, classFiles, generateClassSource, sourceUrl, repoClassUrl } from '../clas.js';
 import { playgroundLink, vscodeLink, filesFromPlaygroundFragment, PLAYGROUND_URL } from '../handoff.js';
 import { zip } from '../zip.js';
-import { state, commit, replaceDesign, showPanel, recentDesigns, designToLink } from './store.js';
-import { $, h, toast, download, dialog } from './dom.js';
+import { state, commit, replaceDesign, showPanel, recentDesigns, designToLink, libraryDesigns, saveToLibrary, removeFromLibrary } from './store.js';
+import { $, h, toast, toastError, download, dialog, choose } from './dom.js';
 import { addControlByName } from './edit.js';
 
 export function newDialog() {
@@ -20,28 +20,63 @@ export function newDialog() {
     }, h('b', { text: s.title }), h('span', { text: s.text }))))), [{ text: 'Cancel', action: () => true }]);
 }
 
-// the designs New, Open, Import or a link replaced - back with one click
+// The designs of this browser: those saved under their class name, and
+// those New, Open, Import or a link replaced - back with one click
 export function recentDialog() {
-  const list = recentDesigns();
   const when = (t) => new Date(t).toLocaleString();
-  dialog('Recent designs', list.length
-    ? h('div', { class: 'starters' }, list.map((r) => h('button', {
-      class: 'starter',
-      onclick: () => {
-        try { replaceDesign(normalizeDesign(JSON.parse(r.json))); $('#dlg').close(); toast(`Back to ${r.className}`); } catch (err) { toast(err.message); }
-      },
-    }, h('b', { text: r.className }), h('span', { text: r.description || ' ' }), h('span', { class: 'muted', text: when(r.at) }))))
-    : h('p', { class: 'hint', text: 'Nothing yet - a design lands here when New, Open, Import or a shared link replaces it.' }),
-  [{ text: 'Close', action: () => true }]);
+  const open = (r, what) => {
+    try { replaceDesign(normalizeDesign(JSON.parse(r.json))); $('#dlg').close(); toast(`${what} ${r.className}`); } catch (err) { toastError(err.message); }
+  };
+  const render = () => {
+    const saved = libraryDesigns();
+    const recent = recentDesigns();
+    const card = (r, what, extra) => h('div', { class: 'starter-wrap' },
+      h('button', { class: 'starter', onclick: () => open(r, what) },
+        h('b', { text: r.className }), h('span', { text: r.description || ' ' }), h('span', { class: 'muted', text: when(r.at) })),
+      extra || null);
+    return h('div', {},
+      h('h3', { class: 'dlg-sub', text: 'Saved in this browser' }),
+      saved.length
+        ? h('div', { class: 'starters' }, saved.map((r) => card(r, 'Opened', h('button', {
+          class: 'icon danger remove', title: `Remove ${r.className} from this browser`, 'aria-label': `Remove ${r.className}`,
+          onclick: async () => {
+            const ok = await choose(`Remove ${r.className}?`, 'The design is removed from this browser. A file saved with Save design (.json) stays.', [
+              { text: 'Cancel', value: false }, { text: 'Remove', value: true, primary: true },
+            ]);
+            if (ok) removeFromLibrary(r.className);
+            recentDialog();
+          },
+        }, '✕'))))
+        : h('p', { class: 'hint', text: 'Nothing yet - File, Save in browser keeps the open design here under its class name.' }),
+      h('h3', { class: 'dlg-sub', text: 'Recent - replaced by New, Open, Import or a link' }),
+      recent.length
+        ? h('div', { class: 'starters' }, recent.map((r) => card(r, 'Back to')))
+        : h('p', { class: 'hint', text: 'Nothing yet - a design lands here when New, Open, Import or a shared link replaces it.' }));
+  };
+  dialog('Designs in this browser', render(), [{ text: 'Close', action: () => true }]);
 }
 
-// a link that carries the design - open it anywhere, the editor loads it
+export function saveToBrowser() {
+  try {
+    const had = saveToLibrary(state.design);
+    toast(`${state.design.className} ${had ? 'updated' : 'saved'} in this browser`, { label: 'Show all', run: recentDialog });
+  } catch (err) {
+    toastError(`Not saved in this browser: ${err.message}`);
+  }
+}
+
+// a link that carries the design - open it anywhere, the editor loads it;
+// a link longer than some browsers, chats and mail take says so
+const LONG_LINK = 8000;
 export async function shareLink() {
   try {
     const url = await designToLink(state.design);
-    await copyText(url, 'Link');
+    const copied = await copyText(url, 'Link');
+    if (copied && url.length > LONG_LINK) {
+      toast(`Link copied - ${Math.round(url.length / 1000)} kB long; some chats and mail cut such links. A file is safer.`, { label: 'Save .json', run: saveDesign });
+    }
   } catch (err) {
-    toast(`No link: ${err.message}`);
+    toastError(`No link: ${err.message}`);
   }
 }
 
@@ -210,7 +245,7 @@ async function fetchClass(raw) {
     if (!/^\s*(?:"|\*|CLASS\b)/im.test(text)) throw new Error(`${href} is not an ABAP class`);
     importClassText(text);
   } catch (err) {
-    toast(`Cannot open the class: ${err.message}`);
+    toastError(`Cannot open the class: ${err.message}`);
   }
 }
 
@@ -254,7 +289,7 @@ export async function openInPlayground() {
     const f = classFile();
     window.open(await playgroundLink(f.name, f.source, playgroundBase()), '_blank', 'noopener');
   } catch (err) {
-    toast(`No playground link: ${err.message}`);
+    toastError(`No playground link: ${err.message}`);
   }
 }
 
@@ -265,7 +300,7 @@ export async function openInVscode() {
     location.assign(href);
     toast('Opening in VS Code - the abap2UI5 extension takes the class', { label: 'Copy link', run: () => copyText(href, 'Link') });
   } catch (err) {
-    toast(`No VS Code link: ${err.message}`);
+    toastError(`No VS Code link: ${err.message}`);
   }
 }
 
@@ -291,7 +326,7 @@ export function openFile(accept) {
         throw new Error('not a design (.json), a view (.xml) or a class (.abap)');
       }
     } catch (err) {
-      toast(`Cannot open ${f.name}: ${err.message}`);
+      toastError(`Cannot open ${f.name}: ${err.message}`);
     }
   };
   inp.click();
@@ -303,10 +338,20 @@ export function saveDesign() {
 }
 
 
-export function exportZip() {
+export async function exportZip() {
   const d = state.design;
   const errors = validate(d).filter((i) => i.level === 'error');
-  if (errors.length && !confirm(`${errors.length} problem(s) - the class may not activate:\n\n${errors.slice(0, 5).map((e) => '• ' + e.text).join('\n')}\n\nExport anyway?`)) return;
+  if (errors.length) {
+    const go = await choose(`${errors.length} problem(s) - the class may not activate`, [
+      h('ul', {}, errors.slice(0, 5).map((e) => h('li', { text: e.text }))),
+      errors.length > 5 ? `… and ${errors.length - 5} more under Checks.` : '',
+    ].filter(Boolean), [
+      { text: 'Show the checks', value: 'checks' },
+      { text: 'Export anyway', value: 'export', primary: true },
+    ]);
+    if (go === 'checks') showPanel('issues');
+    if (go !== 'export') return;
+  }
   const bytes = zip(classFiles(d));
   download(`${d.className.toLowerCase().replace(/\//g, '#')}.zip`, new Blob([bytes], { type: 'application/zip' }));
   toast('Exported - abapGit: New Offline, Import ZIP');
