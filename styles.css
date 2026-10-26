@@ -80,7 +80,8 @@ input.invalid { border-color: var(--error); background: color-mix(in srgb, var(-
 .extra { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: start; }
 .extra .prop { min-width: 0; }
 .appbar { display: flex; align-items: center; gap: 14px; padding: 6px 14px; min-height: 52px; background: var(--appbar); color: var(--appbar-text); flex-wrap: wrap; box-shadow: 0 0 0.125rem 0 rgba(34,53,72,.15), 0 0.125rem 0.25rem 0 rgba(34,53,72,.15); position: relative; z-index: 5; }
-.brand { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 700; }
+.brand { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 700; color: inherit; text-decoration: none; }
+.brand:hover .word span { color: var(--text); }
 .brand .mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--emphasized); color: #fff; font: 700 13px var(--mono); }
 .brand .word span { font-weight: 400; color: var(--muted); }
 .classfield { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 260px; }
