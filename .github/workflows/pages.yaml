@@ -28,7 +28,7 @@ jobs:
       # and the tooling
       - run: |
           mkdir _site
-          cp -r index.html preview.html styles.css src _site/
+          cp -r index.html preview.html styles.css logo.png src _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
