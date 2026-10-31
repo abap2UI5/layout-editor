@@ -8,11 +8,13 @@
   --field: #556b82;
   --text: #1d2d3e;
   --muted: #556b82;
-  --accent: #0064d9;
-  --accent-strong: #0040b0;
-  --accent-soft: #ebf8ff;
-  --emphasized: #0070f2;
-  --focus: #0032a5;
+  /* The accent is the red of the abap2UI5 logo, as on every abap2UI5 site
+     (CONVENTION.md in abap2UI5/abap2UI5.github.io); the surface stays Horizon. */
+  --accent: #d03c4a;
+  --accent-strong: #b02e3b;
+  --accent-soft: #fdecee;
+  --emphasized: #d03c4a;
+  --focus: #b02e3b;
   --appbar: #ffffff;
   --appbar-text: #1d2d3e;
   --warn: #e76500;
@@ -33,7 +35,7 @@
   :root:not([data-theme="light"]) {
     /* Horizon Evening */
     --bg: #12171c; --panel: #1d232a; --panel-2: #12171c; --line: #2f3a45; --line-strong: #4e5b68; --field: #8396a8; --text: #eaecee; --muted: #a9b4be;
-    --accent: #4db1ff; --accent-strong: #8cccff; --accent-soft: #1c3b5a; --emphasized: #0070f2; --focus: #8cccff; --appbar: #1d232a; --appbar-text: #eaecee;
+    --accent: #f0606d; --accent-strong: #ff7a86; --accent-soft: #3a1d22; --emphasized: #f0606d; --focus: #ff7a86; --appbar: #1d232a; --appbar-text: #eaecee;
     --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8; --ok: #6ed482; --error: #ff8888; --warn: #ffab1d; --code-hi-line: #ffab1d;
     color-scheme: dark;
   }
@@ -42,7 +44,7 @@
 :root[data-theme="dark"] {
   /* Horizon Evening */
   --bg: #12171c; --panel: #1d232a; --panel-2: #12171c; --line: #2f3a45; --line-strong: #4e5b68; --field: #8396a8; --text: #eaecee; --muted: #a9b4be;
-  --accent: #4db1ff; --accent-strong: #8cccff; --accent-soft: #1c3b5a; --emphasized: #0070f2; --focus: #8cccff; --appbar: #1d232a; --appbar-text: #eaecee;
+  --accent: #f0606d; --accent-strong: #ff7a86; --accent-soft: #3a1d22; --emphasized: #f0606d; --focus: #ff7a86; --appbar: #1d232a; --appbar-text: #eaecee;
   --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8; --ok: #6ed482; --error: #ff8888; --warn: #ffab1d; --code-hi-line: #ffab1d;
   color-scheme: dark;
 }
@@ -65,7 +67,7 @@ button {
 button:hover { border-color: var(--accent); color: var(--accent); }
 button:disabled { opacity: .45; cursor: default; color: inherit; border-color: var(--line-strong); }
 button.primary { background: var(--emphasized); border-color: var(--emphasized); color: #fff; font-weight: 700; }
-button.primary:hover { background: #0064d9; color: #fff; }
+button.primary:hover { background: var(--accent-strong); color: #fff; }
 button.icon { width: 30px; padding: 5px 0; line-height: 1; }
 button.danger:hover { border-color: var(--error); color: var(--error); }
 button.link { border: none; background: none; padding: 0 2px; color: var(--accent); }
