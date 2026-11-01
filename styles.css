@@ -1,51 +1,70 @@
+/* Inter, self-hosted - the face every abap2UI5 tool and site uses
+   (fonts/NOTICE.md). */
+@font-face {
+  font-family: Inter; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("fonts/inter-roman-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: Inter; font-style: italic; font-weight: 100 900; font-display: swap;
+  src: url("fonts/inter-italic-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
-  /* SAP Fiori Horizon, as published in the Fiori design guidelines */
-  --bg: #f5f6f7;
+  /* The palette of the abap2UI5 tools - the Playground, the AI App Builder
+     and the AI Agent wear the same values (src/shell/shell.css in
+     abap2UI5/playground): a sunken page, the work on white cards, one red
+     accent, the red of the logo (CONVENTION.md in
+     abap2UI5/abap2UI5.github.io). The canvas keeps the UI5 theme chosen
+     for it. */
+  --bg: #f4f5f7;
   --panel: #ffffff;
-  --panel-2: #f5f6f7;
-  --line: #e5e5e5;
-  --line-strong: #bcc3ca;
-  --field: #556b82;
-  --text: #1d2d3e;
-  --muted: #556b82;
-  /* The accent is the red of the abap2UI5 logo, as on every abap2UI5 site
-     (CONVENTION.md in abap2UI5/abap2UI5.github.io); the surface stays Horizon. */
+  --panel-2: #f4f5f7;
+  --line: #d9dbe0;
+  --line-strong: #c3c6cd;
+  --field: #c3c6cd;
+  --text: #1c1d21;
+  --muted: #6a6d76;
   --accent: #d03c4a;
   --accent-strong: #b02e3b;
-  --accent-soft: #fdecee;
+  --accent-soft: #fbecee;
   --emphasized: #d03c4a;
-  --focus: #b02e3b;
-  --appbar: #ffffff;
-  --appbar-text: #1d2d3e;
-  --warn: #e76500;
-  --error: #aa0808;
-  --ok: #256f3a;
-  --code-bg: #fbfbfc;
+  --focus: #d03c4a;
+  --glow: color-mix(in srgb, var(--accent) 22%, transparent);
+  --card-shadow: 0 10px 40px rgba(20, 10, 60, .10);
+  --appbar: transparent;
+  --appbar-text: #1c1d21;
+  --warn: #c25e00;
+  --error: #b5253a;
+  --ok: #237a35;
+  --code-bg: #ffffff;
   --code-hi: #fff8d6;
   --code-hi-line: #e76500;
-  --kw: #7a2bc0;
-  --str: #256f3a;
-  --cmt: #758ca4;
-  --radius: 8px;
-  --font: "72", "72full", system-ui, -apple-system, "Segoe UI", Arial, Helvetica, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --kw: #1c3faa;
+  --str: #15713a;
+  --cmt: #8a8d96;
+  --radius: 10px;
+  --pill: 999px;
+  --font: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    /* Horizon Evening */
-    --bg: #12171c; --panel: #1d232a; --panel-2: #12171c; --line: #2f3a45; --line-strong: #4e5b68; --field: #8396a8; --text: #eaecee; --muted: #a9b4be;
-    --accent: #f0606d; --accent-strong: #ff7a86; --accent-soft: #3a1d22; --emphasized: #f0606d; --focus: #ff7a86; --appbar: #1d232a; --appbar-text: #eaecee;
-    --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8; --ok: #6ed482; --error: #ff8888; --warn: #ffab1d; --code-hi-line: #ffab1d;
+    --bg: #1e2024; --panel: #16171a; --panel-2: #1e2024; --line: #303338; --line-strong: #44474e; --field: #44474e; --text: #e6e7ea; --muted: #9a9da6;
+    --accent: #f0606d; --accent-strong: #ff7a86; --accent-soft: #3a1d22; --emphasized: #f0606d; --focus: #f0606d; --appbar-text: #e6e7ea;
+    --code-bg: #16171a; --code-hi: #3a3218; --kw: #8ab8ff; --str: #7ed49a; --cmt: #8a8d96; --ok: #5cc472; --error: #ff8092; --warn: #ffab1d; --code-hi-line: #ffab1d;
+    --card-shadow: 0 10px 40px rgba(0, 0, 0, .35);
     color-scheme: dark;
   }
 }
 /* chosen in the app bar, whatever the system says */
 :root[data-theme="dark"] {
-  /* Horizon Evening */
-  --bg: #12171c; --panel: #1d232a; --panel-2: #12171c; --line: #2f3a45; --line-strong: #4e5b68; --field: #8396a8; --text: #eaecee; --muted: #a9b4be;
-  --accent: #f0606d; --accent-strong: #ff7a86; --accent-soft: #3a1d22; --emphasized: #f0606d; --focus: #ff7a86; --appbar: #1d232a; --appbar-text: #eaecee;
-  --code-bg: #171d23; --code-hi: #3a3218; --kw: #c99bff; --str: #7fd49b; --cmt: #8396a8; --ok: #6ed482; --error: #ff8888; --warn: #ffab1d; --code-hi-line: #ffab1d;
+  --bg: #1e2024; --panel: #16171a; --panel-2: #1e2024; --line: #303338; --line-strong: #44474e; --field: #44474e; --text: #e6e7ea; --muted: #9a9da6;
+  --accent: #f0606d; --accent-strong: #ff7a86; --accent-soft: #3a1d22; --emphasized: #f0606d; --focus: #f0606d; --appbar-text: #e6e7ea;
+  --code-bg: #16171a; --code-hi: #3a3218; --kw: #8ab8ff; --str: #7ed49a; --cmt: #8a8d96; --ok: #5cc472; --error: #ff8092; --warn: #ffab1d; --code-hi-line: #ffab1d;
+  --card-shadow: 0 10px 40px rgba(0, 0, 0, .35);
   color-scheme: dark;
 }
 
@@ -61,7 +80,7 @@ h3 { font-size: 12px; margin: 0; font-weight: 600; }
 kbd { font: 11px var(--mono); padding: 1px 5px; border-radius: 4px; border: 1px solid currentColor; opacity: .7; }
 
 button {
-  border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--panel); border-radius: var(--pill);
   padding: 5px 10px; cursor: pointer; white-space: nowrap;
 }
 button:hover { border-color: var(--accent); color: var(--accent); }
@@ -97,8 +116,8 @@ input.invalid { border-color: var(--error); background: color-mix(in srgb, var(-
 .appbar button.cmd { border-color: var(--field); color: var(--muted); border-radius: 18px; background: var(--panel-2); }
 button.cmd { display: flex; gap: 10px; align-items: center; min-width: 210px; justify-content: space-between; opacity: .9; }
 .menu-wrap { position: relative; display: flex; }
-.menu-wrap.split .primary:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-.menu-wrap.split .caret { border-radius: 0 var(--radius) var(--radius) 0; border-left: 1px solid rgba(255,255,255,.45); padding: 5px 8px; }
+.menu-wrap.split .primary:first-child { border-radius: var(--pill) 0 0 var(--pill); padding-left: 14px; }
+.menu-wrap.split .caret { border-radius: 0 var(--pill) var(--pill) 0; border-left: 1px solid rgba(255,255,255,.45); padding: 5px 8px; }
 .menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 230px; display: flex; flex-direction: column; padding: 5px;
   background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.18);
@@ -365,3 +384,87 @@ table.keys td:first-child { white-space: nowrap; width: 1%; }
 .lrow .evt { color: var(--warn); font-size: 10px; }
 .code-head #btnCopyCode { margin-left: auto; padding: 2px 10px; font-size: 12px; border-color: transparent; background: transparent; color: var(--accent); }
 .code-head #btnCopyCode:hover { background: var(--accent-soft); }
+
+/* ---------------------------------------------- the abap2UI5 tools' look
+   The Layout Editor wears what the Playground, the AI App Builder and the
+   AI Agent wear (abap2UI5/playground, src/shell/shell.css): the bar on the
+   sunken page with the tool's name in the accent as the menu of all four
+   tools, the work on white cards with an 18px radius, a hairline and a soft
+   shadow, 14px apart, and pills for everything that is pressed - the
+   segmented controls as the AI App Builder's Preview / Code / Split. */
+body { font-size: 13px; }
+input, select, textarea { border-color: var(--line); border-radius: 8px; padding: 5px 9px; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+button.primary { box-shadow: 0 2px 12px var(--glow); }
+button.icon { width: 32px; height: 32px; padding: 0; border-radius: 10px; }
+
+/* the bar */
+.appbar { background: transparent; box-shadow: none; padding: 10px 16px; gap: 12px; min-height: 0; }
+.brand-row { display: flex; align-items: center; gap: .45rem; }
+.brand { gap: .45rem; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.brand .mark { width: 20px; height: 20px; }
+.brand:hover .word { color: var(--text); }
+.tool-switch-name,
+.appbar button.tool-switch-name {
+  display: inline-flex; align-items: center; gap: .3rem; margin-left: -.2rem; padding: .1rem .5rem .1rem .45rem;
+  border: 0; border-radius: var(--pill); background: transparent; color: var(--accent);
+  font-size: 15px; font-weight: 700; letter-spacing: -.01em;
+}
+.tool-switch-name::after { content: "▾"; font-size: 11px; opacity: .7; }
+.appbar button.tool-switch-name:hover,
+.appbar button.tool-switch-name[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent); }
+.menu.tool-menu { width: min(22rem, calc(100vw - 24px)); padding: 6px; gap: 2px; border-radius: 14px; box-shadow: 0 16px 48px rgba(20, 10, 60, .18); }
+.tool-menu-head { padding: 4px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tool-menu a { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 10px; color: var(--text); text-decoration: none; line-height: 1.4; }
+.tool-menu a b { font-size: 14px; font-weight: 650; }
+.tool-menu a span { color: var(--muted); }
+.tool-menu a:hover { background: var(--panel-2); }
+.tool-menu a[aria-current="page"] { background: var(--accent-soft); }
+.tool-menu a[aria-current="page"] b { color: var(--accent); }
+.classfield label { font-weight: 600; }
+.appbar button.ghost { background: var(--panel); border-color: var(--line); color: var(--text); font-weight: 600; }
+.appbar button.ghost:hover { background: var(--panel); border-color: var(--accent); color: var(--text); }
+.appbar button.ghost.icon { font-size: 15px; }
+.appbar button.cmd { border-color: var(--line); background: var(--panel); color: var(--muted); font-weight: 400; }
+.menu { border-radius: 14px; box-shadow: 0 16px 48px rgba(20, 10, 60, .18); }
+.menu button { border-radius: 8px; }
+.menu button:hover { background: var(--panel-2); color: var(--text); }
+
+/* the cards */
+.workspace { padding: 0 14px 14px; grid-template-columns: var(--drawer-w) 14px minmax(0, 1fr) 14px var(--inspector-w); }
+.resizer { background: transparent; position: relative; }
+.resizer::after { content: ""; position: absolute; top: 30%; bottom: 30%; left: 6px; width: 2px; border-radius: 2px; background: transparent; }
+.resizer:hover, .resizer:active { background: transparent; }
+.resizer:hover::after, .resizer:active::after { background: var(--accent); }
+.drawer, .inspector {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--card-shadow); overflow: hidden;
+}
+.inspector { overflow: auto; }
+.rail { background: transparent; padding: 0 10px; }
+.stage { gap: 0; }
+.stage-bar { background: transparent; border-bottom: 0; padding: 0 0 10px; }
+.stage-body { gap: 14px; }
+.canvas-pane, .code-pane {
+  border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--card-shadow); overflow: hidden;
+}
+.canvas-pane { background: var(--panel-2); }
+.code-pane { background: var(--panel); }
+.code-head { padding: 9px 12px; }
+.crumbs { background: transparent; border-top: 0; padding-top: 8px; }
+.device-frame { border-radius: 12px; }
+
+/* the segmented controls: the AI App Builder's Preview / Code / Split */
+.seg { gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: var(--pill); background: var(--panel); overflow: visible; }
+.seg button { border: 0; border-radius: var(--pill); background: transparent; color: var(--muted); font-weight: 600; padding: 4px 13px; }
+.seg button + button { border-left: 0; }
+.seg button:hover { background: transparent; color: var(--text); }
+.seg button.active { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 2px 12px var(--glow); }
+.seg.small button { padding: 2px 10px; font-size: 12px; }
+.stage-bar select, .stage-bar input { border-radius: var(--pill); padding: 5px 12px; }
+
+@media (max-width: 1280px) {
+  .stage-body.view-split .code-pane { border-top: 1px solid var(--line); }
+}
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; gap: 14px; padding: 0 8px 8px; }
+}
