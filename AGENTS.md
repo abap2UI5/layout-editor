@@ -1,8 +1,8 @@
 # AGENTS.md — abap2UI5 Layout Editor
 
 A browser app that turns a drag-and-drop layout into ONE abap2UI5 app class,
-after the pattern of the SAP Web IDE layout editor, styled after SAP Fiori
-Horizon (no SAP code, icons, fonts or logos in the repository).
+after the pattern of the SAP Web IDE layout editor, in the look of the other
+abap2UI5 tools (no SAP code, icons, fonts or logos in the repository).
 Static files, no build step, no runtime of its own in the generated code.
 English for everything: code, comments, commits, docs.
 
@@ -70,6 +70,18 @@ The product is the generated class. It must:
   `src/ui/dom.js`, never the browser's `confirm( )`.
 - The preview module (`src/preview/init.js`) runs inside UI5 1.71: ES5
   style, `sap.ui.define`, no API newer than 1.71.
+
+## One of four tools
+
+The Playground, the AI App Builder and the AI Agent (abap2UI5/playground)
+and this editor wear one look: the bar on a sunken page with the mark,
+"abap2UI5" and the tool's name in the accent, the work on white cards
+(18px radius, hairline, soft shadow, 14px apart), pills for everything that
+is pressed, Inter (`fonts/`, self-hosted). The tool's name is the menu of
+all four tools; its list in `index.html` is the playground's `TOOLS`
+(`src/shell/tool-switch.mjs` there) - change the two together. The palette
+in `styles.css` is a copy of the playground's `shell.css`, kept equal by
+hand. The canvas keeps the UI5 theme chosen for it.
 
 ## Commands
 

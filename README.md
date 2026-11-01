@@ -10,7 +10,9 @@ and no lock-in: the class is all there is.
 
 The editor follows the familiar pattern of the SAP Web IDE layout editor:
 controls and outline on the left, the canvas in the middle, properties on
-the right. Its look follows the SAP Fiori Horizon design guidelines. It adds
+the right. It wears the look of the other abap2UI5 tools - the Playground,
+the AI App Builder and the AI Agent - and the tool's name in its bar leads to
+each of them. It adds
 one thing of its own: the class is never hidden. Canvas and code sit side by
 side, and selecting a control marks the lines that build it. Clicking a line
 selects the control.
@@ -306,8 +308,9 @@ runtime. Run it when the palette gains a control.
 ## Standards, and what is not used
 
 The layout follows the established pattern of UI5 layout editors; the
-colors, spacing and controls of the editor follow the public SAP Fiori
-Horizon design guidelines. No SAP code, icons, fonts or logos are part of
+colors, spacing and controls of the editor are those of the other abap2UI5
+tools, and the type is Inter (SIL Open Font License, `fonts/NOTICE.md`).
+No SAP code, icons, fonts or logos are part of
 this repository. The canvas loads OpenUI5 (Apache 2.0) from the OpenUI5 CDN
 at runtime.
 

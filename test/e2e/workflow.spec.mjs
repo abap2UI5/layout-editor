@@ -318,7 +318,7 @@ test('the editor is light, dark or as the system, and keeps the choice', async (
   expect(await theme()).toBe('light');
   await page.locator('#btnTheme').click();
   expect(await theme()).toBe('dark');
-  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(18, 23, 28)');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(30, 32, 36)');
   // kept with the preferences (a reload here would start from a cleared store)
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('abap2ui5-designer:prefs')).appearance)).toBe('dark');
 });

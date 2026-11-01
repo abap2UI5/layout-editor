@@ -163,6 +163,10 @@ function wire() {
   $('#abapRelease').addEventListener('change', (e) => commit((d) => { if (e.target.value) d.release = e.target.value; else delete d.release; }));
   wireMenu($('#btnFile'), $('#fileMenu'));
   wireMenu($('#btnExport'), $('#exportMenu'));
+  // the menu of the four abap2UI5 tools behind the tool's name; the one on
+  // screen is not opened again - that would only reload the editor
+  wireMenu($('#btnTools'), $('#toolMenu'));
+  $('#toolMenu a[aria-current]').addEventListener('click', (e) => e.preventDefault());
   $('#btnNew').onclick = newDialog;
   $('#btnOpen').onclick = () => openFile('.json,.xml,.abap');
   $('#btnOpenClass').onclick = openClassDialog;

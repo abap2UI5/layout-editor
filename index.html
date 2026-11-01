@@ -10,10 +10,27 @@
 </head>
 <body>
   <header class="appbar">
-    <a class="brand" href="https://abap2ui5.github.io/" title="abap2UI5 Layout Editor - to abap2UI5's home page">
-      <img class="mark" src="logo.png" alt="" width="26" height="26">
-      <span class="word">abap2UI5 <span>Layout Editor</span></span>
-    </a>
+    <!-- The bar every abap2UI5 tool wears (the Playground, the AI App Builder
+         and the AI Agent in abap2UI5/playground): the mark and "abap2UI5" go
+         home, the tool's name in the accent is the menu of all four tools.
+         The list is the playground's TOOLS (src/shell/tool-switch.mjs over
+         there); change the two together. -->
+    <div class="brand-row">
+      <a class="brand" href="https://abap2ui5.github.io/" title="To abap2UI5's home page">
+        <img class="mark" src="logo.png" alt="" width="20" height="20">
+        <span class="word">abap2UI5</span>
+      </a>
+      <div class="menu-wrap tool-switch">
+        <button id="btnTools" class="tool-switch-name" aria-haspopup="menu" aria-expanded="false" title="The abap2UI5 tools - switch to another one">Layout Editor</button>
+        <nav id="toolMenu" class="menu tool-menu" aria-label="abap2UI5 tools" hidden>
+          <span class="tool-menu-head">abap2UI5 tools</span>
+          <a href="https://abap2ui5.github.io/playground/"><b>Playground</b><span>Write ABAP in the browser and watch the app run beside it.</span></a>
+          <a href="./" aria-current="page"><b>Layout Editor</b><span>Design a UI5 view by drag and drop, then export it as an ABAP class.</span></a>
+          <a href="https://abap2ui5.github.io/playground/ai/"><b>AI App Builder</b><span>Describe the app you need. The AI writes it; you download it for abapGit.</span></a>
+          <a href="https://abap2ui5.github.io/playground/pilot/"><b>AI Agent</b><span>Let the AI operate a running app. Describe the task and watch it work.</span></a>
+        </nav>
+      </div>
+    </div>
     <div class="classfield">
       <label for="className">Class</label>
       <input id="className" spellcheck="false" autocomplete="off" maxlength="30">
