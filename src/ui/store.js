@@ -53,12 +53,16 @@ export const state = {
 const TRUSTED_UI5_HOSTS = ['localhost', '127.0.0.1', '[::1]', 'sdk.openui5.org', 'ui5.sap.com', 'openui5.hana.ondemand.com', 'sapui5.hana.ondemand.com'];
 
 // a ?ui5= a link may set: a version, local, a path on this server, or a
-// URL on this host, localhost or one of SAP's UI5 CDNs
+// URL on this host, localhost or one of SAP's UI5 CDNs. A URL is judged
+// by where the browser resolves it: `//host/…` and `/\host/…` look like
+// paths but name another host, so they are refused outright
 export function isLinkableUi5(v) {
-  if (!/^https?:/i.test(v)) return true;
+  if (/^local(?::[\w.-]+)?$/.test(v)) return true;
+  if (/^[\\/]{2}/.test(v)) return false;
   try {
-    const { hostname } = new URL(v);
-    return hostname === location.hostname || TRUSTED_UI5_HOSTS.includes(hostname);
+    const url = new URL(v, location.href);
+    if (url.origin === location.origin) return true;
+    return /^https?:$/.test(url.protocol) && (url.hostname === location.hostname || TRUSTED_UI5_HOSTS.includes(url.hostname));
   } catch { return false; }
 }
 

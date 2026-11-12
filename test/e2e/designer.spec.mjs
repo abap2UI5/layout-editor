@@ -221,6 +221,17 @@ test('copy and paste, by key and across the outline', async ({ designer: page })
   await expect.poll(async () => (await nodeIds(page, 'Switch')).length).toBe(before + 1);
 });
 
+test('a link the clipboard refuses is shown selected, not the code', async ({ designer: page }) => {
+  await page.evaluate(() => { navigator.clipboard.writeText = () => Promise.reject(new Error('denied')); });
+  await page.locator('#btnExport').click();
+  await page.locator('#btnShare').click();
+  const link = page.locator('#dlg input');
+  await expect(link).toHaveValue(/#d=/);
+  await expect(link).toBeFocused();
+  expect(await link.evaluate((el) => el.selectionStart === 0 && el.selectionEnd === el.value.length)).toBe(true);
+  expect(await page.evaluate(() => String(getSelection()))).not.toContain('CLASS');
+});
+
 test('a shared link carries the design, Recent brings the replaced one back', async ({ designer: page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.evaluate(() => window.designer.commit((d) => { d.className = 'ZCL_SHARED'; }));
@@ -391,6 +402,9 @@ test('the canvas boots UI5 from a URL of your own', async ({ page }) => {
   expect(await src('/ui5/mine/resources')).toBe('/ui5/mine/resources/sap-ui-core.js');
   expect(await src('./ui5/resources/sap-ui-core.js')).toBe('./ui5/resources/sap-ui-core.js');
   expect(await src('1.71.80')).toBe('https://sdk.openui5.org/1.71.80/resources/sap-ui-core.js');
+  // a "path" that the browser resolves to another host is refused too
+  expect(await src('//ui5.example.com/1.71.80/')).toBe('https://sdk.openui5.org/resources/sap-ui-core.js');
+  expect(await src('/\\ui5.example.com/1.71.80/')).toBe('https://sdk.openui5.org/resources/sap-ui-core.js');
   expect(await src('/"><b>')).toBe('https://sdk.openui5.org/%2F%22%3E%3Cb%3E/resources/sap-ui-core.js');
   // the editor's field takes the URL and hands it to the canvas
   await page.goto('/index.html');

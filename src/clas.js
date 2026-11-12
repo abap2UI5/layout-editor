@@ -35,7 +35,7 @@
 // gets its WHEN branch in the CASE of on_event. A design without `abap` is
 // generated as always.
 
-import { viewChain, generateClassMap, abapGitFiles, abapType, abapString, fileName } from './abap.js';
+import { viewChain, generateClassMap, abapGitFiles, abapType, abapString, fileName, releaseOf } from './abap.js';
 import { fromXml, importReport, escapeXml, escapeBindingLiteral, isSetValue } from './xml.js';
 import { collectEvents, tableTypes, typeName, clone, walk } from './model.js';
 
@@ -826,18 +826,20 @@ export function classReport() {
 
 // ------------------------------------------------------------- the export
 
-// where a new attribute's declaration goes and what it says
-function declarations(attrs) {
+// where a new attribute's declaration goes and what it says - the table
+// key as src/abap.js writes it for the release (7.02 has no EMPTY KEY)
+function declarations(attrs, release) {
+  const tableKey = release === '702' ? 'WITH DEFAULT KEY' : 'WITH EMPTY KEY';
   const L = [];
   for (const t of attrs.filter((a) => a.type === 'table')) {
     for (const ty of tableTypes(t)) {
       L.push('    TYPES:');
       L.push(`      BEGIN OF ${ty.name},`);
       const w = Math.max(...ty.fields.map((f) => f.name.length));
-      for (const f of ty.fields) L.push(`        ${f.name.toLowerCase().padEnd(w)} TYPE ${f.type === 'table' ? `STANDARD TABLE OF ${typeName(t, [...ty.path, f.name])} WITH EMPTY KEY` : abapType(f.type)},`);
+      for (const f of ty.fields) L.push(`        ${f.name.toLowerCase().padEnd(w)} TYPE ${f.type === 'table' ? `STANDARD TABLE OF ${typeName(t, [...ty.path, f.name])} ${tableKey}` : abapType(f.type)},`);
       L.push(`      END OF ${ty.name}.`);
     }
-    L.push(`    DATA ${t.name} TYPE STANDARD TABLE OF ${typeName(t)} WITH EMPTY KEY.`);
+    L.push(`    DATA ${t.name} TYPE STANDARD TABLE OF ${typeName(t)} ${tableKey}.`);
   }
   for (const a of attrs.filter((a) => a.type !== 'table')) L.push(`    DATA ${a.name} TYPE ${abapType(a.type)}.`);
   return L;
@@ -904,7 +906,7 @@ export function classSource(design) {
   const known = new Set((declared || []).map((n) => n.toLowerCase()));
   const added = design.attributes.filter((a) => !known.has(a.name.toLowerCase()));
   if (added.length && insertAt != null && insertAt <= chain.start) {
-    const decl = declarations(added);
+    const decl = declarations(added, releaseOf(design));
     const before = out.slice(0, insertAt);
     const blankBefore = /\n\n$/.test(before) || before === '';
     const text = (blankBefore ? '' : '\n') + decl.join('\n') + '\n\n';
@@ -1023,5 +1025,8 @@ export function repoClassUrl(className, repo, ref = 'main', path = 'src') {
   if (!m) throw new Error(`${repo} is not owner/repo`);
   if (!/^[A-Za-z0-9_/]+$/.test(className || '')) throw new Error(`${className} is not a class name`);
   const dir = String(path || '').replace(/^\/+|\/+$/g, '');
-  return `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${encodeURIComponent(ref)}/${dir ? `${dir}/` : ''}${fileName(className, 'clas.abap')}`;
+  // a branch like feature/x keeps its slashes; a namespaced class's file
+  // name has # (fileName( ) writes / as #), which a URL takes as fragment
+  const refPath = String(ref).split('/').map(encodeURIComponent).join('/');
+  return `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${refPath}/${dir ? `${dir}/` : ''}${encodeURIComponent(fileName(className, 'clas.abap'))}`;
 }
