@@ -312,6 +312,16 @@ test('public attributes: a comma in a literal, VALUE with READ-ONLY, => in a see
   assert.deepEqual(attrs[0].rows, [{ ID: '1', NAME: 'a\nb' }]);
 });
 
+test('a table added to an imported 7.02 class is declared with the key 7.02 has', () => {
+  const d = fromClass(generateClass(allDesigns702()[0][1]), createDesign());
+  assert.equal(d.release, '702');
+  d.attributes.push({ name: 't_items', type: 'table', fields: [{ name: 'KEY', type: 'string' }, { name: 'SUB', type: 'table', fields: [{ name: 'X', type: 'string' }] }], rows: [] });
+  const out = generateClassSource(d);
+  assert.match(out, /DATA t_items TYPE STANDARD TABLE OF ty_s_items WITH DEFAULT KEY\./);
+  assert.match(out, /sub +TYPE STANDARD TABLE OF \w+ WITH DEFAULT KEY,/);
+  assert.doesNotMatch(out, /WITH EMPTY KEY/);
+});
+
 test('a 7.02 class is 7.02 whatever its builder variable is called', () => {
   const src = generateClass(allDesigns702()[0][1]).replace(/DATA view TYPE REF TO/, 'DATA lo_view TYPE REF TO')
     .replace(/^(\s*)view = /m, '$1lo_view = ').replace(/view->stringify/, 'lo_view->stringify');
@@ -386,7 +396,9 @@ test('where a class may come from', () => {
   assert.throws(() => sourceUrl('https://example.com/x.clas.abap', here), /not from example.com/);
   assert.throws(() => sourceUrl('https://user:pw@raw.githubusercontent.com/a/b/c.clas.abap', here), /user name/);
   assert.equal(repoClassUrl('ZCL_MY_APP', 'abap2UI5/samples'), 'https://raw.githubusercontent.com/abap2UI5/samples/main/src/zcl_my_app.clas.abap');
-  assert.equal(repoClassUrl('/abc/cl_app', 'o/r', 'dev', ''), 'https://raw.githubusercontent.com/o/r/dev/%23abc%23cl_app.clas.abap'.replace(/%23/g, '#'));
+  assert.equal(repoClassUrl('/abc/cl_app', 'o/r', 'dev', ''), 'https://raw.githubusercontent.com/o/r/dev/%23abc%23cl_app.clas.abap');
+  assert.equal(repoClassUrl('ZCL_X', 'o/r', 'feature/x'), 'https://raw.githubusercontent.com/o/r/feature/x/src/zcl_x.clas.abap');
+  assert.equal(repoClassUrl('ZCL_X', 'o/r', 'a b/#c'), 'https://raw.githubusercontent.com/o/r/a%20b/%23c/src/zcl_x.clas.abap');
   assert.throws(() => repoClassUrl('ZCL_X', 'not a repo'), /owner\/repo/);
 });
 

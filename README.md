@@ -193,7 +193,7 @@ Also in the editor:
   `&&` - no inline declarations, string templates or constructor
   expressions. The choice is saved with the design.
 - Every control and property the palette offers exists in **UI5 1.71**:
-  121 controls of sap.m, sap.ui.core, sap.ui.layout, sap.ui.unified,
+  controls of sap.m, sap.ui.core, sap.ui.layout, sap.ui.unified,
   sap.ui.table, sap.f and sap.uxap. A control inserted by class name is
   whatever the canvas's UI5 says it is.
 

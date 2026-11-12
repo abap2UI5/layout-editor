@@ -1,7 +1,7 @@
 // The code pane: the class or the XML view, highlighted, each line linked
 // to the design node that writes it; and the layout / code switches.
 import { state, savePrefs } from './store.js';
-import { $, toast } from './dom.js';
+import { $, h, toast, dialog } from './dom.js';
 import { fileName } from '../abap.js';
 import { classSource } from '../clas.js';
 import { toXml } from '../xml.js';
@@ -132,7 +132,17 @@ export async function copyText(text, what) {
     return true;
   } catch {
     // clipboard refused (no permission, not a secure context): show the
-    // code and select it, so Ctrl+C works
+    // text selected, so Ctrl+C works - a link in a dialog of its own, it
+    // is in no code pane; the code in its pane
+    if (what === 'Link') {
+      const inp = h('input', { value: text, readonly: true, spellcheck: 'false', 'aria-label': 'Link', onfocus: () => inp.select() });
+      dialog('Copy the link', h('div', {},
+        h('p', { class: 'hint', text: 'The browser refused the clipboard. Press Ctrl+C to copy the selected link.' }),
+        inp), [{ text: 'Close', primary: true, action: () => true }]);
+      inp.focus();
+      inp.select();
+      return false;
+    }
     setCode(what === 'XML' ? 'xml' : what === 'Changes' ? 'diff' : 'abap');
     if (state.view === 'canvas') setView('split');
     const range = document.createRange();
